@@ -1,0 +1,188 @@
+/*
+ * USBProtocol_Module.c
+ *
+ * Created: 13/10/2012 00:55:37
+ *  Author: NASSER
+ */ 
+
+#include "USBProtocol_Module.h"
+#include "Generic_Module.h"
+#include "string.h"
+#include "std_defs.h"
+
+#define TRUE  1
+#define FALSE 0
+
+void init_USB()
+{
+	// Initialize appropriate IO for USB Communication
+	MCU_USB_SetAccess();
+	MCU_USB_Initialize();	
+}
+
+void USB_wait_stream (char* data,
+					  unsigned int *length,    // output
+					  unsigned int  max_len,   // input
+					  unsigned int  min_len,   // Minimum length of the stream
+					  unsigned int *time_out) // Timeout variable
+{
+	// Initialize length
+	*length = 0;
+
+	// while we have data (indicated in status register), read it
+	// there is a cap of max_len bytes
+	while (USB_inbound_USB_data() == FALSE && (*time_out) > 1){*time_out = *time_out - 1;} ; // Loop until there is some data
+
+	// Is there timeout? abort in this case
+	if (*time_out == 1)
+	{
+		USB_send_string("exit due to timeout1\n");
+		return;
+	}
+
+	volatile char byte_received = 0;
+	volatile char EOS_detected = 0;
+
+	// Now continue until buffer is empty
+	while ((*length < max_len) && *time_out-- > 1)
+	{
+		// We read as long as there is inbound data, and max-len was not surpassed
+		while ((*length < max_len) && 
+			   (USB_inbound_USB_data() != FALSE) && 
+			   (!EOS_detected))
+		{
+			byte_received = USB_read_byte();
+			data[*length++] = byte_received;
+			
+			// Dynamically check number of bytes received
+			if (*length > max_len) break;
+
+			// Check for signature
+			EOS_detected = ((byte_received == '#') && (*length >= min_len));			
+		}
+
+		// Check for fault detection
+		if (*length >= max_len) break;
+
+		// Ok, now we check if we have detected the sign already
+		if (EOS_detected) break;
+
+		// No, so we wait for more inbound data
+		while (USB_inbound_USB_data() == FALSE && *time_out > 1) { *time_out = *time_out - 1;} ; // Loop until there is some data again...
+	}
+
+	// OK, we're done at this point. Most likely we'll have our packet, unless
+	// there is a timeout, or buffer is bigger than req_size (which means something must've gone wrong)
+	if (!EOS_detected)
+	{
+		USB_send_string("ERR:UNKNOWN!!!\n");
+	}	
+}
+
+void USB_wait_packet(char* data,
+					 unsigned int *length,    // output
+					 unsigned int  req_size,  // input
+					 unsigned int  max_len,	// input
+					 unsigned int *time_out)  // time_out is in/out
+{
+	// Check for errors
+	if (req_size > max_len) return; // Something is wrong...
+
+	// Initialize length
+	*length = 0;
+
+	// while we have data (indicated in status register), read it
+	// there is a cap of max_len bytes
+	while (USB_inbound_USB_data() == 0 && *time_out-- > 1); // Loop until there is some data
+
+	// Is there timeout? abort in this case
+	if (*time_out == 1) return;
+
+	// Now continue until buffer is empty
+	while ((*length < req_size) && *time_out > 1)
+	{
+		// Reduce timeout
+		*time_out = *time_out - 1;
+
+		// We read as long as there is inbound data, and max-len was not surpassed
+		while ((*length < max_len) && (USB_inbound_USB_data() != 0))
+		{
+			data[*length] = USB_read_byte();
+			*length = *length + 1;
+		}
+
+		// Ok, now we check if we have the minimum req_size data we need or not
+		if (*length >= req_size) break;
+
+		// No, so we wait for more inbound data
+		while (USB_inbound_USB_data() == 0 && *time_out > 1){ *time_out = *time_out - 1; } // Loop until there is some data again...
+	}	
+
+}
+
+void USB_send_string(const char* data)
+{
+	volatile unsigned int istrlen = strlen(data);
+	USB_write_data(data, istrlen);
+}
+
+char USB_write_data (const char* data, unsigned int length)
+{
+	MCU_USB_SetAccess();
+	MCU_USB_WriteData(data, length);
+	MCU_USB_FlushOutputData();
+	return length; // We've written these many bytes
+}
+
+void USB_send_immediate(void)
+{
+	MCU_USB_SetAccess();
+	MCU_USB_FlushOutputData();
+}
+
+char USB_inbound_USB_data(void)
+{
+	// Set access
+	MCU_USB_SetAccess();
+	volatile char uInf = MCU_USB_GetInformation();
+	return ((uInf & 0b01) == (0b01)) ? TRUE : FALSE;
+}
+
+void USB_flush_USB_data(void)
+{
+	MCU_USB_SetAccess();
+	MCU_USB_FlushInputData();
+}
+
+char USB_outbound_space(void)
+{
+	MCU_USB_SetAccess();
+	volatile char uInf = MCU_USB_GetInformation();
+	return ((uInf & 0b010) == (0b010)) ? TRUE : FALSE;	
+}
+
+char USB_read_byte(void)
+{
+	// Set access to USB
+	MCU_USB_SetAccess();
+	
+	// Read a byte
+	volatile char uiData = 0;
+	volatile char uiDataRetCount = 0;
+	uiDataRetCount = MCU_USB_GetData(&uiData, 1);
+	return uiData;
+}
+
+char USB_read_status(void)
+{
+	MCU_USB_SetAccess();
+	return (char)(MCU_USB_GetInformation());
+}
+
+char USB_write_byte(char data)
+{
+	MCU_USB_SetAccess();
+	MCU_USB_WriteData(&data,1);
+	return 1; // By default, since only 1 character is read
+}
+
