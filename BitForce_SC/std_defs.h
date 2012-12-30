@@ -27,8 +27,9 @@
 
 
 /*************** XLINK Operations Timeout ***********/
-#define __XLINK_TRANSACTION_TIMEOUT__	800
-#define __XLINK_WAIT_PACKET_TIMEOUT__	400
+#define __XLINK_TRANSACTION_TIMEOUT__	120000000
+#define __XLINK_WAIT_PACKET_TIMEOUT__	4000
+#define __XLINK_ATTEMPT_RETRY_MAXIMUM__ 20
 
 /*************** Firmware Version ******************/
 #define __FIRMWARE_VERSION	"1.0.0"
@@ -38,9 +39,9 @@
 
 ///////////////////////////////////////// typedefs
 // Master Tick Counter (Holds clock in 1uS ticks)
-unsigned long	MAST_TICK_COUNTER;
+long MAST_TICK_COUNTER;
 
-unsigned long	GetTickCount(void);
+long GetTickCount(void);
 void IncrementTickCounter(void);
 
 // Other definitions

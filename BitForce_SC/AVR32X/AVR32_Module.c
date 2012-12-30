@@ -683,7 +683,17 @@ void	__AVR32_LED_Reset(char iLed)
 ISR(__avr32_tmr0_interrupt, 0, 3)
 {
 	// Just increase our counter
-	MAST_TICK_COUNTER += 20;	
+#if defined(__OPERATING_FREQUENCY_32MHz__)
+	MAST_TICK_COUNTER += 20;
+#elif defined(__OPERATING_FREQUENCY_48MHz__)	
+	MAST_TICK_COUNTER += 13;
+#elif defined(__OPERATING_FREQUENCY_64MHz__)
+	MAST_TICK_COUNTER += 10;
+#elif defined(__OPERATING_FREQUENCY_16MHz__)
+	MAST_TICK_COUNTER += 40;
+#else	
+	MAST_TICK_COUNTER += 1;
+#endif
 	
 	// Clear the RTC interrupt.
 	volatile unsigned int umx = AVR32_TC.channel[0].sr; // Read the SR flag to clear the interrupt

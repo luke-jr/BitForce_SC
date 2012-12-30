@@ -42,13 +42,7 @@
 #define CPLD_ADDRESS_IDENTIFICATION	 25
 #define CPLD_ADDRESS_SENDERS_ADRS	 26
 
-
-// Our general buffer, which is 4KB
-char __XLINK_GeneralBuffer[4096];
-unsigned short __XLINK_TotalBytesInGeneralBuffer;
-
-// Addressing is 
-as following:
+// Addressing is as following:
 // 'XLNK' returns the total bytes in XLink General Buffer
 // 'XK<x><y>' Returns the 4 bytes starting at address x * 0x0100 + y
 
@@ -144,7 +138,7 @@ void XLINK_MASTER_transact (char   iAdrs,
 							char*  szResp,
 							unsigned short* response_length,
 							unsigned short  iMaxRespLen,
-							unsigned int    transaction_timeout, // Master timeout
+							long    transaction_timeout, // Master timeout
 							char   *bDeviceNotResponded, // Device did not respond, even to the first packet
 							char   *bTimeoutDetected, // Was a timeout detected?
 							char   bWeAreMaster);
@@ -160,21 +154,21 @@ int XLINK_MASTER_getChainLength(void);
 void XLINK_SLAVE_wait_transact (char  *data,
 								unsigned int *length,
 								unsigned int  max_len,
-								unsigned int transaction_timeout,
+								long transaction_timeout,
 								char  *bTimeoutDetected,
 								char  bWeAreMaster);
 								
 // This is used by slave as well								
 void XLINK_SLAVE_respond_transact  (char  *data,
 									unsigned int length,
-									unsigned int transaction_timeout,
+									long transaction_timeout,
 									char  *bTimeoutDetected,
 									char  bWeAreMaster);
 
 // This function receives data
 void XLINK_wait_packet (char  *data,
 						unsigned int   *length,
-						char  time_out,
+						long  time_out,
 						char  *timeout_detected,
 						char  *senders_address,
 						char  *LP,

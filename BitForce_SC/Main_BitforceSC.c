@@ -216,7 +216,7 @@ int main(void)
 			XLINK_set_cpld_id(0);
 			XLINK_set_cpld_master(TRUE);
 			XLINK_set_cpld_passthrough(FALSE);
-			Management_MASTER_Initialize_XLINK_Chain();	
+			//Management_MASTER_Initialize_XLINK_Chain();	
 		}
 	}
 	else
@@ -374,7 +374,21 @@ static void Protocol_Main(void)
 		else // We listen to XLINK, as we are a chain-slave
 		{
 			// Wait for incoming transactions
-			XLINK_SLAVE_wait_transact(sz_cmd, &i_count, 256, 100, &bTimeoutDetectedOnXLINK, FALSE);
+			bTimeoutDetectedOnXLINK = FALSE;
+			
+			// Run the procedure
+			XLINK_SLAVE_wait_transact(sz_cmd, 
+									 &i_count, 
+									 256, 
+									 __XLINK_TRANSACTION_TIMEOUT__, 
+									 &bTimeoutDetectedOnXLINK, FALSE);
+			
+			// Check for sz_cmd, if it's PUSH then we have an invalid command
+			if ((sz_cmd[0] == 'P') && (sz_cmd[1] == 'U') && (sz_cmd[2] == 'S') && (sz_cmd[3] == 'H'))
+			{
+				XLINK_send_packet(XLINK_get_cpld_id(), "INVA", 4, TRUE, FALSE);
+				continue;
+			}
 			
 			// Check 
 			if (bTimeoutDetectedOnXLINK) continue;			
@@ -493,13 +507,15 @@ PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned shor
 	char  bDeviceNotResponded = 0;
 	char  bTimeoutDetected = 0;
 	
+	for (unsigned int umx = 0; umx < 2048; umx++) szRespData[umx] = 0;
+	
 	XLINK_MASTER_transact(iTarget, 
 						  sz_cmd, 
 						  iCmdLen,
 						  szRespData,
 						  &iRespLen,
 						  2048,					// Maximum response length
-						  __XLINK_TRANSACTION_TIMEOUT__,					// 20000us timeout
+						  __XLINK_TRANSACTION_TIMEOUT__,					
 						  &bDeviceNotResponded,
 						  &bTimeoutDetected,
 						  TRUE);						  
@@ -513,7 +529,8 @@ PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned shor
 	
 	if (bTimeoutDetected)
 	{
-		USB_send_string("ERR:TIMEOUT");
+		sprintf(szRespData,"ERR:TIMEOUT %d\n", bTimeoutDetected);
+		USB_send_string(szRespData);
 		return PROTOCOL_FAILED;		
 	}
 	
@@ -1380,10 +1397,12 @@ static PROTOCOL_RESULT Protocol_xlink_presence_detection()
 	{
 		// Send OK first
 		if (XLINK_ARE_WE_MASTER)
-			USB_send_string("OK\n");  // Send it to USB
+			USB_send_string("PRSN");  // Send it to USB
 		else // We're a slave... send it by XLINK
 		{
-			XLINK_SLAVE_respond_string("OK\n");
+			// XLINK_SLAVE_respond_string("OK\n");
+			char bTimeoutDetected = FALSE;
+			XLINK_SLAVE_respond_transact("PRSN", 4, __XLINK_TRANSACTION_TIMEOUT__, &bTimeoutDetected, FALSE);
 		}			
 	}
 

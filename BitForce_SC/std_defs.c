@@ -7,12 +7,12 @@
 
 #include "std_defs.h"
 
-unsigned long	GetTickCount(void)
+long	GetTickCount(void)
 {
 	return MAST_TICK_COUNTER;
 }
 
-void	   IncrementTickCounter(void)
+void	IncrementTickCounter(void)
 {
 	MAST_TICK_COUNTER++;
 }
