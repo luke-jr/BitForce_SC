@@ -6,8 +6,8 @@
  */ 
 
 #include <avr32/io.h>
-#include "AVR32Modules\intc.h"
-#include "std_defs.h"
+#include "intc.h"
+#include "..\std_defs.h"
 #include "AVR32_Module.h"
 
 //////////////////////////////////////////////
@@ -84,7 +84,7 @@ void __AVR32_LowLevelInitialize()
 }
 
 // A2D Functions
- void  __AVR32_A2D_Initialize()
+void  __AVR32_A2D_Initialize()
 {
 	// Initialize A2D unit
 	AVR32_A2D_MODE_REGISTER = MAKE_DWORD(0b00001000, // Setup/Hold Time = 1000 (binary)
@@ -103,7 +103,7 @@ void __AVR32_LowLevelInitialize()
 													(1<<AVR32_A2D_VCHANNEL_PWR_MAIN)); // Enables channel 1 by default (CORRECT THIS!)
 }
 
- void  __AVR32_A2D_SetAccess()
+void  __AVR32_A2D_SetAccess()
 {
 	// Nothing special for this function
 	return;
@@ -113,9 +113,9 @@ volatile int __AVR32_A2D_GetTemp1 ()
 {
 	// Activate the channel
 	AVR32_A2D_CHANNEL_ENABLE_REGISTER = MAKE_DWORD(0b00000000,
-													0b00000000,
-													0b00000000,
-													(1<<AVR32_A2D_TEMP1_CHANNEL)); // Enables channel 1 by default (CORRECT THIS!)
+												   0b00000000,
+												   0b00000000,
+												   (1<<AVR32_A2D_TEMP1_CHANNEL)); // Enables channel 1 by default (CORRECT THIS!)
 	// Initiate Conversion
 	AVR32_A2D_CONTROL_REGISTER |= (0b010); // Second-Bit activates the START command... thus conversion will start
 
@@ -276,7 +276,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 /////////////////////////////////////////////
 // USB Chip Functions
 /////////////////////////////////////////////
- void	 __AVR32_USB_Initialize()
+void __AVR32_USB_Initialize()
 {
 	// Enable GPIOs on Port A
 	AVR32_GPIO.port[0].gpers =  __AVR32_USB_AD0 | __AVR32_USB_AD1 | __AVR32_USB_AD2 | __AVR32_USB_AD3 |
@@ -294,13 +294,13 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 	AVR32_GPIO.port[0].ovrc  =  __AVR32_USB_A0;
 }
 
- void	 __AVR32_USB_SetAccess()
+void __AVR32_USB_SetAccess()
 {
 	// No conditional access here, we simply return...
 	return;
 }
 
- char __AVR32_USB_WriteData(char* iData, char iCount)
+char __AVR32_USB_WriteData(char* iData, char iCount)
 {
 	// Return if we're zero
 	if (iCount == 0) return 0;
@@ -324,12 +324,11 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 	// Disable output drivers on bus lines
 	AVR32_GPIO.port[0].oderc =  __AVR32_USB_AD0 | __AVR32_USB_AD1 |	__AVR32_USB_AD2 | __AVR32_USB_AD3 |
 								__AVR32_USB_AD4 | __AVR32_USB_AD5 |	__AVR32_USB_AD6 | __AVR32_USB_AD7;
-	
 	// Return
 	return iCount;
 }
 
- int  __AVR32_USB_GetInformation()
+int  __AVR32_USB_GetInformation()
 {
 	// Save actual port state
 	volatile int iActualPortState = (AVR32_GPIO.port[0].oder & 0x0FF);
@@ -356,7 +355,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 	return iRetVal;
 }
 
- char __AVR32_USB_GetData(char* iData, char iMaxCount)
+char __AVR32_USB_GetData(char* iData, char iMaxCount)
 {
 	// Return if we're zero
 	if (iMaxCount == 0) return 0;
@@ -387,7 +386,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 	return i_total_read;
 }
 
- void	 __AVR32_USB_FlushInputData()
+void __AVR32_USB_FlushInputData()
 {
 	// Write data...
 	AVR32_GPIO.port[0].oderc =  __AVR32_USB_AD0 | __AVR32_USB_AD1 |	__AVR32_USB_AD2 | __AVR32_USB_AD3 |
@@ -402,7 +401,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 	}
 }
 
- void	 __AVR32_USB_FlushOutputData()
+void __AVR32_USB_FlushOutputData()
 {
 	// Set A0
 	AVR32_GPIO.port[2].ovrs =  __AVR32_USB_SIWUA;
@@ -412,7 +411,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 ////////////////////////////////////////////
 // CHAIN Functions
 ////////////////////////////////////////////
- void		__AVR32_CPLD_Initialize()
+void __AVR32_CPLD_Initialize()
 {
 	// Enable GPIOs on Port A
 	AVR32_GPIO.port[1].oderc =  __AVR32_CPLD_BUS_ALL | __AVR32_CPLD_RES0 |  __AVR32_CPLD_RES1; // Disable bus output for this time...
@@ -426,12 +425,13 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_CS;
 }
 
- void		__AVR32_CPLD_SetAccess()
+void __AVR32_CPLD_SetAccess()
 {
 	// Nothing needed, the bus is not multiplexed here...
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_CS; // Activate CS and leave it active...
 }
 
- void		__AVR32_CPLD_Write (char iAdrs, char iData)
+void __AVR32_CPLD_Write (char iAdrs, char iData)
 {
 	// Disable CPLDs OE and Select the chip
 	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
@@ -459,7 +459,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 	AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL;
 }
 
- unsigned int	__AVR32_CPLD_Read (char iAdrs)
+unsigned int	__AVR32_CPLD_Read (char iAdrs)
 {
 	// Disable CPLD's OE and Select the chip
 	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
@@ -485,7 +485,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 	AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_OE;
 	
 	// Get the result
-	volatile char iRetVal = (AVR32_GPIO.port[1].pvr & 0x000000FF);
+	volatile int iRetVal = (AVR32_GPIO.port[1].pvr & 0x000000FF);
 	
 	// Disable OE
 	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
@@ -500,7 +500,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 //////////////////////////////////////////////
 // SC Chips
 //////////////////////////////////////////////
- void	__AVR32_SC_Initialize()
+void	__AVR32_SC_Initialize()
 {
 	////////////////// Set SPI1 GPIO settings (Function-A)
 	AVR32_GPIO.port[0].gperc = (AVR32_SPI0_PIN1)  |  (AVR32_SPI0_PIN2)  |  (AVR32_SPI0_PIN3);// SPI0_PIN_MISO;
@@ -513,7 +513,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 
 	// Activate SPI1
 	AVR32_SPI0_CR 	= (1 << 0); // SPIEN = 1
-	AVR32_SPI0_MR 	= (0b01 | (1<<4)); // MSTR = 1, The rest have their default value... ModeFaultDetection disabled
+	AVR32_SPI0_MR   = (0b01 | (1<<4)); // MSTR = 1, The rest have their default value... 
 	AVR32_SPI0_CSR0 = (0b00000000000000000000000000000010) | (1<<8) | (0b01000 << 4)  ; // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 1, BITS = 1000 (16 Bit mode)
 	
 	////////////////// Activate SC_CHIP_DONE
@@ -534,7 +534,7 @@ void __AVR32_ASIC_Deactivate_CS()
 	AVR32_GPIO.port[0].ovrs   = AVR32_SPI0_PIN_NPCS;
 }
 
-void	__AVR32_SPI0_SendWord(unsigned short data)
+void __AVR32_SPI0_SendWord(unsigned short data)
 {
 	// Put data in register and wait until its sent
 	AVR32_SPI0_TDR = (data & 0x0FFFF);
@@ -547,12 +547,12 @@ unsigned short __AVR32_SPI0_ReadWord()
 	return (AVR32_SPI0_RDR & 0x0FFFF);
 }
 
- void	__AVR32_SC_SetAccess()
+void	__AVR32_SC_SetAccess()
 {
 	// Nothing, this is not multiplexed
 }
 
- unsigned int __AVR32_SC_GetDone  (char iChip)
+unsigned int __AVR32_SC_GetDone  (char iChip)
 {
 	if (iChip == 0) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE0) != 0);
 	if (iChip == 1) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE1) != 0);
@@ -564,28 +564,30 @@ unsigned short __AVR32_SPI0_ReadWord()
 	if (iChip == 7) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE7) != 0);
 }
 
- unsigned int __AVR32_SC_ReadData (char iChip, unsigned short iAdrs)
+unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs)
 {
 	volatile unsigned short iCommand = 0;
 	
 	// Generate the command
 	iCommand = (0) |  // RW COMMAND (0 = Read)
-			   (((unsigned int)(iChip & 0x0FF) << 12) & 0b00111000000000000) | // Chip address
-		       (((unsigned int)(iAdrs & 0x0FF) << 8) &  0b00000111100000000); // Engine Address
+			   (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+			   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+		       (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
 		
 	// Send it via SPI
 	__AVR32_SPI0_SendWord(iCommand);
 	return (__AVR32_SPI0_ReadWord() & 0x0FFFF);
 }
 
- unsigned int __AVR32_SC_WriteData(char iChip, unsigned short iAdrs, unsigned int iData)
+unsigned int __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
 {
 	volatile unsigned short iCommand = 0;
 	
 	// Generate the command
 	iCommand = (ASIC_SPI_RW_COMMAND) |  // RW COMMAND (1 = WRITE)
-			   (((unsigned int)(iChip & 0x0FF) << 12) & 0b00111000000000000) | // Chip address
-			   (((unsigned int)(iAdrs & 0x0FF) << 8) &  0b00000111100000000); // Engine Address
+			   (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+			   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+			   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
 							  							  
 	// Send it via SPI
 	__AVR32_SPI0_SendWord(iCommand);
@@ -610,7 +612,7 @@ void	__AVR32_MainLED_Set()
 	AVR32_GPIO.port[0].ovrs  =  __AVR32_MAIN_LED_PIN;
 }
 
- void	__AVR32_MainLED_Reset()
+void	__AVR32_MainLED_Reset()
 {
 	AVR32_GPIO.port[0].ovrc  =  __AVR32_MAIN_LED_PIN;
 }
@@ -618,59 +620,59 @@ void	__AVR32_MainLED_Set()
 //////////////////////////////////////////////////
 // LEDs
 //////////////////////////////////////////////////
- void	__AVR32_LED_Initialize()
+void	__AVR32_LED_Initialize()
 {
 	// Enable GPIOs on Port A
 	AVR32_GPIO.port[1].gpers =  __AVR32_ENGINE_LED1 | __AVR32_ENGINE_LED2 |	__AVR32_ENGINE_LED3 | __AVR32_ENGINE_LED4 |
-								__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8;
+								__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8 ;
 	
 	AVR32_GPIO.port[1].oders =  __AVR32_ENGINE_LED1 | __AVR32_ENGINE_LED2 | __AVR32_ENGINE_LED3 | __AVR32_ENGINE_LED4 |
-								__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8;
+								__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8 ;
 }
 
- void	__AVR32_LED_SetAccess()
+void	__AVR32_LED_SetAccess()
 {
 	// return
 }
 
- void	__AVR32_LED_Set  (char iLed)
+void	__AVR32_LED_Set  (char iLed)
 {
 	if (iLed == 1)
-	AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED1;
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED1;
 	else if (iLed == 2)
-	AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED2;
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED2;
 	else if (iLed == 3)
-	AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED3;
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED3;
 	else if (iLed == 4)
-	AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED4;
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED4;
 	else if (iLed == 5)
-	AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED5;
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED5;
 	else if (iLed == 6)
-	AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED6;
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED6;
 	else if (iLed == 7)
-	AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED7;
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED7;
 	else if (iLed == 8)
-	AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED8;
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED8;
 }
 
- void	__AVR32_LED_Reset(char iLed)
+void	__AVR32_LED_Reset(char iLed)
 {
 	if (iLed == 1)
-	AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED1;
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED1;
 	else if (iLed == 2)
-	AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED2;
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED2;
 	else if (iLed == 3)
-	AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED3;
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED3;
 	else if (iLed == 4)
-	AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED4;
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED4;
 	else if (iLed == 5)
-	AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED5;
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED5;
 	else if (iLed == 6)
-	AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED6;
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED6;
 	else if (iLed == 7)
-	AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED7;
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED7;
 	else if (iLed == 8)
-	AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED8;
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED8;
 }
 
 /////////////////////////////////////////////
@@ -687,7 +689,7 @@ ISR(__avr32_tmr0_interrupt, 0, 3)
 	volatile unsigned int umx = AVR32_TC.channel[0].sr; // Read the SR flag to clear the interrupt
 }
 
-void	__AVR32_Timer_Initialize()
+void __AVR32_Timer_Initialize()
 {
 	// Reset master tick counter
 	MAST_TICK_COUNTER = 0;
@@ -725,18 +727,18 @@ void	__AVR32_Timer_Initialize()
 	Enable_global_interrupt();
 }
 
-void	__AVR32_Timer_SetInterval(unsigned int iPeriod)
+void __AVR32_Timer_SetInterval(unsigned int iPeriod)
 {
 	// Set the RC compare value
 	AVR32_RTC.top = iPeriod; 
 }
 
-void	__AVR32_Timer_Start()
+void __AVR32_Timer_Start()
 {
 	AVR32_RTC.CTRL.en = 1;
 }
 
-void	__AVR32_Timer_Stop()
+void __AVR32_Timer_Stop()
 {
 	// Enable the Timer
 	AVR32_RTC.CTRL.en = 0;
@@ -745,7 +747,7 @@ void	__AVR32_Timer_Stop()
 /////////////////////////////////////////////////
 // FAN Controller
 /////////////////////////////////////////////////
- void	__AVR32_FAN_Initialize()
+ void __AVR32_FAN_Initialize()
 {
 	// Enable GPIOs on Port B
 	AVR32_GPIO.port[1].gpers =  __AVR32_FAN_CTRL0 |	__AVR32_FAN_CTRL1 |	__AVR32_FAN_CTRL2 |	__AVR32_FAN_CTRL3;
@@ -753,12 +755,12 @@ void	__AVR32_Timer_Stop()
 	AVR32_GPIO.port[1].ovrc  =  __AVR32_FAN_CTRL0 |	__AVR32_FAN_CTRL1 |	__AVR32_FAN_CTRL2 |	__AVR32_FAN_CTRL3;
 }
 
- void	__AVR32_FAN_SetAccess()
+ void __AVR32_FAN_SetAccess()
 {
 	// nothing special to do
 }
 
- void	__AVR32_FAN_SetSpeed(char iSpeed)
+ void __AVR32_FAN_SetSpeed(char iSpeed)
 {
 	volatile unsigned int ovr_value = AVR32_GPIO.port[1].ovr;
 	ovr_value = ~( __AVR32_FAN_CTRL3 | __AVR32_FAN_CTRL2 | __AVR32_FAN_CTRL1 | __AVR32_FAN_CTRL0);

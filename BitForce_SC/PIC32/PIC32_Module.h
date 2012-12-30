@@ -42,8 +42,8 @@
  void			__PIC32_SC_Initialize();
  void			__PIC32_SC_SetAccess();
  unsigned int	__PIC32_SC_GetDone  (char iChip);
- unsigned int	__PIC32_SC_ReadData (char iChip, unsigned short iAdrs);
- unsigned int	__PIC32_SC_WriteData(char iChip, unsigned short iAdrs, unsigned int iData);
+ unsigned int	__PIC32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs);
+ unsigned int	__PIC32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData);
 
 // Main LED
  void		__PIC32_MainLED_Initialize();

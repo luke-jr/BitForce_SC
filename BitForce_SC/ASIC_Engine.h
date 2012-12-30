@@ -55,8 +55,10 @@
 
 #define ASIC_SPI_MAP_W0_LWORD	  0b010100000 // COntinues as W0_HWORD, W1_LWORD, W1_HWORD, ... Up to W31
 
-#define ASIC_SPI_READ_STATUS_REGISTER	0b000000000
-#define ASIC_SPI_WRITE_REGISTER			0b000000000
+#define ASIC_SPI_READ_STATUS_REGISTER	0b00000000
+#define ASIC_SPI_WRITE_REGISTER			0b00000000
+
+#define ASIC_SPI_CLOCK_OUT_ENABLE		0b01100001
 
 #define ASIC_SPI_FIFO0_LWORD	  0b010000000 // This is the fifo0 address (Lower 16 Bit) (it applies when reading, so no conflict with MAP_H0...)
 #define ASIC_SPI_FIFO0_HWORD	  0b010000001 // This is the fifo0 address (Lower 16 Bit) (it applies when reading, so no conflict with MAP_H0...)
@@ -118,7 +120,9 @@ int  	ASIC_get_chip_count(void);
 int		ASIC_are_all_engines_done(unsigned short iChip);
 int		ASIC_does_chip_exist(unsigned int iChipIndex);
 int		ASIC_is_processing(void);
-
+void	ASIC_Bootup_Chips(void);
+int		ASIC_GetFrequencyFactor(void);
+void	ASIC_SetFrequencyFactor(int iFreqFactor);
 void		 __ASIC_WriteEngine(char iChip, char iEngine, unsigned int iAddress, unsigned int iData16Bit);
 unsigned int __ASIC_ReadEngine (char iChip, char iEngine, unsigned int iAddress);
 

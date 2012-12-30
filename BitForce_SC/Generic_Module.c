@@ -10,9 +10,9 @@
 #include "std_defs.h"
 
 // Include all headers
-#include "AVR32_Module.h"
-#include "PIC32_Module.h"
-#include "STM32_Module.h"
+#include "AVR32X\AVR32_Module.h"
+#include "PIC32\PIC32_Module.h"
+#include "STM32\STM32_Module.h"
 
 
 // Now it depends which MCU we have chosen
@@ -256,55 +256,55 @@ void MCU_SC_SetAccess()
 unsigned int MCU_SC_GetDone(char iChip)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
-	return __AVR32_SC_GetDone(iChip);
+		return __AVR32_SC_GetDone(iChip);
 	#elif defined( __COMPILING_FOR_STM32__)
-	return __STM32_SC_GetDone(iChip);
+		return __STM32_SC_GetDone(iChip);
 	#elif defined( __COMPILING_FOR_PIC32__)
-	return __PIC32_SC_GetDone(iChip);
+		return __PIC32_SC_GetDone(iChip);
 	#endif
 }
 
 void __MCU_ASIC_Activate_CS(void)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
-	 __AVR32_ASIC_Activate_CS();
+		 __AVR32_ASIC_Activate_CS();
 	#elif defined( __COMPILING_FOR_STM32__)
-	 __STM32_ASIC_Activate_CS();
+		 __STM32_ASIC_Activate_CS();
 	#elif defined( __COMPILING_FOR_PIC32__)
-	 __PIC32_ASIC_Activate_CS();
+		 __PIC32_ASIC_Activate_CS();
 	#endif
 }
  
 void __MCU_ASIC_Deactivate_CS(void)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
-	 __AVR32_ASIC_Deactivate_CS();
+		 __AVR32_ASIC_Deactivate_CS();
 	#elif defined( __COMPILING_FOR_STM32__)
-	 __STM32_ASIC_Deactivate_CS();
+		 __STM32_ASIC_Deactivate_CS();
 	#elif defined( __COMPILING_FOR_PIC32__)
-	 __PIC32_ASIC_Deactivate_CS();
+		 __PIC32_ASIC_Deactivate_CS();
 	#endif
 }
 
-unsigned int MCU_SC_ReadData(char iChip, unsigned short iAdrs)
+unsigned int MCU_SC_ReadData(char iChip, char iEngine, unsigned char iAdrs)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
-	return __AVR32_SC_ReadData(iChip, iAdrs);
+		return __AVR32_SC_ReadData(iChip, iEngine, iAdrs);
 	#elif defined( __COMPILING_FOR_STM32__)
-	return __STM32_SC_ReadData(iChip, iAdrs);
+		return __STM32_SC_ReadData(iChip, iEngine, iAdrs);
 	#elif defined( __COMPILING_FOR_PIC32__)
-	return __PIC32_SC_ReadData(iChip, iAdrs);
+		return __PIC32_SC_ReadData(iChip, iEngine, iAdrs);
 	#endif
 }
 
-unsigned int MCU_SC_WriteData(char iChip, unsigned short iAdrs, unsigned int iData)
+unsigned int MCU_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
-	return __AVR32_SC_WriteData(iChip, iAdrs, iData);
+		return __AVR32_SC_WriteData(iChip, iEngine, iAdrs, iData);
 	#elif defined( __COMPILING_FOR_STM32__)
-	return __STM32_SC_WriteData(iChip, iAdrs, iData);
+		return __STM32_SC_WriteData(iChip, iEngine, iAdrs, iData);
 	#elif defined( __COMPILING_FOR_PIC32__)
-	return __PIC32_SC_WriteData(iChip, iAdrs, iData);
+		return __PIC32_SC_WriteData(iChip, iEngine, iAdrs, iData);
 	#endif
 }
 
@@ -312,11 +312,11 @@ unsigned int MCU_SC_WriteData(char iChip, unsigned short iAdrs, unsigned int iDa
 void	MCU_MainLED_Initialize()
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
-	__AVR32_MainLED_Initialize();
+		__AVR32_MainLED_Initialize();
 	#elif defined( __COMPILING_FOR_STM32__)
-	__STM32_MainLED_Initialize();
+		__STM32_MainLED_Initialize();
 	#elif defined( __COMPILING_FOR_PIC32__)
-	__PIC32_MainLED_Initialize();
+		__PIC32_MainLED_Initialize();
 	#endif
 }
 

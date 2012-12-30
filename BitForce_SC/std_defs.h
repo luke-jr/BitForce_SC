@@ -15,9 +15,9 @@
 
 /*************** Operating Frequency ******************/
 // #define __OPERATING_FREQUENCY_16MHz__
-// #define __OPERATING_FREQUENCY_32MHz__ 
-#define __OPERATING_FREQUENCY_48MHz__
-//#define __OPERATING_FREQUENCY_64MHz__
+#define __OPERATING_FREQUENCY_32MHz__ 
+// #define __OPERATING_FREQUENCY_48MHz__
+// #define __OPERATING_FREQUENCY_64MHz__
 
 /*************** Product Model *********************/
 // #define __PRODUCT_MODEL_JALAPENO__
@@ -25,6 +25,10 @@
 #define __PRODUCT_MODEL_SINGLE__
 // #define __PRODUCT_MODEL_MINIRIG__
 
+
+/*************** XLINK Operations Timeout ***********/
+#define __XLINK_TRANSACTION_TIMEOUT__	800
+#define __XLINK_WAIT_PACKET_TIMEOUT__	400
 
 /*************** Firmware Version ******************/
 #define __FIRMWARE_VERSION	"1.0.0"

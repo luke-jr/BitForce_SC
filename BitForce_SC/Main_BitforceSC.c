@@ -29,7 +29,6 @@
 #include "USBProtocol_Module.h"
 #include "A2D_Module.h"
 #include "ASIC_Engine.h"
-#include "AVR32_Module.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -42,12 +41,6 @@ extern char 		   __buf_job_results_count;  // Total of results in our __buf_job_
 // ========== META FEATURES ============
 // -------------------------------------
 
-// Enable auto-reconfigures if chips loose configuration
-#define __AUTO_RECONFIGURE_ON_CHIP_FAILURE__
-
-// Options are __SYSTEM_AT_16MHz, __SYSTEM_AT_32MHz and __SYSTEM_AT_64MHz
-#define __SYSTEM_AT_16MHz
-
 // Unit Identification String
 #define UNIT_FIRMWARE_ID_STRING	">>>>ID: BitFORCE SC SHA256 Version 1.0>>>>\n"
 #define UNIT_FIRMWARE_REVISION	">>>>REVISION 1.0>>>>"
@@ -57,7 +50,6 @@ extern char 		   __buf_job_results_count;  // Total of results in our __buf_job_
 // -------------------------------------
 // ============ END META ===============
 // -------------------------------------
-
 
 /// ************************ DEBUG
 void dbg_printf(const char* sz_message);
@@ -70,9 +62,6 @@ unsigned int tickcount;
 
 void clear_buffer(char* sz_stream, unsigned int ilen);
 void stream_to_hex(char* sz_stream, char* sz_hex, unsigned int i_stream_len, unsigned int *i_hex_len);
-
-// Prototypes
-void Management_flush_p2p_buffer_into_engines(void);
 
 /// ************************ Protocols
 #define PROTOCOL_RESULT int
@@ -113,11 +102,16 @@ const PROTOCOL_RESULT PROTOCOL_FLASH_FAILED		= 12;
 #define	PROTOCOL_REQ_BUF_STATUS			  	14+65 // O
 #define PROTOCOL_REQ_BUF_FLUSH				16+65 // Q ZQX
 #define PROTOCOL_REQ_GET_VOLTAGES			19+65 // T
+#define PROTOCOL_REQ_PRESENCE_DETECTION		17+65 // R // Respond with something if we don't have an ID attached to us...
 #define PROTOCOL_REQ_GET_CHAIN_LENGTH		23+65 // X
 #define PROTOCOL_REQ_SET_FREQ_FACTOR		21+65 // V
+#define PROTOCOL_REQ_GET_FREQ_FACTOR		10+65 // K
+#define PROTOCOL_REQ_SET_XLINK_ADDRESS		4+65  // E 
+#define PROTOCOL_REQ_XLINK_ALLOW_PASS		7+65  // H 
+#define PROTOCOL_REQ_XLINK_DENY_PASS		8+65  // I
 
 // ***** Functions
-static void 	Protocol_Main					 (void);
+static void 		   Protocol_Main			 (void);
 static PROTOCOL_RESULT Protocol_handle_job		 (void);
 static PROTOCOL_RESULT Protocol_handle_job_p2p	 (void);
 static PROTOCOL_RESULT Protocol_info_request	 (void);
@@ -126,8 +120,8 @@ static PROTOCOL_RESULT Protocol_get_voltages	 (void);
 static PROTOCOL_RESULT Protocol_get_firmware_version(void);
 static PROTOCOL_RESULT Protocol_id				 (void);
 static PROTOCOL_RESULT Protocol_Blink			 (void);
-static PROTOCOL_RESULT Protocol_temperature	 (void);
-static PROTOCOL_RESULT Protocol_chain_forward   (char iTarget, char* sz_cmd, unsigned short iCmdLen);
+static PROTOCOL_RESULT Protocol_temperature		 (void);
+static PROTOCOL_RESULT Protocol_chain_forward    (char iTarget, char* sz_cmd, unsigned short iCmdLen);
 
 // Initiate process for the next job from the buffer
 // And returns previous popped job result
@@ -140,46 +134,19 @@ static PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS (void);
 // This function flushes the P2P FIFO
 static PROTOCOL_RESULT  Protocol_P2P_BUF_FLUSH(void);
 
-// Definition for SPI1 (Base address is 0xFFFF2800 )
-#define AVR32_SPI1_CR			(*((volatile unsigned int*)0xFFFF2800))
-#define AVR32_SPI1_MR			(*((volatile unsigned int*)0xFFFF2804))
-#define AVR32_SPI1_CSR0			(*((volatile unsigned int*)0xFFFF2830))
-#define AVR32_SPI1_TDR			(*((volatile unsigned int*)0xFFFF280C))
-#define AVR32_SPI1_RDR			(*((volatile unsigned int*)0xFFFF2808))
-#define AVR32_SPI1_SR			(*((volatile unsigned int*)0xFFFF2810))
+// This sets/gets our ASICs frequency
+static PROTOCOL_RESULT  Protocol_get_freq_factor(void);
+static PROTOCOL_RESULT  Protocol_set_freq_factor(void);
 
-#define	SPI_STATUS_RDRF			(0b01)
-#define SPI_STATUS_TDRE			(0b010)
-#define	SPI_STATUS_OVRS			(0b01000)
-#define SPI_STATUS_ENDRX		(0b010000)
-#define SPI_STATUS_ENDTX		(0b0100000)
-#define SPI_STATUS_RXBUFF		(0b01000000)
-#define SPI_STATUS_TXBUFF		(0b010000000)
-#define SPI_STATUS_TXEMPTY		(0b01000000000)
+// Our XLINK Support...
+static PROTOCOL_RESULT  Protocol_set_xlink_address(void);
+static PROTOCOL_RESULT  Protocol_xlink_allow_pass(void);
+static PROTOCOL_RESULT  Protocol_xlink_deny_pass(void);
+static PROTOCOL_RESULT  Protocol_xlink_presence_detection(void);
 
-// Disables the SPI and enables CHIP-CE pin
-#define DISABLE_XLINK_SPI		AVR32_SPI1_CR = (1 << 1); \
-								AVR32_GPIO.port[0].gper  |= PIN_XLINK_CE; \
-								AVR32_GPIO.port[0].oderc = PIN_XLINK_CE;
-
-// Enables the SPI and prior to doing so, it disables the XLINK_CE pin
-#define ENABLE_XLINK_SPI		AVR32_GPIO.port[0].gper  &= ~(PIN_XLINK_CE); \
-								AVR32_GPIO.port[0].oderc = PIN_XLINK_CE; \
-								AVR32_SPI1_CR = (1 << 0);
-
-// What interface are we going to use?
-char MAIN_LINK_INTERFACE;
-#define MAIN_LINK_XLINK   1
-#define MAIN_LINK_USB	  0
-
-/// ************************ JTAG
-#define JTAG_EN					(1<<14)
-
-/// ************************ MCU LED
-#define LED_MASK  				(1<<18)
-#define SET_MCU_LED   			AVR32_GPIO.port[0].ovrs = LED_MASK  // output value register set
-#define CLEAR_MCU_LED   		AVR32_GPIO.port[0].ovrc = LED_MASK  // output value register clear
-#define TOGGLE_MCU_LED  		AVR32_GPIO.port[0].ovrr = LED_MASK  // output value register toggle
+// This function initializes the XLINK Chain
+static void	Management_MASTER_Initialize_XLINK_Chain(void);
+static void Management_flush_p2p_buffer_into_engines(void);
 
 void 	init_mcu_led(void);
 void	blink_fast(void);
@@ -194,21 +161,6 @@ int 	Delay_3(void);
 /////////////////////////////////////////////////////////
 /// PROTOCOL
 /////////////////////////////////////////////////////////
-
-//#define PROTOCOL_REQ_INFO_REQUEST			2+65  // C
-//#define PROTOCOL_REQ_HANDLE_JOB			3+65  // D
-//#define PROTOCOL_REQ_HANDLE_JOB_P2POOL	15+65 // P
-//#define PROTOCOL_REQ_GET_STATUS			5+65  // F
-//#define PROTOCOL_REQ_ID					6+65  // G
-//#define PROTOCOL_REQ_GET_FIRMWARE_VERSION	9+65  // J
-//#define PROTOCOL_REQ_TEMPERATURE  		11+65 // L (ZLX)
-//#define PROTOCOL_REQ_BLINK				12+65 // M
-//#define PROTOCOL_REQ_BUF_PUSH_JOB			13+65 // N
-//#define PROTOCOL_REQ_BUF_STATUS			14+65 // O
-//#define PROTOCOL_REQ_BUF_FLUSH			16+65 // Q (ZQX)
-//#define PROTOCOL_REQ_GET_VOLTAGES			19+65 // T
-//#define PROTOCOL_REQ_GET_CHAIN_LENGTH		23+65 // X
-//#define PROTOCOL_REQ_SET_FREQ_FACTOR		21+65 // V
 
 /*!
  * brief Main function. Execution starts here.
@@ -230,11 +182,11 @@ int main(void)
 	
 	// Initialize A2D
 	a2d_init();
-	a2d_get_temp(0); // This is to clear the first invalid conversion result...
-	a2d_get_temp(1); // This is to clear the first invalid conversion result...
-	a2d_get_voltage(0);// This is to clear the first invalid conversion result...
-	a2d_get_voltage(1);// This is to clear the first invalid conversion result...
-	a2d_get_voltage(2);// This is to clear the first invalid conversion result...
+	a2d_get_temp(0);    // This is to clear the first invalid conversion result...
+	a2d_get_temp(1);    // This is to clear the first invalid conversion result...
+	a2d_get_voltage(0); // This is to clear the first invalid conversion result...
+	a2d_get_voltage(1); // This is to clear the first invalid conversion result...
+	a2d_get_voltage(2); // This is to clear the first invalid conversion result...
 	
 	// Initialize timer
 	MCU_Timer_Initialize();
@@ -258,16 +210,32 @@ int main(void)
 		blink_medium(); 
 		
 		// Initialize the XLINK. Interrogate all devices in the chain and assign then addresses
-		XLINK_MASTER_Initialize_Chain();
+		if (XLINK_is_cpld_present() == TRUE)
+		{
+			// We're the master, set proper configuration
+			XLINK_set_cpld_id(0);
+			XLINK_set_cpld_master(TRUE);
+			XLINK_set_cpld_passthrough(FALSE);
+			Management_MASTER_Initialize_XLINK_Chain();	
+		}
 	}
-	
+	else
+	{
+		if (XLINK_is_cpld_present() == TRUE)
+		{
+			// Disable pass-through and set our cpld-address = 255
+			// We later will await enumeration
+			XLINK_set_cpld_id(XLINK_GENERAL_DISPATCH_ADDRESS);
+			// XLINK_set_cpld_id(0x01);
+			XLINK_set_cpld_master(FALSE);
+			XLINK_set_cpld_passthrough(FALSE);
+		}
+	}
 
 	// Go to our protocol main loop
 	Protocol_Main();
-
 	return(0);
 }
-
 
 //////////////////////////////////
 //// PROTOCOL functions
@@ -292,8 +260,7 @@ static void Protocol_Main(void)
 	volatile int i = 10000;
 	unsigned int intercepted_command_length = 0;
 	
-	while (USB_inbound_USB_data() && i-- > 1)
-		USB_read_byte();
+	while (USB_inbound_USB_data() && i-- > 1) USB_read_byte();
 
 	// OK, now the memory on FTDI is empty,
 	// wait for standard packet size
@@ -440,16 +407,22 @@ static void Protocol_Main(void)
 					sz_cmd[1] != PROTOCOL_REQ_BUF_STATUS &&
 					sz_cmd[1] != PROTOCOL_REQ_BUF_FLUSH &&
 					sz_cmd[1] != PROTOCOL_REQ_GET_VOLTAGES &&
+					sz_cmd[1] != PROTOCOL_REQ_GET_CHAIN_LENGTH &&
+					sz_cmd[1] != PROTOCOL_REQ_SET_FREQ_FACTOR &&
+					sz_cmd[1] != PROTOCOL_REQ_GET_FREQ_FACTOR &&
+					sz_cmd[1] != PROTOCOL_REQ_SET_XLINK_ADDRESS	&&
+					sz_cmd[1] != PROTOCOL_REQ_XLINK_ALLOW_PASS &&
+					sz_cmd[1] != PROTOCOL_REQ_XLINK_DENY_PASS &&
+					sz_cmd[1] != PROTOCOL_REQ_PRESENCE_DETECTION &&
 					sz_cmd[1] != PROTOCOL_REQ_GET_STATUS)
-				{
-					
+				{					
 					if (XLINK_ARE_WE_MASTER)
 						USB_send_string("ERR:UNKNOWN COMMAND\n");
 					else
 					{
 						XLINK_SLAVE_respond_transact("ERR:UNKNOWN COMMAND\n", 
 													 sizeof("ERR:UNKNOWN COMMAND\n"), 
-													 300, 
+													 __XLINK_TRANSACTION_TIMEOUT__, 
 													 &bDeviceNotRespondedOnXLINK, 
 													 FALSE);
 					}
@@ -464,46 +437,41 @@ static void Protocol_Main(void)
 					// Forward command to the device in chain...
 					Protocol_chain_forward((char )sz_cmd[2], 
 										   (char*)(sz_cmd+3), 
-										   intercepted_command_length); // Length is always 3				
+										   intercepted_command_length); // Length is always 3	
+										   
+					// Read the leftover
+					/*	if (TRUE)
+						{
+							char szUMX[100];
+							char bTimeout = 0;
+							char bLength = 0;
+							char bSender = 0;
+							char bLP = 0;
+							char bBC = 0;
+							XLINK_wait_packet(szUMX, &bLength, 100, &bTimeout, &bSender, &bLP, &bBC);
+						}		*/	
 				}					
 				else
 				{
 					// We have a valid command, go call its procedure...
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB)
-						Protocol_P2P_BUF_PUSH();
-
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_FLUSH)
-						Protocol_P2P_BUF_FLUSH();
-
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_STATUS)
-						Protocol_P2P_BUF_STATUS();
-
-					if (sz_cmd[1] == PROTOCOL_REQ_INFO_REQUEST)
-						Protocol_info_request();
-
-					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB)
-						Protocol_handle_job();
-
-					if (sz_cmd[1] == PROTOCOL_REQ_ID)
-						Protocol_id();
-						
-					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB_P2POOL)
-						Protocol_handle_job_p2p();
-
-					if (sz_cmd[1] == PROTOCOL_REQ_BLINK)
-						Protocol_Blink();
-
-					if (sz_cmd[1] == PROTOCOL_REQ_TEMPERATURE)
-						Protocol_temperature();
-
-					if (sz_cmd[1] == PROTOCOL_REQ_GET_STATUS)
-						Protocol_get_status();
-						
-					if (sz_cmd[1] == PROTOCOL_REQ_GET_VOLTAGES)
-						Protocol_get_voltages();
-						
-					if (sz_cmd[1] == PROTOCOL_REQ_GET_FIRMWARE_VERSION)
-						Protocol_get_firmware_version();
+					if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB)			Protocol_P2P_BUF_PUSH();
+					if (sz_cmd[1] == PROTOCOL_REQ_BUF_FLUSH)			Protocol_P2P_BUF_FLUSH();
+					if (sz_cmd[1] == PROTOCOL_REQ_BUF_STATUS)			Protocol_P2P_BUF_STATUS();
+					if (sz_cmd[1] == PROTOCOL_REQ_INFO_REQUEST)			Protocol_info_request();
+					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB)			Protocol_handle_job();
+					if (sz_cmd[1] == PROTOCOL_REQ_ID)					Protocol_id();
+					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB_P2POOL)	Protocol_handle_job_p2p();
+					if (sz_cmd[1] == PROTOCOL_REQ_BLINK)				Protocol_Blink();
+					if (sz_cmd[1] == PROTOCOL_REQ_TEMPERATURE)			Protocol_temperature();
+					if (sz_cmd[1] == PROTOCOL_REQ_GET_STATUS)			Protocol_get_status();
+					if (sz_cmd[1] == PROTOCOL_REQ_GET_VOLTAGES)			Protocol_get_voltages();
+					if (sz_cmd[1] == PROTOCOL_REQ_GET_FIRMWARE_VERSION)	Protocol_get_firmware_version();
+					if (sz_cmd[1] == PROTOCOL_REQ_SET_FREQ_FACTOR)		Protocol_set_freq_factor();
+					if (sz_cmd[1] == PROTOCOL_REQ_GET_FREQ_FACTOR)		Protocol_get_freq_factor();
+					if (sz_cmd[1] == PROTOCOL_REQ_SET_XLINK_ADDRESS)	Protocol_set_xlink_address();
+					if (sz_cmd[1] == PROTOCOL_REQ_XLINK_ALLOW_PASS)		Protocol_xlink_allow_pass();
+					if (sz_cmd[1] == PROTOCOL_REQ_XLINK_DENY_PASS)		Protocol_xlink_deny_pass();
+					if (sz_cmd[1] == PROTOCOL_REQ_PRESENCE_DETECTION)   Protocol_xlink_presence_detection();
 				}	
 				
 				// Once we reach here, our procedure has run and we're back to standby...
@@ -531,11 +499,10 @@ PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned shor
 						  szRespData,
 						  &iRespLen,
 						  2048,					// Maximum response length
-						  200,					// 200us timeout
+						  __XLINK_TRANSACTION_TIMEOUT__,					// 20000us timeout
 						  &bDeviceNotResponded,
 						  &bTimeoutDetected,
-						  1);
-						  
+						  TRUE);						  
 					 
 	// Check response errors
 	if (bDeviceNotResponded)
@@ -566,8 +533,14 @@ PROTOCOL_RESULT Protocol_id(void)
 	if (XLINK_ARE_WE_MASTER)
 		USB_send_string(UNIT_ID_STRING);  // Send it to USB
 	else // We're a slave... send it by XLINK
-		XLINK_SLAVE_respond_string(UNIT_ID_STRING);	
-
+	{
+		char bTimeoutDetected = FALSE;
+		XLINK_SLAVE_respond_transact(UNIT_ID_STRING,	
+									 strlen(UNIT_ID_STRING), 
+									 __XLINK_TRANSACTION_TIMEOUT__, 
+									 &bTimeoutDetected, 
+									 FALSE);
+	}
 	// Return our result...
 	return res;
 }
@@ -620,12 +593,18 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	return res;
 }
 
-
 PROTOCOL_RESULT Protocol_Blink(void)
 {
 	// Our result
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
-
+	
+	// Send the OK back first
+	// All is good... sent the identifier and get out of here...
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string("OK\n");  // Send it to USB
+	else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string("OK\n");
+	
 	// All is good... sent the identifier and get out of here...
 	blink_medium();
 	blink_medium();
@@ -650,7 +629,7 @@ PROTOCOL_RESULT Protocol_Blink(void)
 
 // Initiate process for the next job from the buffer
 // And returns previous popped job result
-PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH()
+PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 {
 	// Our result
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
@@ -667,7 +646,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH()
 			unsigned int bXTimeoutDetected = 0;
 			XLINK_SLAVE_respond_transact("ERR:BUFFER FULL\n",
 									sizeof("ERR:BUFFER FULL\n"),
-									300,
+									__XLINK_TRANSACTION_TIMEOUT__,
 									&bXTimeoutDetected,
 									FALSE);
 		}			
@@ -683,7 +662,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH()
 	else
 	{
 		unsigned int bYTimeoutDetected = 0;
-		XLINK_SLAVE_respond_transact("OK\n", sizeof("OK\n"), 300, &bYTimeoutDetected, FALSE);
+		XLINK_SLAVE_respond_transact("OK\n", sizeof("OK\n"), __XLINK_TRANSACTION_TIMEOUT__, &bYTimeoutDetected, FALSE);
 	}
 	
 	// Wait for job data (96 Bytes)
@@ -693,7 +672,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH()
 
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
-		USB_wait_stream(sz_buf, &i_read, 1024, 8+32+12+4+4-1, &i_timeout);
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
 	else
 	{
 		char bTimeoutDetectedX = FALSE;
@@ -711,7 +690,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH()
 			unsigned int bXTimeoutDetected = 0;
 			XLINK_SLAVE_respond_transact("ERR:TIMEOUT\n",
 										sizeof("ERR:TIMEOUT\n"),
-										300,
+										__XLINK_TRANSACTION_TIMEOUT__,
 										&bXTimeoutDetected,
 										FALSE);
 		}
@@ -720,7 +699,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH()
 	}
 
 	// Check integrity
-	if (i_read < sizeof(job_packet_p2p)+16) // Extra 16 bytes are preamble / postamble
+	if (i_read < sizeof(job_packet_p2p)) // Extra 16 bytes are preamble / postamble
 	{
 		sprintf(sz_buf, "ERR:INVALID DATA, i_read = %d\n", i_read);
 		
@@ -731,7 +710,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH()
 			unsigned int bXTimeoutDetected = 0;
 			XLINK_SLAVE_respond_transact(sz_buf,
 										strlen(sz_buf),
-										300,
+										__XLINK_TRANSACTION_TIMEOUT__,
 										&bXTimeoutDetected,
 										FALSE);
 		}
@@ -740,7 +719,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH()
 	}
 
 	// All is ok, send data to ASIC for processing, and respond with OK
-	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf+8); // 8 Bytes are for the initial '>>>>>>>>'
+	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf); // 8 Bytes are for the initial '>>>>>>>>'
 	__pipe_push_P2P_job(p_job);
 
 	// Before we return, we must call this function to get buffer loop going...
@@ -754,7 +733,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH()
 		unsigned int bXTimeoutDetected = 0;
 		XLINK_SLAVE_respond_transact("OK:BUFFERED\n",
 									sizeof("OK:BUFFERED\n"),
-									300,
+									__XLINK_TRANSACTION_TIMEOUT__,
 									&bXTimeoutDetected,
 									FALSE);
 	}
@@ -782,7 +761,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_FLUSH(void)
 		unsigned int bXTimeoutDetected = 0;
 		XLINK_SLAVE_respond_transact("OK\n",
 				sizeof("OK\n"),
-				300,
+				__XLINK_TRANSACTION_TIMEOUT__,
 				&bXTimeoutDetected,
 				FALSE);
 	}		
@@ -932,7 +911,7 @@ PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void)
 		unsigned int bXTimeoutDetected = 0;
 		XLINK_SLAVE_respond_transact(sz_rep,
 				strlen(sz_rep),
-				300,
+				__XLINK_TRANSACTION_TIMEOUT__,
 				&bXTimeoutDetected,
 				FALSE);
 	}		
@@ -940,7 +919,6 @@ PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void)
 	// Return the result...
 	return res;
 }
-
 
 PROTOCOL_RESULT Protocol_handle_job(void)
 {
@@ -963,7 +941,7 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	unsigned int i_timeout = 1000000000;
 
 	if (XLINK_ARE_WE_MASTER)
-	    USB_wait_stream(sz_buf, &i_read, 1024, 8+32+12-1, &i_timeout);
+	    USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
 	else
 	{
 		// Wait for incoming transactions
@@ -988,9 +966,9 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	}
 
 	// Check integrity
-	if (i_read < sizeof(job_packet)+16) // Extra 16 bytes are preamble / postamble
+	if (i_read < sizeof(job_packet)) // Extra 16 bytes are preamble / postamble
 	{
-		sprintf(sz_buf, "ERR:INVALID DATA, i_read = %d\n", i_read);
+		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
 		
 		if (XLINK_ARE_WE_MASTER)
 			USB_send_string(sz_buf);  // Send it to USB
@@ -1001,7 +979,7 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	}
 
 	// All is ok, send data to ASIC for processing, and respond with OK
-	pjob_packet p_job = (pjob_packet)(sz_buf+4); // 4 Bytes are for the initial '>>>>'
+	pjob_packet p_job = (pjob_packet)(sz_buf);
 
 	// We have all what we need, send it to ASIC-COMM interface
 	ASIC_job_issue(p_job, 0, 0x0FFFFFFFF);
@@ -1029,9 +1007,7 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	if (XLINK_ARE_WE_MASTER)
 		USB_send_string("OK\n");
 	else
-	{
 		XLINK_SLAVE_respond_string("OK\n");
-	}
 
 	// Wait for job data (96 Bytes)
 	char sz_buf[1024];
@@ -1040,7 +1016,7 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
-		USB_wait_stream(sz_buf, &i_read, 1024, 8+32+12+4+4-1, &i_timeout);
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
 	else
 	{
 		char bTimeoutDetected = FALSE;
@@ -1061,7 +1037,7 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	}
 
 	// Check integrity
-	if (i_read < sizeof(job_packet_p2p)+16) // Extra 16 bytes are preamble / postamble
+	if (i_read < sizeof(job_packet_p2p)) // Extra 16 bytes are preamble / postamble
 	{
 		sprintf(sz_buf, "ERR:INVALID DATA, i_read = %d\n", i_read);
 		
@@ -1074,7 +1050,7 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	}
 
 	// All is ok, send data to ASIC for processing, and respond with OK
-	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf+4); // 4 Bytes are for the initial '>>>>'
+	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf); // 4 Bytes are for the initial '>>>>'
 
 	// We have all what we need, send it to ASIC-COMM interface
 	ASIC_job_issue_p2p(p_job);
@@ -1174,7 +1150,7 @@ PROTOCOL_RESULT Protocol_temperature()
 
 	 // All is good... sent the identifier and get out of here...
 	 char sz_resp[128];
-	 sprintf(sz_resp,"Temp1: %d Temp2: %d\n", temp_val1, temp_val2); // .1f means 1 digit after decimal point, format=floating
+	 sprintf(sz_resp,"Temp1: %d, Temp2: %d\n", temp_val1, temp_val2); // .1f means 1 digit after decimal point, format=floating
 	 
 	 if (XLINK_ARE_WE_MASTER)
 		 USB_send_string(sz_resp);  // Send it to USB
@@ -1208,7 +1184,6 @@ PROTOCOL_RESULT Protocol_get_voltages()
 	 return res;
 }
 
-
 PROTOCOL_RESULT Protocol_get_firmware_version()
 {
 	// Our result
@@ -1224,11 +1199,373 @@ PROTOCOL_RESULT Protocol_get_firmware_version()
 	return res;
 }
 
-///////////////////////////////////////
-//// JOB Scheduler
-///////////////////////////////////////
+// This sets our ASICs frequency
+static PROTOCOL_RESULT  Protocol_get_freq_factor()
+{
+	// Our result
+	PROTOCOL_RESULT result = PROTOCOL_SUCCESS;
 
-void Management_flush_p2p_buffer_into_engines()
+	// Get the frequency factor from engines...
+	char szResp[128];
+	sprintf(szResp,"FREQ:%d\n", ASIC_GetFrequencyFactor());
+	
+	// Send OK first
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string(szResp);  // Send it to USB
+	else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string(szResp);	
+		
+	// We have our frequency factor sent, exit 
+	return result;	
+}
+
+// This sets our ASICs frequency
+static PROTOCOL_RESULT  Protocol_set_freq_factor()
+{
+	// Our result
+	PROTOCOL_RESULT result = PROTOCOL_SUCCESS;
+
+	// Send OK first
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string("OK\n");  // Send it to USB
+	else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string("OK\n");
+		
+	// Wait for 4bytes of frequency factor
+	char sz_buf[1024];
+	unsigned int i_read;
+	unsigned int i_timeout = 1000000000;
+
+	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
+	if (XLINK_ARE_WE_MASTER)
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+	else
+	{
+		char bTimeoutDetected = FALSE;
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 200, &bTimeoutDetected, FALSE);
+		if (bTimeoutDetected) return PROTOCOL_FAILED;
+	}
+
+	// Timeout?
+	if (i_timeout < 2)
+	{
+		if (XLINK_ARE_WE_MASTER)
+			USB_send_string("ERR:TIMEOUT\n");  // Send it to USB
+		else // We're a slave... send it by XLINK
+			XLINK_SLAVE_respond_string("ERR:TIMEOUT\n");
+			
+		return PROTOCOL_TIMEOUT;
+	}
+	
+	// If i_read is not 4, we've got something wrong...
+	if (i_read != 4)
+	{
+		if (XLINK_ARE_WE_MASTER)
+			USB_send_string("ERR:INVALID DATA\n");  // Send it to USB
+		else // We're a slave... send it by XLINK
+			XLINK_SLAVE_respond_string("ERR:INVALID DATA\n");
+		
+		return PROTOCOL_FAILED;		
+	}		
+	
+	// Get the Frequency word 
+	int iFreqFactor = (sz_buf[0]) | (sz_buf[1] << 8) | (sz_buf[2] << 16) | (sz_buf[3] << 24);
+	
+	// Do whatever we want with this iFreqFactor
+	ASIC_SetFrequencyFactor(iFreqFactor);
+	
+	// Say we're ok
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string("OK\n");  // Send it to USB
+	else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string("OK\n");	
+	
+	// We have our frequency factor sent, exit
+	return result;
+}
+
+// Our XLINK Support...
+static PROTOCOL_RESULT  Protocol_set_xlink_address()
+{
+	// Our result
+	PROTOCOL_RESULT result = PROTOCOL_SUCCESS;
+
+	// Do we have CPLD installed at all?
+	if (XLINK_is_cpld_present() == FALSE)
+	{
+		// Send OK first
+		if (XLINK_ARE_WE_MASTER)
+			USB_send_string("ERROR: XLINK NOT PRESENT\n");  // Send it to USB
+		else // We're a slave... send it by XLINK
+			XLINK_SLAVE_respond_string("ERROR: XLINK NOT PRESENT\n");
+	}
+	
+	// Send OK first
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string("OK\n");  // Send it to USB
+	else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string("OK\n");
+		
+	// Wait for 4bytes of frequency factor
+	char sz_buf[1024];
+	unsigned int i_read;
+	unsigned int i_timeout = 1000000000;
+
+	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
+	if (XLINK_ARE_WE_MASTER)
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+	else
+	{
+		char bTimeoutDetected = FALSE;
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 200, &bTimeoutDetected, FALSE);
+		if (bTimeoutDetected) return PROTOCOL_FAILED;
+	}
+
+	// Timeout?
+	if (i_timeout < 2)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		USB_send_string("ERR:TIMEOUT\n");  // Send it to USB
+		else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string("ERR:TIMEOUT\n");
+	
+		return PROTOCOL_TIMEOUT;
+	}
+
+	// If i_read is not 4, we've got something wrong...
+	if (i_read != 4)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		USB_send_string("ERR:INVALID DATA\n");  // Send it to USB
+		else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string("ERR:INVALID DATA\n");
+	
+		return PROTOCOL_FAILED;
+	}
+	
+	// Set the CPLD address
+	XLINK_set_cpld_id(sz_buf[0]);
+	
+	// Also allow pass-through
+	XLINK_set_cpld_passthrough(TRUE);
+			
+	// Say we're ok
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string("OK\n");  // Send it to USB
+	else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string("OK\n");	
+		
+	// We have our frequency factor sent, exit
+	return result;
+	
+}
+
+static PROTOCOL_RESULT Protocol_xlink_presence_detection()
+{
+	// Our result
+	PROTOCOL_RESULT result = PROTOCOL_SUCCESS;
+
+	// Do we have CPLD installed at all?
+	if (XLINK_is_cpld_present() == FALSE)
+	{
+		// Nothing to send
+		return PROTOCOL_SUCCESS;
+	}
+	
+	// Get our ID
+	volatile unsigned char iCPLDId = XLINK_get_cpld_id();
+	
+	// Check if it's not 0x1F
+	if (iCPLDId == XLINK_GENERAL_DISPATCH_ADDRESS)
+	{
+		// Send OK first
+		if (XLINK_ARE_WE_MASTER)
+			USB_send_string("OK\n");  // Send it to USB
+		else // We're a slave... send it by XLINK
+		{
+			XLINK_SLAVE_respond_string("OK\n");
+		}			
+	}
+
+	// We're ok
+	return PROTOCOL_SUCCESS;
+}
+
+static PROTOCOL_RESULT  Protocol_xlink_allow_pass()
+{
+	// Our result
+	PROTOCOL_RESULT result = PROTOCOL_SUCCESS;
+
+	// Do we have CPLD installed at all?
+	if (XLINK_is_cpld_present() == FALSE)
+	{
+		// Send OK first
+		if (XLINK_ARE_WE_MASTER)
+			USB_send_string("ERROR: XLINK NOT PRESENT\n");  // Send it to USB
+		else // We're a slave... send it by XLINK
+			XLINK_SLAVE_respond_string("ERROR: XLINK NOT PRESENT\n");		
+	}
+	
+	// Allow pass through
+	XLINK_set_cpld_passthrough(TRUE);
+
+	// Send OK first
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string("OK\n");  // Send it to USB
+	else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string("OK\n");
+	
+	// We have our frequency factor sent, exit
+	return result;	
+}
+
+static PROTOCOL_RESULT  Protocol_xlink_deny_pass()
+{
+	// Our result
+	PROTOCOL_RESULT result = PROTOCOL_SUCCESS;
+	
+	// Do we have CPLD installed at all?
+	if (XLINK_is_cpld_present() == FALSE)
+	{
+		// Send OK first
+		if (XLINK_ARE_WE_MASTER)
+			USB_send_string("ERROR: XLINK NOT PRESENT\n");  // Send it to USB
+		else // We're a slave... send it by XLINK
+			XLINK_SLAVE_respond_string("ERROR: XLINK NOT PRESENT\n");
+	}
+	
+	// Allow passthrough
+	XLINK_set_cpld_passthrough(FALSE);
+	
+	// Send OK first
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string("OK\n");  // Send it to USB
+	else // We're a slave... send it by XLINK
+		XLINK_SLAVE_respond_string("OK\n");
+
+	// We have our frequency factor sent, exit
+	return result;	
+}
+
+
+//////////////////////////////////
+//// Management functions
+//////////////////////////////////
+
+static void Management_MASTER_Initialize_XLINK_Chain()
+{
+	// What we do here is we keep sending PROTOCOL_PRESENCE_DETECTION until we no longer receive
+	// a response. For each response we receive, we send a SET-ID command. The responding device
+	// we have an ID assigned to it and will no longer response to PROTOCOL_PRESENCE_DETECTION command
+	// OK We've detected a ChainForward request. First Send 'OK' to the host
+		
+	char szRespData[32];
+	char sz_cmd[16];
+	unsigned short iRespLen = 0;
+	char  bDeviceNotResponded = 0;
+	char  bTimeoutDetected = 0;
+	char  iActualID = 1; // The ID we have to assign
+	unsigned int iTotalRetryCount = 0;
+
+	
+	while (TRUE)
+	{
+		// set the proper command
+		sz_cmd[0] = 'Z';
+		sz_cmd[2] = 'X';
+		sz_cmd[1] = PROTOCOL_REQ_PRESENCE_DETECTION;
+		
+		// Clear the response messag
+		szRespData[0] = 0; szRespData[1] = 0; szRespData[2] = 0; szRespData[3] = 0; szRespData[4] = 0;
+		szRespData[5] = 0; szRespData[6] = 0; szRespData[7] = 0; szRespData[8] = 0; szRespData[9] = 0;
+	
+		// Send a message to general dispatch	
+		XLINK_MASTER_transact(XLINK_GENERAL_DISPATCH_ADDRESS,
+							  sz_cmd,
+							  3,
+							  szRespData,
+							  &iRespLen,
+							  128,					// Maximum response length
+							  __XLINK_TRANSACTION_TIMEOUT__,			// 400us timeout
+							  &bDeviceNotResponded,
+							  &bTimeoutDetected,
+							  TRUE);				// We're master
+
+		// Check response errors
+		if (bDeviceNotResponded || bTimeoutDetected)
+		{
+			// We have no more devices...
+			break;
+		}
+
+		// Check response, is it 'Present'?
+		if ((szRespData[0] == 'O') && (szRespData[1] == 'K')) // && (szRespData[2] == 'S') && (szRespData[3] == 'N'))
+		{
+			// We're ok, Blink for a while....
+			// blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();
+		}
+		else
+		{
+			// Exit the loop, we're done with our devices here...
+			break;
+		}
+		
+		// OK, We have 'Present', set the device ID
+		// set the proper command
+		sz_cmd[0] = iActualID;
+		sz_cmd[1] = 0;
+		sz_cmd[2] = 0;
+		sz_cmd[3] = 0;
+		
+		// Clear the response message
+		szRespData[0] = 0; szRespData[1] = 0; szRespData[2] = 0; szRespData[3] = 0; szRespData[4] = 0;
+		szRespData[5] = 0; szRespData[6] = 0; szRespData[7] = 0; szRespData[8] = 0; szRespData[9] = 0;
+		
+		// Send a message to general dispatch
+		 XLINK_MASTER_transact(XLINK_GENERAL_DISPATCH_ADDRESS,
+							  sz_cmd,
+							  4,
+							  szRespData,
+							  &iRespLen,
+							  128,					// Maximum response length
+							  __XLINK_TRANSACTION_TIMEOUT__,					// 400us timeout
+							  &bDeviceNotResponded,
+							  &bTimeoutDetected,
+							  TRUE);				// We're master
+		
+		
+		// Check response errors
+		if (bDeviceNotResponded || bTimeoutDetected)
+		{
+			// We have no more devices...
+			break;
+		}
+
+		// Check response, is it 'Present'?
+		if ((szRespData[0] == 'O') && (szRespData[1] == 'K'))
+		{
+			// We're not OK, try again (unless failure tells us not too)
+			iActualID++;
+		}
+		else
+		{
+			// Exit the loop, we're done with our devices here...
+			iTotalRetryCount++;
+			
+			if (iTotalRetryCount == 5)
+			{
+				// This is a major failure. Blink 50 times and give up
+				for (unsigned int umx = 0; umx < 50; umx++) blink_medium();
+				break;
+			}
+		}		
+	}	
+		
+	// We've been successful
+	return PROTOCOL_SUCCESS;	
+}
+
+static void Management_flush_p2p_buffer_into_engines()
 {
 	// Our flag which tells us where the previous job
 	// was a P2P job processed or not :)

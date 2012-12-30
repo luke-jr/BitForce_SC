@@ -20,7 +20,6 @@ void	USB_wait_packet(char* data,
 void	USB_wait_stream(char* data,
 						unsigned int *length,    // output
 						unsigned int  max_len,   // input
-						unsigned int  min_len,   // Minimum length of the stream
 						unsigned int *time_out); // Timeout variable
 
 void	USB_send_string(const char* data);

@@ -23,7 +23,6 @@ void init_USB()
 void USB_wait_stream (char* data,
 					  unsigned int *length,    // output
 					  unsigned int  max_len,   // input
-					  unsigned int  min_len,   // Minimum length of the stream
 					  unsigned int *time_out) // Timeout variable
 {
 	// Initialize length
@@ -42,6 +41,8 @@ void USB_wait_stream (char* data,
 
 	volatile char byte_received = 0;
 	volatile char EOS_detected = 0;
+	volatile char expected_length = 0;
+	volatile char length_detected = FALSE;
 
 	// Now continue until buffer is empty
 	while ((*length < max_len) && *time_out-- > 1)
@@ -52,23 +53,35 @@ void USB_wait_stream (char* data,
 			   (!EOS_detected))
 		{
 			byte_received = USB_read_byte();
-			data[*length++] = byte_received;
 			
-			// Dynamically check number of bytes received
-			if (*length > max_len) break;
-
+			if (length_detected == FALSE)
+			{
+				// If this is the first byte we're receiving, then it's our length indicator
+				expected_length = byte_received;
+				length_detected = TRUE;
+			}
+			else
+			{			
+				// We take the byte as long as total length is less than maximum length.
+				// Like this if we're in a problematic transaction, we won't encounter buffer overrun
+				// and at the same time we will clear FTDI's buffer for the newer transactions
+				if (*length < max_len) data[*length++] = byte_received;
+			}			
+			
 			// Check for signature
-			EOS_detected = ((byte_received == '#') && (*length >= min_len));			
+			EOS_detected = ((*length >= max_len) || (*length == length_detected));			
 		}
 
-		// Check for fault detection
-		if (*length >= max_len) break;
-
 		// Ok, now we check if we have detected the sign already
-		if (EOS_detected) break;
+		if ((*length >= max_len) || (EOS_detected))
+		{
+			// Read the remainder of bytes in FTDI fifo until it's empty
+			while (USB_inbound_USB_data() == TRUE) { byte_received = USB_read_byte(); } 
+			break;
+		}			 
 
 		// No, so we wait for more inbound data
-		while (USB_inbound_USB_data() == FALSE && *time_out > 1) { *time_out = *time_out - 1;} ; // Loop until there is some data again...
+		while (USB_inbound_USB_data() == FALSE && *time_out > 1) { *time_out = *time_out - 1;} // Loop until there is some data again...
 	}
 
 	// OK, we're done at this point. Most likely we'll have our packet, unless

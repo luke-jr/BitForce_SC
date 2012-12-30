@@ -69,79 +69,79 @@
 #define AVR32_A2D_CDR6								(*((volatile unsigned int*)AVR32_A2D_CDR6_ADRS))
 #define AVR32_A2D_CDR7								(*((volatile unsigned int*)AVR32_A2D_CDR7_ADRS))
 
-#define AVR32_A2D_TEMP1_CHANNEL     (0) // This is the MCU channel we use for the first  temperature sensor
-#define AVR32_A2D_TEMP2_CHANNEL     (1) // This is the MCU channel we use for the second temperature sensor
+#define AVR32_A2D_TEMP1_CHANNEL						(0) // This is the MCU channel we use for the first  temperature sensor
+#define AVR32_A2D_TEMP2_CHANNEL						(1) // This is the MCU channel we use for the second temperature sensor
 
-#define AVR32_A2D_VCHANNEL_3P3V		(3)
-#define AVR32_A2D_VCHANNEL_1V		(2)
-#define AVR32_A2D_VCHANNEL_PWR_MAIN	(4)
+#define AVR32_A2D_VCHANNEL_3P3V						(3)
+#define AVR32_A2D_VCHANNEL_1V						(2)
+#define AVR32_A2D_VCHANNEL_PWR_MAIN					(4)
 
-#define AVR32_A2D_TEMP1_CHANNEL_CDR		AVR32_A2D_CDR0 // This is the MCU channel we use for the first  temperature sensor
-#define AVR32_A2D_TEMP2_CHANNEL_CDR		AVR32_A2D_CDR1 // This is the MCU channel we use for the second temperature sensor
+#define AVR32_A2D_TEMP1_CHANNEL_CDR					AVR32_A2D_CDR0 // This is the MCU channel we use for the first  temperature sensor
+#define AVR32_A2D_TEMP2_CHANNEL_CDR					AVR32_A2D_CDR1 // This is the MCU channel we use for the second temperature sensor
 
-#define AVR32_A2D_VCHANNEL_3P3V_CDR		AVR32_A2D_CDR3
-#define AVR32_A2D_VCHANNEL_1V_CDR		AVR32_A2D_CDR2
-#define AVR32_A2D_VCHANNEL_PWR_MAIN_CDR	AVR32_A2D_CDR4
+#define AVR32_A2D_VCHANNEL_3P3V_CDR					AVR32_A2D_CDR3
+#define AVR32_A2D_VCHANNEL_1V_CDR					AVR32_A2D_CDR2
+#define AVR32_A2D_VCHANNEL_PWR_MAIN_CDR				AVR32_A2D_CDR4
 
-#define __AVR32_FAN_CTRL0	(1<<20)
-#define __AVR32_FAN_CTRL1	(1<<21)
-#define __AVR32_FAN_CTRL2	(1<<22)
-#define __AVR32_FAN_CTRL3	(1<<23)
+#define __AVR32_FAN_CTRL0	 (1<<20)
+#define __AVR32_FAN_CTRL1	 (1<<21)
+#define __AVR32_FAN_CTRL2	 (1<<22)
+#define __AVR32_FAN_CTRL3	 (1<<23)
 
 // Definitions
-#define __AVR32_USB_AD0		(1<<0)	// PORT A
-#define __AVR32_USB_AD1		(1<<1)	// PORT A
-#define __AVR32_USB_AD2		(1<<2)	// PORT A
-#define __AVR32_USB_AD3		(1<<3)	// PORT A
-#define __AVR32_USB_AD4		(1<<4)	// PORT A
-#define __AVR32_USB_AD5		(1<<5)	// PORT A
-#define __AVR32_USB_AD6		(1<<6)	// PORT A
-#define __AVR32_USB_AD7		(1<<7)	// PORT A
+#define __AVR32_USB_AD0		 (1<<0)	// PORT A
+#define __AVR32_USB_AD1		 (1<<1)	// PORT A
+#define __AVR32_USB_AD2		 (1<<2)	// PORT A
+#define __AVR32_USB_AD3		 (1<<3)	// PORT A
+#define __AVR32_USB_AD4		 (1<<4)	// PORT A
+#define __AVR32_USB_AD5		 (1<<5)	// PORT A
+#define __AVR32_USB_AD6		 (1<<6)	// PORT A
+#define __AVR32_USB_AD7		 (1<<7)	// PORT A
 
-#define __AVR32_USB_WR		(1<<8)	// PORT A
-#define __AVR32_USB_RD		(1<<9)	// PORT A
+#define __AVR32_USB_WR		 (1<<8)	// PORT A
+#define __AVR32_USB_RD		 (1<<9)	// PORT A
 
-#define __AVR32_USB_SIWUA	(1<<1)  // PORT C
-#define __AVR32_USB_A0		(1<<4)  // PORT C
-#define __AVR32_USB_CS		(1<<5)  // PORT C
+#define __AVR32_USB_SIWUA	 (1<<1)  // PORT C
+#define __AVR32_USB_A0		 (1<<4)  // PORT C
+#define __AVR32_USB_CS		 (1<<5)  // PORT C
 
 // Chain function definitions
-#define __AVR32_CPLD_BUS0		(1<<0) // PORT B
-#define __AVR32_CPLD_BUS1		(1<<1) // PORT B
-#define __AVR32_CPLD_BUS2		(1<<2) // PORT B
-#define __AVR32_CPLD_BUS3		(1<<3) // PORT B
-#define __AVR32_CPLD_BUS4		(1<<4) // PORT B
-#define __AVR32_CPLD_BUS5		(1<<5) // PORT B
-#define __AVR32_CPLD_BUS6		(1<<6) // PORT B
-#define __AVR32_CPLD_BUS7		(1<<7) // PORT B
-#define __AVR32_CPLD_BUS_ALL	(__AVR32_CPLD_BUS0 | __AVR32_CPLD_BUS1 | __AVR32_CPLD_BUS2 | __AVR32_CPLD_BUS3 | __AVR32_CPLD_BUS4 | __AVR32_CPLD_BUS5 | __AVR32_CPLD_BUS6 | __AVR32_CPLD_BUS7)
-
-#define __AVR32_CPLD_ADRS		(1<<8) // PORT B
-#define __AVR32_CPLD_OE			(1<<9) // PORT B
-
-#define __AVR32_CPLD_RES0		(1<<10) // PORT B
-#define __AVR32_CPLD_RES1		(1<<11) // PORT B
-
-#define __AVR32_CPLD_CS			(1<<26) // PORT A
-#define __AVR32_CPLD_STROBE		(1<<29) // PORT A
-
-// SC Chip interface
-#define AVR32_SPI0_PIN1			(1 << 13) // PORT A
-#define AVR32_SPI0_PIN2			(1 << 12) // PORT A
-#define AVR32_SPI0_PIN3			(1 << 11) // PORT A
-#define AVR32_SPI0_PIN_NPCS		(1 << 10) // PORT A
-
-#define AVR32_SC_CHIP_DONE0		(1 << 12) // PORT B
-#define AVR32_SC_CHIP_DONE1		(1 << 13) // PORT B
-#define AVR32_SC_CHIP_DONE2		(1 << 14) // PORT B
-#define AVR32_SC_CHIP_DONE3		(1 << 15) // PORT B
-#define AVR32_SC_CHIP_DONE4		(1 << 16) // PORT B
-#define AVR32_SC_CHIP_DONE5		(1 << 17) // PORT B
-#define AVR32_SC_CHIP_DONE6		(1 << 18) // PORT B
-#define AVR32_SC_CHIP_DONE7		(1 << 19) // PORT B
-
-// MAIN LED
-#define __AVR32_MAIN_LED_PIN	(1<<18)    // Port A
+#define __AVR32_CPLD_BUS0	 (1<<0) // PORT B
+#define __AVR32_CPLD_BUS1	 (1<<1) // PORT B
+#define __AVR32_CPLD_BUS2	 (1<<2) // PORT B
+#define __AVR32_CPLD_BUS3	 (1<<3) // PORT B
+#define __AVR32_CPLD_BUS4	 (1<<4) // PORT B
+#define __AVR32_CPLD_BUS5	 (1<<5) // PORT B
+#define __AVR32_CPLD_BUS6	 (1<<6) // PORT B
+#define __AVR32_CPLD_BUS7	 (1<<7) // PORT B
+#define __AVR32_CPLD_BUS_ALL (__AVR32_CPLD_BUS0 | __AVR32_CPLD_BUS1 | __AVR32_CPLD_BUS2 | __AVR32_CPLD_BUS3 | __AVR32_CPLD_BUS4 | __AVR32_CPLD_BUS5 | __AVR32_CPLD_BUS6 | __AVR32_CPLD_BUS7)
+							 
+#define __AVR32_CPLD_ADRS	 (1<<8) // PORT B
+#define __AVR32_CPLD_OE		 (1<<9) // PORT B
+							 
+#define __AVR32_CPLD_RES0	 (1<<10) // PORT B
+#define __AVR32_CPLD_RES1	 (1<<11) // PORT B
+							 
+#define __AVR32_CPLD_CS		 (1<<26) // PORT A
+#define __AVR32_CPLD_STROBE	 (1<<29) // PORT A
+							 
+// SC Chip interface		 
+#define AVR32_SPI0_PIN1		 (1 << 13) // PORT A
+#define AVR32_SPI0_PIN2		 (1 << 12) // PORT A
+#define AVR32_SPI0_PIN3		 (1 << 11) // PORT A
+#define AVR32_SPI0_PIN_NPCS	 (1 << 10) // PORT A
+							 
+#define AVR32_SC_CHIP_DONE0	 (1 << 12) // PORT B
+#define AVR32_SC_CHIP_DONE1	 (1 << 13) // PORT B
+#define AVR32_SC_CHIP_DONE2	 (1 << 14) // PORT B
+#define AVR32_SC_CHIP_DONE3	 (1 << 15) // PORT B
+#define AVR32_SC_CHIP_DONE4	 (1 << 16) // PORT B
+#define AVR32_SC_CHIP_DONE5	 (1 << 17) // PORT B
+#define AVR32_SC_CHIP_DONE6	 (1 << 18) // PORT B
+#define AVR32_SC_CHIP_DONE7	 (1 << 19) // PORT B
+							 
+// MAIN LED					 
+#define __AVR32_MAIN_LED_PIN (1<<18)    // Port A
 
 // Side LEDs
 #define __AVR32_ENGINE_LED1  (1<<24)   // PORT B
@@ -153,58 +153,56 @@
 #define __AVR32_ENGINE_LED7  (1<<30)   // PORT B
 #define __AVR32_ENGINE_LED8  (1<<31)   // PORT B
 
-
 //////////////////////////////////////////////
 // FUNCTIONS
 /////////////////////////////////////////////
 
 // General MCU Functions
-void __AVR32_LowLevelInitialize(void);
+volatile void  __AVR32_LowLevelInitialize(void);
 
 // A2D Functions
-void  __AVR32_A2D_Initialize(void);
-void  __AVR32_A2D_SetAccess(void);
-volatile int __AVR32_A2D_GetTemp1(void);
-volatile int __AVR32_A2D_GetTemp2(void);
-volatile int __AVR32_A2D_Get3P3V(void);
-volatile int __AVR32_A2D_Get1V(void);
-volatile int __AVR32_A2D_GetPWR_MAIN(void);
-
+volatile void  __AVR32_A2D_Initialize(void);
+volatile void  __AVR32_A2D_SetAccess(void);
+volatile int   __AVR32_A2D_GetTemp1(void);
+volatile int   __AVR32_A2D_GetTemp2(void);
+volatile int   __AVR32_A2D_Get3P3V(void);
+volatile int   __AVR32_A2D_Get1V(void);
+volatile int   __AVR32_A2D_GetPWR_MAIN(void);
 
 /////////////////////////////////////////////
 // USB Chip Functions
 /////////////////////////////////////////////
 
- void	__AVR32_USB_Initialize(void);
- void	__AVR32_USB_SetAccess(void);
- char	__AVR32_USB_WriteData(char* iData, char iCount);
- int	__AVR32_USB_GetInformation(void);
- char	__AVR32_USB_GetData(char* iData, char iMaxCount);
- void	__AVR32_USB_FlushInputData(void);
- void	__AVR32_USB_FlushOutputData(void);
+void	__AVR32_USB_Initialize(void);
+void	__AVR32_USB_SetAccess(void);
+char	__AVR32_USB_WriteData(char* iData, char iCount);
+int		__AVR32_USB_GetInformation(void);
+char	__AVR32_USB_GetData(char* iData, char iMaxCount);
+void	__AVR32_USB_FlushInputData(void);
+void	__AVR32_USB_FlushOutputData(void);
 
 ////////////////////////////////////////////
 // CHAIN Functions
 ////////////////////////////////////////////
- void		__AVR32_CPLD_Initialize(void);
- void		__AVR32_CPLD_SetAccess(void);
- void		__AVR32_CPLD_Write (char iAdrs, char iData);
- unsigned int	__AVR32_CPLD_Read (char iAdrs);
+void			__AVR32_CPLD_Initialize(void);
+void			__AVR32_CPLD_SetAccess(void);
+void			__AVR32_CPLD_Write (char iAdrs, char iData);
+unsigned int	__AVR32_CPLD_Read (char iAdrs);
 
 //////////////////////////////////////////////
 // SC Chips
 //////////////////////////////////////////////
- void	__AVR32_SC_Initialize(void);
- void	__AVR32_SC_SetAccess(void);
- unsigned int __AVR32_SC_GetDone  (char iChip);
- unsigned int __AVR32_SC_ReadData (char iChip, unsigned short iAdrs);
- unsigned int __AVR32_SC_WriteData(char iChip, unsigned short iAdrs, unsigned int iData);
- 
- void __AVR32_ASIC_Activate_CS(void); 
- void __AVR32_ASIC_Deactivate_CS(void);
+void	__AVR32_SC_Initialize(void);
+void	__AVR32_SC_SetAccess(void);
+unsigned int __AVR32_SC_GetDone  (char iChip);
+unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs);
+unsigned int __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData);
 
- void __AVR32_SPI0_SendWord(unsigned short data);
- unsigned short __AVR32_SPI0_ReadWord(void);
+void __AVR32_ASIC_Activate_CS(void); 
+void __AVR32_ASIC_Deactivate_CS(void);
+
+void __AVR32_SPI0_SendWord(unsigned short data);
+unsigned short __AVR32_SPI0_ReadWord(void);
 
 ////////////////////////////////////////////////////
 // Main LED
@@ -213,14 +211,13 @@ void	__AVR32_MainLED_Initialize(void);
 void	__AVR32_MainLED_Set(void);
 void	__AVR32_MainLED_Reset(void);
 
-
 //////////////////////////////////////////////////
 // LEDs
 //////////////////////////////////////////////////
- void	__AVR32_LED_Initialize(void);
- void	__AVR32_LED_SetAccess(void);
- void	__AVR32_LED_Set  (char iLed);
- void	__AVR32_LED_Reset(char iLed);
+void	__AVR32_LED_Initialize(void);
+void	__AVR32_LED_SetAccess(void);
+void	__AVR32_LED_Set  (char iLed);
+void	__AVR32_LED_Reset(char iLed);
 
 /////////////////////////////////////////////
 // Timer
@@ -233,8 +230,8 @@ void	__AVR32_Timer_Stop(void);
 /////////////////////////////////////////////////
 // FAN Controller
 /////////////////////////////////////////////////
- void	__AVR32_FAN_Initialize(void);
- void	__AVR32_FAN_SetAccess(void);
- void	__AVR32_FAN_SetSpeed(char iSpeed);
+void	__AVR32_FAN_Initialize(void);
+void	__AVR32_FAN_SetAccess(void);
+void	__AVR32_FAN_SetSpeed(char iSpeed);
 
 #endif /* AVR32_MODULE_H_ */

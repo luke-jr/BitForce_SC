@@ -1,3 +1,4 @@
+
 /*
  * A2D_Module.h
  *
@@ -20,8 +21,9 @@
 #define A2D_CHANNEL_3P3V		1
 #define A2D_CHANNEL_PWR_MAIN	2
 
-void  	a2d_init(void);
-volatile int 	a2d_get_temp(unsigned int iChannel); // Can be Channel 0 or Channel 1
-volatile int	a2d_get_voltage(unsigned int iVoltageChannel); // Choose between the available voltage channels
+void  		 a2d_init(void);
+volatile int a2d_get_temp(unsigned int iChannel); // Can be Channel 0 or Channel 1
+volatile int a2d_get_voltage(unsigned int iVoltageChannel); // Choose between the available voltage channels
 
 #endif /* A2D_MODULE_H_ */
+

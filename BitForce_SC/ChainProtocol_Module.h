@@ -40,7 +40,17 @@
 #define CPLD_ADDRESS_RX_BUF_BEGIN 	 10
 #define CPLD_ADDRESS_RX_BUF_END		 17
 #define CPLD_ADDRESS_IDENTIFICATION	 25
+#define CPLD_ADDRESS_SENDERS_ADRS	 26
 
+
+// Our general buffer, which is 4KB
+char __XLINK_GeneralBuffer[4096];
+unsigned short __XLINK_TotalBytesInGeneralBuffer;
+
+// Addressing is 
+as following:
+// 'XLNK' returns the total bytes in XLink General Buffer
+// 'XK<x><y>' Returns the 4 bytes starting at address x * 0x0100 + y
 
 // *** IREG - RX Status (8 Bit)
 //
@@ -111,6 +121,9 @@
 // Variables
 unsigned short XLINK_chain_device_count;
 
+// Our general dispatch address
+#define XLINK_GENERAL_DISPATCH_ADDRESS 0x01F
+
 // Procedures
 void init_XLINK();
 
@@ -131,14 +144,11 @@ void XLINK_MASTER_transact (char   iAdrs,
 							char*  szResp,
 							unsigned short* response_length,
 							unsigned short  iMaxRespLen,
-							unsigned short  transaction_timeout, // Master timeout
+							unsigned int    transaction_timeout, // Master timeout
 							char   *bDeviceNotResponded, // Device did not respond, even to the first packet
 							char   *bTimeoutDetected, // Was a timeout detected?
 							char   bWeAreMaster);
 							
-							
-// The master here attempts to initialize the chain, assign an Address to every device it finds in the chain
-void XLINK_MASTER_Initialize_Chain(void);
 
 // Called by the master, used to determine the chain length
 int XLINK_MASTER_chainDevicesExists(void);
@@ -160,7 +170,6 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 									unsigned int transaction_timeout,
 									char  *bTimeoutDetected,
 									char  bWeAreMaster);
-									
 
 // This function receives data
 void XLINK_wait_packet (char  *data,
@@ -173,6 +182,7 @@ void XLINK_wait_packet (char  *data,
 									  
 char	 XLINK_data_inbound				(void);
 void	 XLINK_set_cpld_id				(char iID);
+char	 XLINK_get_cpld_id				(void);
 void	 XLINK_set_cpld_master			(char bMaster);
 void	 XLINK_set_cpld_passthrough		(char bPassthrough);
 char	 XLINK_get_chain_status			(void);

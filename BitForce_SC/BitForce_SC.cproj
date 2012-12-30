@@ -20,26 +20,26 @@
     <OverrideVtor>false</OverrideVtor>
     <OverrideVtorValue />
     <eraseonlaunchrule>0</eraseonlaunchrule>
-    <AsfVersion>3.1.3</AsfVersion>
-    <avrtool>com.atmel.avrdbg.tool.jtagicemkii</avrtool>
+    <AsfVersion>2.11.1</AsfVersion>
+    <avrtool>com.atmel.avrdbg.tool.jtagicemk3</avrtool>
     <avrtoolinterface>JTAG</avrtoolinterface>
     <com_atmel_avrdbg_tool_jtagicemkii>
       <ToolType>com.atmel.avrdbg.tool.jtagicemkii</ToolType>
       <ToolName>JTAGICE mkII</ToolName>
-      <ToolNumber>00A000404041</ToolNumber>
+      <ToolNumber>070000004696</ToolNumber>
       <KeepTimersRunning>true</KeepTimersRunning>
       <OverrideVtor>false</OverrideVtor>
       <OverrideVtorValue>
       </OverrideVtorValue>
       <Channel>
         <host>127.0.0.1</host>
-        <port>49743</port>
+        <port>57968</port>
         <ssl>False</ssl>
       </Channel>
       <ToolOptions>
         <InterfaceName>JTAG</InterfaceName>
         <InterfaceProperties>
-          <JtagDbgClock>0</JtagDbgClock>
+          <JtagDbgClock>200000</JtagDbgClock>
           <JtagProgClock>1000000</JtagProgClock>
           <IspClock>150000</IspClock>
           <JtagInChain>false</JtagInChain>
@@ -51,6 +51,34 @@
         </InterfaceProperties>
       </ToolOptions>
     </com_atmel_avrdbg_tool_jtagicemkii>
+    <com_atmel_avrdbg_tool_jtagicemk3>
+      <ToolType>com.atmel.avrdbg.tool.jtagicemk3</ToolType>
+      <ToolName>JTAGICE3</ToolName>
+      <ToolNumber>J30200015107</ToolNumber>
+      <KeepTimersRunning>true</KeepTimersRunning>
+      <OverrideVtor>false</OverrideVtor>
+      <OverrideVtorValue>
+      </OverrideVtorValue>
+      <Channel>
+        <host>127.0.0.1</host>
+        <port>55264</port>
+        <ssl>False</ssl>
+      </Channel>
+      <ToolOptions>
+        <InterfaceName>JTAG</InterfaceName>
+        <InterfaceProperties>
+          <JtagDbgClock>1000000</JtagDbgClock>
+          <JtagProgClock>1000000</JtagProgClock>
+          <IspClock>150000</IspClock>
+          <JtagInChain>false</JtagInChain>
+          <JtagEnableExtResetOnStartSession>false</JtagEnableExtResetOnStartSession>
+          <JtagDevicesBefore>0</JtagDevicesBefore>
+          <JtagDevicesAfter>0</JtagDevicesAfter>
+          <JtagInstrBitsBefore>0</JtagInstrBitsBefore>
+          <JtagInstrBitsAfter>0</JtagInstrBitsAfter>
+        </InterfaceProperties>
+      </ToolOptions>
+    </com_atmel_avrdbg_tool_jtagicemk3>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <ToolchainSettings>
@@ -76,25 +104,26 @@
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <ToolchainSettings>
       <Avr32Gcc>
-  <avr32gcc.common.outputfiles.hex>True</avr32gcc.common.outputfiles.hex>
-  <avr32gcc.common.outputfiles.lss>True</avr32gcc.common.outputfiles.lss>
-  <avr32gcc.common.outputfiles.eep>True</avr32gcc.common.outputfiles.eep>
-  <avr32gcc.compiler.optimization.level>Optimize (-O1)</avr32gcc.compiler.optimization.level>
-  <avr32gcc.compiler.optimization.PrepareFunctionsForGarbageCollection>True</avr32gcc.compiler.optimization.PrepareFunctionsForGarbageCollection>
-  <avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>True</avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>
-  <avr32gcc.compiler.optimization.DebugLevel>Maximum (-g3)</avr32gcc.compiler.optimization.DebugLevel>
-  <avr32gcc.compiler.warnings.AllWarnings>True</avr32gcc.compiler.warnings.AllWarnings>
-  <avr32gcc.linker.libraries.Libraries>
-    <ListValues>
-      <Value>m</Value>
-    </ListValues>
-  </avr32gcc.linker.libraries.Libraries>
-  <avr32gcc.linker.optimization.GarbageCollectUnusedSections>True</avr32gcc.linker.optimization.GarbageCollectUnusedSections>
-  <avr32gcc.linker.optimization.PutReadOnlyDataInWritableDataSection>True</avr32gcc.linker.optimization.PutReadOnlyDataInWritableDataSection>
-  <avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>True</avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>
-  <avr32gcc.assembler.debugging.DebugLevel>Default (-g)</avr32gcc.assembler.debugging.DebugLevel>
-  <avr32gcc.preprocessingassembler.debugging.DebugLevel>Default (-Wa,-g)</avr32gcc.preprocessingassembler.debugging.DebugLevel>
-</Avr32Gcc>
+        <avr32gcc.common.outputfiles.hex>True</avr32gcc.common.outputfiles.hex>
+        <avr32gcc.common.outputfiles.lss>True</avr32gcc.common.outputfiles.lss>
+        <avr32gcc.common.outputfiles.eep>True</avr32gcc.common.outputfiles.eep>
+        <avr32gcc.common.outputfiles.srec>True</avr32gcc.common.outputfiles.srec>
+        <avr32gcc.compiler.optimization.level>Optimize (-O1)</avr32gcc.compiler.optimization.level>
+        <avr32gcc.compiler.optimization.PrepareFunctionsForGarbageCollection>True</avr32gcc.compiler.optimization.PrepareFunctionsForGarbageCollection>
+        <avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>True</avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>
+        <avr32gcc.compiler.optimization.DebugLevel>Maximum (-g3)</avr32gcc.compiler.optimization.DebugLevel>
+        <avr32gcc.compiler.warnings.AllWarnings>True</avr32gcc.compiler.warnings.AllWarnings>
+        <avr32gcc.linker.libraries.Libraries>
+          <ListValues>
+            <Value>m</Value>
+          </ListValues>
+        </avr32gcc.linker.libraries.Libraries>
+        <avr32gcc.linker.optimization.GarbageCollectUnusedSections>True</avr32gcc.linker.optimization.GarbageCollectUnusedSections>
+        <avr32gcc.linker.optimization.PutReadOnlyDataInWritableDataSection>True</avr32gcc.linker.optimization.PutReadOnlyDataInWritableDataSection>
+        <avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>True</avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>
+        <avr32gcc.assembler.debugging.DebugLevel>Default (-g)</avr32gcc.assembler.debugging.DebugLevel>
+        <avr32gcc.preprocessingassembler.debugging.DebugLevel>Default (-Wa,-g)</avr32gcc.preprocessingassembler.debugging.DebugLevel>
+      </Avr32Gcc>
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
@@ -110,43 +139,43 @@
     <Compile Include="ASIC_Engine.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\compiler.h">
+    <Compile Include="AVR32X\AVR32_Module.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\exception.S">
+    <Compile Include="AVR32X\AVR32_Module.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\intc.c">
+    <Compile Include="AVR32X\compiler.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\intc.h">
+    <Compile Include="AVR32X\exception.S">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\interrupt.h">
+    <Compile Include="AVR32X\intc.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\interrupt_avr32.h">
+    <Compile Include="AVR32X\intc.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\mrepeat.h">
+    <Compile Include="AVR32X\interrupt.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\parts.h">
+    <Compile Include="AVR32X\interrupt_avr32.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\preprocessor.h">
+    <Compile Include="AVR32X\mrepeat.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\stringz.h">
+    <Compile Include="AVR32X\parts.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32Modules\tpaste.h">
+    <Compile Include="AVR32X\preprocessor.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32_Module.c">
+    <Compile Include="AVR32X\stringz.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="AVR32_Module.h">
+    <Compile Include="AVR32X\tpaste.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="Generic_Module.c">
@@ -176,7 +205,7 @@
     <Compile Include="MCU_Initialization.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="PIC32_Module.h">
+    <Compile Include="PIC32\PIC32_Module.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="std_defs.c">
@@ -185,7 +214,7 @@
     <Compile Include="std_defs.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="STM32_Module.h">
+    <Compile Include="STM32\STM32_Module.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="USBProtocol_Module.c">
@@ -196,10 +225,12 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="AVR32Modules" />
+    <Folder Include="AVR32X" />
+    <Folder Include="PIC32" />
+    <Folder Include="STM32" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="AVR32Modules\exception.s82">
+    <None Include="AVR32X\exception.s82">
       <SubType>compile</SubType>
     </None>
   </ItemGroup>

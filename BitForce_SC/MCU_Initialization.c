@@ -5,9 +5,9 @@
  *  Author: NASSER
  */ 
 
-#include "AVR32_Module.h"
-#include "PIC32_Module.h"
-#include "STM32_Module.h"
+#include "AVR32X\AVR32_Module.h"
+#include "PIC32\PIC32_Module.h"
+#include "STM32\STM32_Module.h"
 #include "std_defs.h"
 
 /// ************************ MCU Initialization
