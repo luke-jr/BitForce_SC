@@ -109,9 +109,13 @@ const PROTOCOL_RESULT PROTOCOL_FLASH_FAILED		= 12;
 #define PROTOCOL_REQ_SET_XLINK_ADDRESS		4+65  // E 
 #define PROTOCOL_REQ_XLINK_ALLOW_PASS		7+65  // H 
 #define PROTOCOL_REQ_XLINK_DENY_PASS		8+65  // I
+#define PROTOCOL_REQ_ECHO					0+65  // A // Echoes back whatever it hears
+#define PROTOCOL_REQ_TEST_COMMAND			1+65  // B // Custom Command
 
 // ***** Functions
 static void 		   Protocol_Main			 (void);
+static PROTOCOL_RESULT Protocol_Echo			 (void);
+static PROTOCOL_RESULT Protocol_Test_Command	 (void);
 static PROTOCOL_RESULT Protocol_handle_job		 (void);
 static PROTOCOL_RESULT Protocol_handle_job_p2p	 (void);
 static PROTOCOL_RESULT Protocol_info_request	 (void);
@@ -145,7 +149,7 @@ static PROTOCOL_RESULT  Protocol_xlink_deny_pass(void);
 static PROTOCOL_RESULT  Protocol_xlink_presence_detection(void);
 
 // This function initializes the XLINK Chain
-static void	Management_MASTER_Initialize_XLINK_Chain(void);
+static int	Management_MASTER_Initialize_XLINK_Chain(void);
 static void Management_flush_p2p_buffer_into_engines(void);
 
 void 	init_mcu_led(void);
@@ -216,7 +220,10 @@ int main(void)
 			XLINK_set_cpld_id(0);
 			XLINK_set_cpld_master(TRUE);
 			XLINK_set_cpld_passthrough(FALSE);
-			//Management_MASTER_Initialize_XLINK_Chain();	
+			if (Management_MASTER_Initialize_XLINK_Chain() == FALSE)
+			{
+				// Ok this can be bad, we failed the chain initialization
+			}
 		}
 	}
 	else
@@ -390,6 +397,21 @@ static void Protocol_Main(void)
 				continue;
 			}
 			
+			// Check for sz_cmd, AA BB C4 <ID>, then we set CPLD ID and enable pass-through
+			if ((sz_cmd[0] == 0xAA) && (sz_cmd[1] == 0xBB) && (sz_cmd[2] == 0xC4) && (i_count == 4))
+			{
+				// We respond with 'ACK' and then change the address
+				XLINK_SLAVE_respond_transact("ACK", 
+											 3,
+											 __XLINK_TRANSACTION_TIMEOUT__, 
+											 &bTimeoutDetectedOnXLINK, 
+											 FALSE); // Note: We'll used XLINK general dispatch address for this specific operation!
+
+				// Set the new address
+				XLINK_set_cpld_id(sz_cmd[3]);
+				continue;
+			}
+			
 			// Check 
 			if (bTimeoutDetectedOnXLINK) continue;			
 		}		
@@ -428,6 +450,8 @@ static void Protocol_Main(void)
 					sz_cmd[1] != PROTOCOL_REQ_XLINK_ALLOW_PASS &&
 					sz_cmd[1] != PROTOCOL_REQ_XLINK_DENY_PASS &&
 					sz_cmd[1] != PROTOCOL_REQ_PRESENCE_DETECTION &&
+					sz_cmd[1] != PROTOCOL_REQ_ECHO &&
+					sz_cmd[1] != PROTOCOL_REQ_TEST_COMMAND &&
 					sz_cmd[1] != PROTOCOL_REQ_GET_STATUS)
 				{					
 					if (XLINK_ARE_WE_MASTER)
@@ -452,18 +476,6 @@ static void Protocol_Main(void)
 					Protocol_chain_forward((char )sz_cmd[2], 
 										   (char*)(sz_cmd+3), 
 										   intercepted_command_length); // Length is always 3	
-										   
-					// Read the leftover
-					/*	if (TRUE)
-						{
-							char szUMX[100];
-							char bTimeout = 0;
-							char bLength = 0;
-							char bSender = 0;
-							char bLP = 0;
-							char bBC = 0;
-							XLINK_wait_packet(szUMX, &bLength, 100, &bTimeout, &bSender, &bLP, &bBC);
-						}		*/	
 				}					
 				else
 				{
@@ -485,6 +497,8 @@ static void Protocol_Main(void)
 					if (sz_cmd[1] == PROTOCOL_REQ_SET_XLINK_ADDRESS)	Protocol_set_xlink_address();
 					if (sz_cmd[1] == PROTOCOL_REQ_XLINK_ALLOW_PASS)		Protocol_xlink_allow_pass();
 					if (sz_cmd[1] == PROTOCOL_REQ_XLINK_DENY_PASS)		Protocol_xlink_deny_pass();
+					if (sz_cmd[1] == PROTOCOL_REQ_ECHO)					Protocol_Echo();
+					if (sz_cmd[1] == PROTOCOL_REQ_TEST_COMMAND)			Protocol_Test_Command();
 					if (sz_cmd[1] == PROTOCOL_REQ_PRESENCE_DETECTION)   Protocol_xlink_presence_detection();
 				}	
 				
@@ -604,8 +618,15 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	if (XLINK_ARE_WE_MASTER)
 		USB_send_string(szInfoReq);  // Send it to USB
 	else // We're a slave... send it by XLINK
-		XLINK_SLAVE_respond_string(szInfoReq);
-
+	{
+		char bTimeoutDetected = 0;
+		XLINK_SLAVE_respond_transact(szInfoReq, strlen(szInfoReq), __XLINK_TRANSACTION_TIMEOUT__, &bTimeoutDetected, FALSE);
+		
+		// DEBUG
+		// We blink for the number of the times the bTimeoutDetect detects
+		// for (int m = 0; m < bTimeoutDetected; m++) blink_medium();
+	}
+	
 	// Return our result...
 	return res;
 }
@@ -640,6 +661,108 @@ PROTOCOL_RESULT Protocol_Blink(void)
 	blink_medium();
 	blink_medium();
 
+	// Return our result...
+	return res;
+}
+
+
+PROTOCOL_RESULT Protocol_Echo(void)
+{
+	// Our result
+	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
+	
+	// Send the OK back first
+	// All is good... sent the identifier and get out of here...
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string("ECHO");  // Send it to USB
+	else // We're a slave... send it by XLINK
+		XLINK_send_packet(XLINK_get_cpld_id(), "ECHO", 4, TRUE, FALSE);
+	
+	// Return our result...
+	return res;
+}
+
+PROTOCOL_RESULT Protocol_Test_Command(void)
+{
+	// Our result
+	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
+	
+	// Variables
+	char szTempMsg[128];
+	char szReportResult[1024];
+	
+	strcpy(szTempMsg,"");
+	strcpy(szReportResult,"");
+	
+	// Success Counter
+	int iSuccessCounter = 0;
+	long iTurnaroundTime = 0;
+	
+	// First get our tick counter
+	long iActualTick = GetTickCount();
+	
+	// Now we send message to XLINK_GENERAL_DISPATCH_ADDRESS for an ECHO and count the successful iterations
+	for (unsigned int x = 0; x < 10000; x++)
+	{
+		// Calculate single turn-around time
+		long iActualTickTemp = GetTickCount();
+		
+		// Clear input
+		XLINK_clear_RX();
+		
+		// Send the command
+		XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
+		
+		// Now we wait for response
+		char bTimedOut = FALSE;
+		char szResponse[10] = {0,0,0,0,0,0,0,0,0,0};
+		unsigned int iRespLen = 0;
+		char iBC = 0;
+		char iLP = 0;
+		char iSendersAddress = 0;
+		
+		szResponse[0] = 0; szResponse[1] = 0; szResponse[2] = 0; szResponse[3] = 0;
+		iRespLen = 0;
+		
+		XLINK_wait_packet(szResponse, &iRespLen, 200, &bTimedOut, &iSendersAddress, &iLP, &iBC );
+		
+		// Check the response
+		if ((iRespLen == 4) && 
+		    (szResponse[0] == 'E') &&
+		    (szResponse[1] == 'C') &&
+		    (szResponse[2] == 'H') &&
+		    (szResponse[3] == 'O'))
+		{
+			iSuccessCounter++;
+		}			
+		
+		// Update turnaround time
+		if (x == 0) iTurnaroundTime = (GetTickCount() - iActualTickTemp);
+					
+		//  Update turnaround time
+		iTurnaroundTime = (iTurnaroundTime + (GetTickCount() - iActualTickTemp)) / 2;
+	}
+	
+	// Total time taken
+	long iTotalTimeTaken = GetTickCount() - iActualTick;
+	
+	// Generate Report
+	sprintf(szReportResult, "Total success: %d / %d\nTotal duration: %d us\nAverage transact: %d us\n",
+			iSuccessCounter, 10000, iTotalTimeTaken, iTurnaroundTime );
+	
+	
+	// Send the OK back first
+	// All is good... sent the identifier and get out of here...
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string(szReportResult);  // Send it to USB	
+	}	
+	else // We're a slave... send it by XLINK
+	{
+		// We do nothing here...	
+	}
+	
+	
 	// Return our result...
 	return res;
 }
@@ -1360,17 +1483,14 @@ static PROTOCOL_RESULT  Protocol_set_xlink_address()
 		return PROTOCOL_FAILED;
 	}
 	
-	// Set the CPLD address
-	XLINK_set_cpld_id(sz_buf[0]);
-	
-	// Also allow pass-through
-	XLINK_set_cpld_passthrough(TRUE);
-			
 	// Say we're ok
 	if (XLINK_ARE_WE_MASTER)
 		USB_send_string("OK\n");  // Send it to USB
 	else // We're a slave... send it by XLINK
 		XLINK_SLAVE_respond_string("OK\n");	
+		
+	// Set the CPLD address (we'll do it after the transaction is over)
+	XLINK_set_cpld_id(sz_buf[0]);		
 		
 	// We have our frequency factor sent, exit
 	return result;
@@ -1471,7 +1591,7 @@ static PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 //// Management functions
 //////////////////////////////////
 
-static void Management_MASTER_Initialize_XLINK_Chain()
+static int Management_MASTER_Initialize_XLINK_Chain()
 {
 	// What we do here is we keep sending PROTOCOL_PRESENCE_DETECTION until we no longer receive
 	// a response. For each response we receive, we send a SET-ID command. The responding device
@@ -1485,19 +1605,22 @@ static void Management_MASTER_Initialize_XLINK_Chain()
 	char  bTimeoutDetected = 0;
 	char  iActualID = 1; // The ID we have to assign
 	unsigned int iTotalRetryCount = 0;
-
 	
-	while (TRUE)
+	// Our device detection counter...
+	int iDevDetectionCount = 0;
+		
+	// Main loop
+	while (iActualID < 0x01F) // Maximum 31 devices supported
 	{
 		// set the proper command
 		sz_cmd[0] = 'Z';
 		sz_cmd[2] = 'X';
 		sz_cmd[1] = PROTOCOL_REQ_PRESENCE_DETECTION;
-		
-		// Clear the response messag
+
+		// Clear the response message
 		szRespData[0] = 0; szRespData[1] = 0; szRespData[2] = 0; szRespData[3] = 0; szRespData[4] = 0;
 		szRespData[5] = 0; szRespData[6] = 0; szRespData[7] = 0; szRespData[8] = 0; szRespData[9] = 0;
-	
+
 		// Send a message to general dispatch	
 		XLINK_MASTER_transact(XLINK_GENERAL_DISPATCH_ADDRESS,
 							  sz_cmd,
@@ -1513,35 +1636,45 @@ static void Management_MASTER_Initialize_XLINK_Chain()
 		// Check response errors
 		if (bDeviceNotResponded || bTimeoutDetected)
 		{
-			// We have no more devices...
-			break;
+			// We will try for 80 times here
+			if (iDevDetectionCount++ > 80)
+			{
+				// Then we have no more devices, exit the loop
+				break;
+			}
+			else continue;
 		}
 
 		// Check response, is it 'Present'?
-		if ((szRespData[0] == 'O') && (szRespData[1] == 'K')) // && (szRespData[2] == 'S') && (szRespData[3] == 'N'))
+		if ((szRespData[0] == 'P') && (szRespData[1] == 'R') && (szRespData[2] == 'S') && (szRespData[3] == 'N') && (iRespLen == 4))
 		{
 			// We're ok, Blink for a while....
-			// blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();blink_medium();
 		}
 		else
 		{
-			// Exit the loop, we're done with our devices here...
-			break;
+			// We will try for 80 times here
+			if (iDevDetectionCount++ > 80)
+			{
+				// Then we have no more devices, exit the loop
+				break;
+			}
+			else continue; // Otherwise we try again
+			
 		}
 		
 		// OK, We have 'Present', set the device ID
-		// set the proper command
-		sz_cmd[0] = iActualID;
-		sz_cmd[1] = 0;
-		sz_cmd[2] = 0;
-		sz_cmd[3] = 0;
+		// set the proper command (This is valid in XLINK: AA BB C4 <ID>, device will then activate pass-through
+		sz_cmd[0] = 0xAA;
+		sz_cmd[1] = 0xBB;
+		sz_cmd[2] = 0xC4;
+		sz_cmd[3] = iActualID;
 		
 		// Clear the response message
 		szRespData[0] = 0; szRespData[1] = 0; szRespData[2] = 0; szRespData[3] = 0; szRespData[4] = 0;
 		szRespData[5] = 0; szRespData[6] = 0; szRespData[7] = 0; szRespData[8] = 0; szRespData[9] = 0;
 		
 		// Send a message to general dispatch
-		 XLINK_MASTER_transact(XLINK_GENERAL_DISPATCH_ADDRESS,
+		XLINK_MASTER_transact(XLINK_GENERAL_DISPATCH_ADDRESS,
 							  sz_cmd,
 							  4,
 							  szRespData,
@@ -1554,34 +1687,137 @@ static void Management_MASTER_Initialize_XLINK_Chain()
 		
 		
 		// Check response errors
-		if (bDeviceNotResponded || bTimeoutDetected)
+		if ( (bDeviceNotResponded) || (bTimeoutDetected) || (!((szRespData[0] == 'A') && (szRespData[1] == 'C') && (szRespData[2] == 'K') && (iRespLen == 3))) )
 		{
-			// We have no more devices...
-			break;
+			if (iTotalRetryCount++ >= 200)
+			{
+				// Device did not respond to our message for 200 attempts. 
+				// Either it doesn't exist or has already  taken the ID but we failed to received the
+				// confirmation from it. Should this be the case, we can discover it by trying to execute
+				// presence detection on it's new address. If it responded, then we're ok.
+				
+				int iPresenceDetectionRetryCount = 0;
+				int iDeviceIsPresent = FALSE;
+				
+				// Note that we will execute this command for 40 times maximum
+				// set the proper command
+				while (iPresenceDetectionRetryCount++ < 40)
+				{
+					sz_cmd[0] = 'Z';
+					sz_cmd[2] = 'X';
+					sz_cmd[1] = PROTOCOL_REQ_PRESENCE_DETECTION;
+					
+					// Clear the response message
+					szRespData[0] = 0; szRespData[1] = 0; szRespData[2] = 0; szRespData[3] = 0; szRespData[4] = 0;
+					szRespData[5] = 0; szRespData[6] = 0; szRespData[7] = 0; szRespData[8] = 0; szRespData[9] = 0;
+					
+					// Send a message to general dispatch
+					XLINK_MASTER_transact(iActualID,
+										  sz_cmd,
+										  3,
+										  szRespData,
+										  &iRespLen,
+										  128,					// Maximum response length
+										  __XLINK_TRANSACTION_TIMEOUT__,			// 400us timeout
+										  &bDeviceNotResponded,
+										  &bTimeoutDetected,
+										  TRUE);				// We're master
+
+					// Check response errors
+					if (bDeviceNotResponded || bTimeoutDetected)
+					{
+						// We have no more devices...
+						continue;
+					}
+					
+					// Check response
+					if ((szRespData[0] == 'P') && (szRespData[1] == 'R') && (szRespData[2] == 'S') && (szRespData[3] == 'N') && (iRespLen == 4))
+					{
+						// We're ok
+						iDeviceIsPresent = TRUE;
+						break;
+					}					
+				}
+				
+				// Did we fail?
+				if (iDeviceIsPresent == FALSE)				
+				{
+					// Chain Device INIT has failed! This is bad..
+					return FALSE;					
+				}
+
+			}  else continue; // Otherwise we repeat
 		}
 
-		// Check response, is it 'Present'?
-		if ((szRespData[0] == 'O') && (szRespData[1] == 'K'))
+		// Since we've reached here, it means the ACK was received and we're OK to allow 'PassThrough'
+		if (TRUE)
 		{
-			// We're not OK, try again (unless failure tells us not too)
+			// Now ask the device to enable pass-through
+			sz_cmd[0] = 'Z';
+			sz_cmd[1] = PROTOCOL_REQ_XLINK_ALLOW_PASS;
+			sz_cmd[2] = 'X';
+			
+			unsigned int iPassthroughRetryCount = 0;
+			
+			while (iPassthroughRetryCount < 200)
+			{
+				 // First clear the response buffer
+				 szRespData[0] = 0; 
+				 szRespData[1] = 0;
+				 szRespData[2] = 0;
+				 szRespData[3] = 0;
+				 iRespLen = 0;
+				 
+				 // Get response
+				 XLINK_MASTER_transact(iActualID, // We'll use the actual ID of the device
+									   sz_cmd,
+									   3,
+									   szRespData,
+									   &iRespLen,
+									   128,					
+									   __XLINK_TRANSACTION_TIMEOUT__,	
+									   &bDeviceNotResponded,
+									   &bTimeoutDetected,
+									   TRUE);	
+			
+				// Check for response
+				if (bDeviceNotResponded || bTimeoutDetected)					   
+				{
+					// We continue...
+					iPassthroughRetryCount++;
+					continue;
+				}
+				
+				// If Response was not 'OK' we try again as well
+				if (szRespData[0] != 'O' || szRespData[1] != 'K')
+				{
+					// We continue...
+					iPassthroughRetryCount++;
+					continue;
+				}
+				
+				// All ok, we break
+				break;
+			}						
+			
+			// Check if we have succeeded or not by checking the retry count
+			if (iPassthroughRetryCount >= 200)
+			{
+				// We have failed!	
+				return FALSE;
+			}
+			
+			// We're OK
 			iActualID++;
 		}
-		else
-		{
-			// Exit the loop, we're done with our devices here...
-			iTotalRetryCount++;
-			
-			if (iTotalRetryCount == 5)
-			{
-				// This is a major failure. Blink 50 times and give up
-				for (unsigned int umx = 0; umx < 50; umx++) blink_medium();
-				break;
-			}
-		}		
+	
 	}	
-		
+	
+	// At this point, the iActualID shows the number of devices in chain
+	XLINK_chain_device_count = iActualID - 1;
+	
 	// We've been successful
-	return PROTOCOL_SUCCESS;	
+	return TRUE;	
 }
 
 static void Management_flush_p2p_buffer_into_engines()

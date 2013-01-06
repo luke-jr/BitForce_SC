@@ -83,11 +83,14 @@
 //      7           6           5..1             0
 
 
-
 char __OUR_CPLD_ID = 0;
 char __OUR_CHAIN_LENGTH = 0;
 int  __internal_are_we_master = 0;
 
+// This is the XLINK out box buffer
+char XLINK_Outbox[4096]; 
+char XLINK_Device_Status;
+char XLINK_Outbox_Length;
 
 // Initialize
 void init_XLINK()
@@ -98,6 +101,8 @@ void init_XLINK()
 	XLINK_set_cpld_passthrough(0); // Disable pass-through
 	XLINK_set_cpld_id(0); // Initialize our ID
 	XLINK_chain_device_count = 0;
+	XLINK_set_device_status(XLINK_DEVICE_STATUS_NO_TRANS);
+	XLINK_set_outbox("",0);
 }
 
 // Detect if we are real master or not?
@@ -226,13 +231,13 @@ void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, c
 	char x_plen = (iTotalToSend > 4) ? 4 : iTotalToSend;
 				
 	// Set Data
-	MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN, szData[0]);
-	if (x_plen > 1) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN+1, szData[1]);
-	if (x_plen > 2) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN+2, szData[2]);
-	if (x_plen > 3) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN+3, szData[3]);
+	while (MCU_CPLD_Read(CPLD_ADDRESS_TX_BUF_BEGIN) != szData[0]) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN, szData[0]);
+	if (x_plen > 1) while (MCU_CPLD_Read(CPLD_ADDRESS_TX_BUF_BEGIN+1) != szData[1]) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN+1, szData[1]);
+	if (x_plen > 2) while (MCU_CPLD_Read(CPLD_ADDRESS_TX_BUF_BEGIN+2) != szData[2]) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN+2, szData[2]);
+	if (x_plen > 3) while (MCU_CPLD_Read(CPLD_ADDRESS_TX_BUF_BEGIN+3) != szData[3]) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN+3, szData[3]);
 		
 	// What's the value to write to our TX Control
-	char iTxControlVal = 0b00000001;	// Send bit is set by default
+	char iTxControlVal = 0b00000000;	
 	iTxControlVal |= (x_plen << 1);		//
 	if (LP) iTxControlVal |= CPLD_TX_CONTROL_LP;
 		
@@ -240,7 +245,10 @@ void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, c
 	iTxControlVal |= (BC != 0) ? CPLD_TX_CONTROL_BC : 0;
 	
 	// Send packet info
-	MCU_CPLD_Write(CPLD_ADDRESS_TX_CONTROL, iTxControlVal);
+	while (MCU_CPLD_Read(CPLD_ADDRESS_TX_CONTROL) != iTxControlVal) MCU_CPLD_Write(CPLD_ADDRESS_TX_CONTROL, iTxControlVal);
+	
+	// Send the start command
+	MCU_CPLD_Write(CPLD_ADDRESS_TX_START, CPLD_ADDRESS_TX_START_SEND);
 			
 	// Wait until send is completed
 	volatile int iTimeoutGuard = 0; // Maximum overflow is 5000 increments
@@ -274,7 +282,20 @@ void XLINK_wait_packet (char  *data,
 	// Wait until RX Data is 1
 	// We send data 4byte by 4byte
 	// First check TX Status
-	volatile char  iActualRXStatus = XLINK_get_RX_status();
+	volatile char  iActualRXStatus = 0;
+	
+	// Get length
+	volatile unsigned char us1 = 0;
+	volatile unsigned char us2 = 0;
+		
+	do
+	{
+		us1 = XLINK_get_RX_status();
+		us2 = XLINK_get_RX_status();
+		iActualRXStatus = us1;
+	} while (us1 != us2);
+	
+	 
 	long iTimeoutHolder;
 
 	// Are we in progress?
@@ -287,7 +308,15 @@ void XLINK_wait_packet (char  *data,
 		// Wait for 25uS
 		while (GetTickCount() - iTimeoutHolder < time_out)
 		{
-			iActualRXStatus = XLINK_get_RX_status();
+			// Get the status
+			do
+			{
+				us1 = XLINK_get_RX_status();
+				us2 = XLINK_get_RX_status();
+				iActualRXStatus = us1;
+			} while (us1 != us2);
+			
+			// Check for data
 			if ((iActualRXStatus & CPLD_RX_STATUS_DATA) != 0) break;
 		}
 		
@@ -307,7 +336,9 @@ void XLINK_wait_packet (char  *data,
 	}
 	
 	// We've received data
-	volatile char imrLen = ((iActualRXStatus & 0b0111000) >> 3);
+	volatile char imrLen = 0;
+	
+	imrLen = ((iActualRXStatus & 0b0111000) >> 3);
 	*length = imrLen;
 	*LP = ((iActualRXStatus & CPLD_RX_STATUS_LP) != 0) ? 1 : 0;
 	*BC = ((iActualRXStatus & CPLD_RX_STATUS_BC) != 0) ? 1 : 0;
@@ -315,11 +346,20 @@ void XLINK_wait_packet (char  *data,
 	
 	for (char ux = 0; ux < imrLen; ux++)
 	{
-		data[ux] = MCU_CPLD_Read(CPLD_ADDRESS_RX_BUF_BEGIN + ux);
-	}
+		unsigned char u1;
+		unsigned char u2;
+		
+		do
+		{
+			u1 = MCU_CPLD_Read(CPLD_ADDRESS_RX_BUF_BEGIN + ux);
+			u2 = MCU_CPLD_Read(CPLD_ADDRESS_RX_BUF_BEGIN + ux);
+			data[ux] = u1;	
+		} while (u1 != u2);		
+	}		
 	
 	// Clear READ buffer
-	MCU_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR);
+	while ((XLINK_get_RX_status() & CPLD_RX_STATUS_DATA) == CPLD_RX_STATUS_DATA)
+		MCU_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR);
 	
 	// OK we have all we need
 }
@@ -336,6 +376,10 @@ void XLINK_MASTER_transact(char   iAdrs,
 						   char   *bTimeoutDetected, // Was a timeout detected?
 					       char   bWeAreMaster)
 {
+	// Reset this value
+	*bDeviceNotResponded = 0;
+	*bTimeoutDetected = 0;
+	
 	// First check if we are master
 	if (bWeAreMaster == 0) return;
 	
@@ -385,7 +429,7 @@ RETRY_POINT_1:
 		// Wait for response
 		XLINK_wait_packet(szDevResponse, 
 						  &__iRespLen, 
-						  __XLINK_WAIT_PACKET_TIMEOUT__ + ((iTotalSent == 0) ? 100 : 0),  // For the first packet (only), we allow 120us delay 
+						  (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3),  // We operate on reduced timeout... This is to make sure we try more than the slave waits...
 						  &iTimeoutDetected, 
 						  &__senders_address, 
 						  &__lp, 
@@ -461,15 +505,18 @@ RETRY_POINT_1:
 	volatile unsigned short iTotalReceived = 0;
 	iTotalRetryCount = 0;
 	
+	volatile long imrActualHolder = 0;
+	volatile long imrActualTime = 0;
+	
 	// We have to reset the BitCorrector, as it will start from 0 for the PUSH part
-	iBC = FALSE;
+	iBC = TRUE; // Push must be set to one
+	char iExpectedBC = TRUE; // This is what we expect from the slave as BitCorrector
 		
 	// Now we have to wait for data
 	while (iTotalReceived < iMaxRespLen)
 	{
-		// Send push command
+
 		
-RETRY_POINT_2:
 		// Before doing anything, clear the CPLD
 		XLINK_clear_RX();
 		
@@ -488,10 +535,13 @@ RETRY_POINT_2:
 		szDevResponse[2] = 0;
 		szDevResponse[3] = 0;
 		
+		// We would want to measure something here...
+		imrActualHolder = GetTickCount();
+		
 		// Wait for response		
 		XLINK_wait_packet(szDevResponse, 
 						  &__iRespLen,
-						  __XLINK_WAIT_PACKET_TIMEOUT__ + ((iTotalReceived == 0) ? 100 : 0),  // For the first packet (only), we allow 120us delay
+						  ((iTotalReceived == 0) ? (__XLINK_WAIT_PACKET_TIMEOUT__ << 2) : (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3)),  // For the first packet (only) we wait long time. For the rest, we'll be fast...
 						  &iTimeoutDetected,
 						  &__senders_address,
 						  &__lp,
@@ -525,12 +575,12 @@ RETRY_POINT_2:
 			else
 			{
 				iTotalRetryCount++;
-				goto RETRY_POINT_2;
+				continue;
 			}
 		}
 		
 		// No timeout was detected, check resp. If it was not ok, try again
-		if (__senders_address != iAdrs || __iRespLen == 0) // Check both for address-match and response-length
+		if (__senders_address != iAdrs || __iRespLen == 0 || iExpectedBC != __bc) // Check both for address-match, response-length and bit-corrector
 		{
 			// Ok we've timed out, try for 3 times
 			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
@@ -546,7 +596,7 @@ RETRY_POINT_2:
 			else
 			{
 				iTotalRetryCount++;
-				goto RETRY_POINT_2;
+				continue;
 			}
 		}
 		
@@ -561,9 +611,18 @@ RETRY_POINT_2:
 		
 		// We've sent 4 more bytes
 		iBC = (iBC == 0) ? 1 : 0; // Flip BitCorrector
+		iExpectedBC = (iExpectedBC == 0) ? 1 : 0; // Flip the expected BitCorrector
 		
 		// Was it the last packet? if so, exit the loop
-		if (__lp == 1) break;				
+		if (__lp == 1)
+		{
+			 imrActualTime++;
+			 break;		
+		}			 
+		
+		// Update imrTime
+		imrActualTime = GetTickCount() - imrActualHolder;		
+		imrActualTime++;
 	}		
 	
 	// Set the response size
@@ -599,7 +658,7 @@ RETRY_POINT_3:
 		// Wait for response
 		XLINK_wait_packet(szDevResponse,
 						  &__iRespLen,
-						  __XLINK_WAIT_PACKET_TIMEOUT__,  // For the first packet (only), we allow 120us delay
+						  __XLINK_WAIT_PACKET_TIMEOUT__,  // We wait an 8th of the maximum allowed, since we're master
 						  &iTimeoutDetected,
 						  &__senders_address,
 						  &__lp,
@@ -676,7 +735,6 @@ RETRY_POINT_3:
 	*bDeviceNotResponded = 0;
 	return;	
 }
-
 
 // This is used by slave...
 void XLINK_SLAVE_wait_transact (char  *data,
@@ -789,6 +847,19 @@ void XLINK_SLAVE_wait_transact (char  *data,
 				XLINK_send_packet(__OUR_CPLD_ID,"TERM",4, 1, 0);
 				continue;
 			}
+			
+			if ((__iRespLen == 3) &&
+				(szResp[0] == 'Z') &&
+				(szResp[1] == 'A') &&
+				(szResp[2] == 'X'))
+			{
+				// Clear the Input buffer first
+				XLINK_clear_RX();
+							
+				// Reply with TERM and repeat the loop
+				XLINK_send_packet(__OUR_CPLD_ID,"ECHO",4, TRUE, FALSE);
+				continue;
+			}
 		}
 			
 		// Resp was OK... Take the data
@@ -839,7 +910,6 @@ void XLINK_SLAVE_wait_transact (char  *data,
 	return;								
 }
 
-
 void XLINK_SLAVE_respond_transact  (char  *data,
 									unsigned int length,
 									long transaction_timeout,
@@ -850,18 +920,21 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 	// This is used by slave only, make sure we are slave..
 	if (bWeAreMaster == 1) return;
 	
+	// What address do we used?
+	volatile char iAddressToUseForTransactions = XLINK_get_cpld_id();
+	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	unsigned int iActualTickcount = GetTickCount();
-	unsigned short iTotalSent = 0;
-	char  iBytesToSend = 0;
-	char  iBC = 0; // BitCorrector
-	char  iTotalRetryCount = 0;
+	volatile unsigned int iActualTickcount = GetTickCount();
+	volatile unsigned short iTotalSent = 0;
+	volatile unsigned short  iBytesToSend = 0;
+	volatile char  iBC = 1; // BitCorrector is ONE, since the previous part has already set it to one!
+	volatile char  iTotalRetryCount = 0;
 	
-	char  szPrevData[4];
-	char  iPrevDataLen = 0;
-	char  iPrevLP = 0;
-	char  iPrevBC = 0;
+	volatile char  szPrevData[4];
+	volatile char  iPrevDataLen = 0;
+	volatile char  iPrevLP = 0;
+	volatile char  iPrevBC = 0;
 	
 	// Now we have to wait for data
 	while (1)
@@ -915,7 +988,7 @@ RETRY_POINT_1:
 			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
 			{
 				// We've failed
-				*bTimeoutDetected = 1;
+				*bTimeoutDetected = 2;
 				return;			
 			}
 			else
@@ -939,7 +1012,7 @@ RETRY_POINT_1:
 			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
 			{
 				// We've failed
-				*bTimeoutDetected = 1;
+				*bTimeoutDetected = 3;
 				XLINK_clear_RX();				
 				return;		
 			}
@@ -949,7 +1022,7 @@ RETRY_POINT_1:
 				XLINK_clear_RX();
 				
 				// We will respond with 'OK' (perhaps the host has not received the OK from the time the first command was executed)
-				XLINK_send_packet(__OUR_CPLD_ID, "AR99", 4, TRUE, 0);				
+				XLINK_send_packet(iAddressToUseForTransactions, "AR99", 4, TRUE, !iBC); // BitCorrector must never be correct for this				
 				
 				// We'll try again as well
 				iTotalRetryCount++;
@@ -967,7 +1040,7 @@ RETRY_POINT_1:
 			XLINK_clear_RX();
 			
 			// This means we have to send old data and continue the loop
-			XLINK_send_packet(__OUR_CPLD_ID, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
+			XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
 		}
 		else // We send new data
 		{
@@ -988,7 +1061,7 @@ RETRY_POINT_1:
 			XLINK_clear_RX();	
 			
 			// Now send the data
-			XLINK_send_packet(__OUR_CPLD_ID,szPrevData, iBytesToSend, iPrevLP, 0);				
+			XLINK_send_packet(iAddressToUseForTransactions,szPrevData, iBytesToSend, iPrevLP, iBC);				
 			
 			// Flip the BitCorrector
 			iBC = (iBC == 1) ? 0 : 1;
@@ -998,6 +1071,9 @@ RETRY_POINT_1:
 			if (iPrevLP == 1) break;
 		}
 	}
+	
+	// Reset the retry count
+	iTotalRetryCount = 0;
 	
 	// OK, we now here wait for TERM signal
 	// Now we have to wait for data
@@ -1024,7 +1100,7 @@ RETRY_POINT_2:
 		// Check master timeout
 		if (GetTickCount() - iActualTickcount > transaction_timeout)
 		{
-			*bTimeoutDetected = 1;
+			*bTimeoutDetected = 4;
 			XLINK_clear_RX();
 			return;
 		}
@@ -1033,7 +1109,7 @@ RETRY_POINT_2:
 		if (iTimeoutDetected)
 		{
 			// Ok we've timed out, try for 3 times
-			*bTimeoutDetected = 1;
+			*bTimeoutDetected = 5;
 			XLINK_clear_RX();
 			return;
 		}
@@ -1046,7 +1122,7 @@ RETRY_POINT_2:
 			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
 			{
 				// We've failed
-				*bTimeoutDetected = 1;
+				*bTimeoutDetected = 6;
 				XLINK_clear_RX();				
 				return;
 			}
@@ -1074,7 +1150,7 @@ RETRY_POINT_2:
 				if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__) // for TERM it's 20 retries
 				{
 					// We've failed
-					*bTimeoutDetected = 1;
+					*bTimeoutDetected = 7;
 					XLINK_clear_RX();					
 					return;
 				}
@@ -1082,7 +1158,7 @@ RETRY_POINT_2:
 				{
 					// Resend the packet
 					XLINK_clear_RX();					
-					XLINK_send_packet(__OUR_CPLD_ID, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
+					XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
 					
 					// We will try again
 					iTotalRetryCount++;
@@ -1094,7 +1170,7 @@ RETRY_POINT_2:
 				if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__) // for TERM it's 20 retries
 				{
 					// We've failed
-					*bTimeoutDetected = 1;
+					*bTimeoutDetected = 8;
 					XLINK_clear_RX();						
 					return;
 				}
@@ -1107,14 +1183,12 @@ RETRY_POINT_2:
 			}
 		}
 		
-		// Reset retry count
-		iTotalRetryCount = 0;
 
 		// Before doing anything, clear the CPLD
 		XLINK_clear_RX();		
 		
 		// OK we've received our 
-		XLINK_send_packet(__OUR_CPLD_ID, "TERM", 4, 1, 0);
+		XLINK_send_packet(iAddressToUseForTransactions, "TERM", 4, 1, 0);
 		break; 
 				
 		// Now here is the catch: If the host won't received the TERM signal, it will resend it. The next TERM packet
@@ -1123,12 +1197,10 @@ RETRY_POINT_2:
 	
 	// OK, We've come out
 	// there is nothing special to do...
-	XLINK_clear_RX();
+	// XLINK_clear_RX();
 	*bTimeoutDetected = 0;
 	return;										
 }
-
-
 
 char XLINK_data_inbound(void)
 {
@@ -1161,7 +1233,7 @@ void  XLINK_set_cpld_passthrough(char bPassthrough)
 {
 	MCU_CPLD_SetAccess();
 	char iValueToSet = MCU_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(CPLD_MASTER_CONTROL_PASSTHROUGH);
-	iValueToSet |= CPLD_MASTER_CONTROL_PASSTHROUGH;	
+	if (bPassthrough == TRUE) iValueToSet |= CPLD_MASTER_CONTROL_PASSTHROUGH;	
 	MCU_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);	
 }
 
@@ -1183,22 +1255,37 @@ char XLINK_get_RX_status(void)
 	return MCU_CPLD_Read(CPLD_ADDRESS_RX_STATUS);		
 }
 
-void  XLINK_set_target_address(char uAdrs)
+void XLINK_set_target_address(char uAdrs)
 {
 	MCU_CPLD_SetAccess();	
 	MCU_CPLD_Write(CPLD_ADDRESS_TX_TARGET_ADRS, uAdrs & 0b011111);
 }
 
-void  XLINK_clear_RX(void)
+void XLINK_clear_RX(void)
 {
 	MCU_CPLD_SetAccess();											
     while ((MCU_CPLD_Read(CPLD_ADDRESS_RX_STATUS) & CPLD_RX_STATUS_DATA) == CPLD_RX_STATUS_DATA) 
 		MCU_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR);
 }
 
-int	  XLINK_is_cpld_present(void)
+int	XLINK_is_cpld_present(void)
 {
 	MCU_CPLD_SetAccess();
-	return (MCU_CPLD_Read(CPLD_ADDRESS_IDENTIFICATION) == 0x0A4);		
+	return (MCU_CPLD_Read(CPLD_ADDRESS_IDENTIFICATION) == 0x0A4);
 }
 
+char XLINK_get_device_status()
+{
+	return XLINK_Device_Status;
+}
+
+void XLINK_set_device_status(char iDevState)
+{
+	XLINK_Device_Status = iDevState;
+}
+
+void XLINK_set_outbox(char* szData, short iLen)
+{
+	XLINK_Outbox_Length = iLen;
+	for (unsigned int x = 0; x < iLen; x++) XLINK_Outbox[x] = szData[x];
+}

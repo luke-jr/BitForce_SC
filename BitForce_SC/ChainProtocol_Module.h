@@ -42,6 +42,13 @@
 #define CPLD_ADDRESS_IDENTIFICATION	 25
 #define CPLD_ADDRESS_SENDERS_ADRS	 26
 
+#define CPLD_ADDRESS_TX_START		27
+#define CPLD_ADDRESS_TX_START_SEND	0b01
+
+#define XLINK_DEVICE_STATUS_PROCESSING	1
+#define XLINK_DEVICE_STATUS_FINISHED	2
+#define XLINK_DEVICE_STATUS_NO_TRANS	3
+
 // Addressing is as following:
 // 'XLNK' returns the total bytes in XLink General Buffer
 // 'XK<x><y>' Returns the 4 bytes starting at address x * 0x0100 + y
@@ -141,9 +148,9 @@ void XLINK_MASTER_transact (char   iAdrs,
 							long    transaction_timeout, // Master timeout
 							char   *bDeviceNotResponded, // Device did not respond, even to the first packet
 							char   *bTimeoutDetected, // Was a timeout detected?
-							char   bWeAreMaster);
+							char   bWeAreMaster); // The address we expect from the device to respond to
 							
-
+				
 // Called by the master, used to determine the chain length
 int XLINK_MASTER_chainDevicesExists(void);
 
@@ -163,7 +170,7 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 									unsigned int length,
 									long transaction_timeout,
 									char  *bTimeoutDetected,
-									char  bWeAreMaster);
+									char  bWeAreMaster); // If zero, we'll use CPLDs address
 
 // This function receives data
 void XLINK_wait_packet (char  *data,
@@ -186,6 +193,11 @@ void	 XLINK_set_target_address		(char uAdrs);
 void	 XLINK_clear_RX					(void);
 int		 XLINK_detect_if_we_are_master  (void);
 int		 XLINK_is_cpld_present			(void);
+
+char	 XLINK_get_device_status		(void);
+void	 XLINK_set_device_status		(char  iDevState);
+void	 XLINK_set_outbox				(char* szData, short iLen);
+
 
 ///////////////////////////////////////////////////////////////////
 
