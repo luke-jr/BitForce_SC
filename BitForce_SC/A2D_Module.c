@@ -6,6 +6,7 @@
  */ 
 
 #include "A2D_Module.h"
+#include "Generic_Module.h"
 #include "std_defs.h"
 
 /////////////////////////////////

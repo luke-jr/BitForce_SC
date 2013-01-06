@@ -37,6 +37,12 @@
 /*************** UNIT ID STRING ********************/
 #define  UNIT_ID_STRING "BitForce SC 1.0"
 
+// Unit Identification String
+#define UNIT_FIRMWARE_ID_STRING	">>>>ID: BitFORCE SC SHA256 Version 1.0>>>>\n"
+#define UNIT_FIRMWARE_REVISION	">>>>REVISION 1.0>>>>"
+#define UNIT_FIRMWARE_TYPE		">>>>JALAPENO>>>>" // OR ">>>>MINIRIG>>>>" OR ">>>>SINGLE>>>>" OR ">>>>LITTLE-SINGLE>>>>"
+#define UNIT_FIRMWARE_SPEED		">>>>32>>>>"
+
 ///////////////////////////////////////// typedefs
 // Master Tick Counter (Holds clock in 1uS ticks)
 long MAST_TICK_COUNTER;
