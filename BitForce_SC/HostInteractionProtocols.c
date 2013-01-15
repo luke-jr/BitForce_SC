@@ -13,7 +13,7 @@
 #include "A2D_Module.h"
 #include "ASIC_Engine.h"
 
-#include "OperationProtocols.h"
+#include "HostInteractionProtocols.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -33,15 +33,15 @@ PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned shor
 	for (unsigned int umx = 0; umx < 2048; umx++) szRespData[umx] = 0;
 	
 	XLINK_MASTER_transact(iTarget,
-	sz_cmd,
-	iCmdLen,
-	szRespData,
-	&iRespLen,
-	2048,					// Maximum response length
-	__XLINK_TRANSACTION_TIMEOUT__,
-	&bDeviceNotResponded,
-	&bTimeoutDetected,
-	TRUE);
+						  sz_cmd,
+						  iCmdLen,
+						  szRespData,
+						  &iRespLen,
+						  2048,					// Maximum response length
+						  __XLINK_TRANSACTION_TIMEOUT__,
+						  &bDeviceNotResponded,
+						  &bTimeoutDetected,
+						  TRUE);
 	
 	// Check response errors
 	if (bDeviceNotResponded)
@@ -194,7 +194,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	
 	// Variables
 	char szTempMsg[128];
-	char szReportResult[1024];
+	char szReportResult[4024];
 	
 	strcpy(szTempMsg,"");
 	strcpy(szReportResult,"");
@@ -206,17 +206,32 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	// First get our tick counter
 	long iActualTick = GetTickCount();
 	
+	// Total timeout counters
+	int iTotalTimeoutCounter = 0;
+	int iTransactionTimes[30];
+
+	char szResponseFromDev[395];
+	int  iResponseLenFromDev = 0;
+	char bDevNotResponded = FALSE;
+	char bTimedOut = FALSE;
+	
 	// Now we send message to XLINK_GENERAL_DISPATCH_ADDRESS for an ECHO and count the successful iterations
-	for (unsigned int x = 0; x < 10000; x++)
+	for (unsigned int x = 0; x < 100000; x++)
 	{
-		// Calculate single turn-around time
-		long iActualTickTemp = GetTickCount();
-		
 		// Clear input
 		XLINK_clear_RX();
 		
+		// Calculate single turn-around time
+		long iActualTickTemp = GetTickCount();
+		long iSecondaryTickTemp = 0;		
+		
 		// Send the command
 		XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
+		
+		/*iResponseLenFromDev = 0;
+		bDevNotResponded = FALSE;
+		bTimedOut = FALSE;
+		XLINK_MASTER_transact(1, "ZGX", 3, szResponseFromDev, &iResponseLenFromDev, 395, __XLINK_TRANSACTION_TIMEOUT__, &bDevNotResponded, &bTimedOut, TRUE );*/
 		
 		// Now we wait for response
 		char bTimedOut = FALSE;
@@ -229,32 +244,50 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		szResponse[0] = 0; szResponse[1] = 0; szResponse[2] = 0; szResponse[3] = 0;
 		iRespLen = 0;
 	
-		XLINK_wait_packet(szResponse, &iRespLen, 200, &bTimedOut, &iSendersAddress, &iLP, &iBC );
+		XLINK_wait_packet(szResponse, &iRespLen, 20, &bTimedOut, &iSendersAddress, &iLP, &iBC );
+	
+		//if (x < 30) iTransactionTimes[x] = (GetTickCount() - iActualTickTemp);
 	
 		// Check the response
+		// if ((bDevNotResponded == FALSE) && (bTimedOut == FALSE) && (iResponseLenFromDev > 12))
 		if ((iRespLen == 4) &&
 		(szResponse[0] == 'E') &&
 		(szResponse[1] == 'C') &&
 		(szResponse[2] == 'H') &&
 		(szResponse[3] == 'O'))
 		{
+			// Update turnaround time
+			iSecondaryTickTemp = GetTickCount();
+			
+			if (x == 0) iTurnaroundTime = (iSecondaryTickTemp - iActualTickTemp);
+			
+			//  Update turnaround time
+			iTurnaroundTime = (iTurnaroundTime + (iSecondaryTickTemp - iActualTickTemp)) / 2;
+			
+			// Increase our success counter			
 			iSuccessCounter++;
 		}
-	
-		// Update turnaround time
-		if (x == 0) iTurnaroundTime = (GetTickCount() - iActualTickTemp);
-	
-		//  Update turnaround time
-		iTurnaroundTime = (iTurnaroundTime + (GetTickCount() - iActualTickTemp)) / 2;
 	}
 
 	// Total time taken
 	long iTotalTimeTaken = GetTickCount() - iActualTick;
 
 	// Generate Report
-	sprintf(szReportResult, "Total success: %d / %d\nTotal duration: %d us\nAverage transact: %d us\n",
-	iSuccessCounter, 10000, iTotalTimeTaken, iTurnaroundTime );
+	char szTempex[128];
+	strcpy(szReportResult,"");
+	
+	for (int x = 0; x < 30; x++)
+	{
+		sprintf(szTempex,"%d,", iTransactionTimes[x]);
+		strcat(szReportResult, szTempex);
+		
+	}
+	
+	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %d us\nAverage transact: %d us\n",
+			iSuccessCounter, 100000, iTotalTimeTaken, iTurnaroundTime );
 
+	strcat(szReportResult, szTempex);
+	
 
 	// Send the OK back first
 	// All is good... sent the identifier and get out of here...
@@ -267,7 +300,51 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		// We do nothing here...
 	}
 
+	
+	
+	/*
+	int iDigestValues[8] = {0,0,0,0,0,0,0,0};
+		
+	long iTickVal = GetTickCount();
+		
+	SHA256_Digest(0x0FFEE2E3A, iDigestValues);
+	
+	long iResultTick = GetTickCount() - iTickVal;
+	
+	char szReportResult[128];
+	
+	sprintf(szReportResult, "SHA2 Took %lu microseconds to complete\n", iResultTick);
+	
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string(szReportResult);  // Send it to USB
+	}
+	else // We're a slave... send it by XLINK
+	{
+		// We do nothing here...
+	}
+	*/
+	
+	/*unsigned long iActualTick = GetTickCount();
+	volatile unsigned int iRetVals[8] = {0,0,0,0,0,0,0,0};
+	SHA256_Digest("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiKK", 362, iRetVals);
+	char szResponse[128];
+	unsigned long iPostTick = GetTickCount();
+	unsigned int iDiff = (iPostTick - iActualTick);
+	
+	sprintf(szResponse, "HASH RESULT: %08X-%08X-%08X-%08X-%08X-%08X-%08X-%08X\nOperation took: %d us",
+			iRetVals[0], iRetVals[1], iRetVals[2], iRetVals[3], iRetVals[4], iRetVals[5], iRetVals[6], iRetVals[7], iDiff);
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string(szResponse);  // Send it to USB
+	}
+	else // We're a slave... send it by XLINK
+	{
+		// We do nothing here...
+	}
 
+	*/
+	
 	// Return our result...
 	return res;
 }

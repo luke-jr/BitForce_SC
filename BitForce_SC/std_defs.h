@@ -27,9 +27,10 @@
 
 
 /*************** XLINK Operations Timeout ***********/
-#define __XLINK_TRANSACTION_TIMEOUT__	120000
-#define __XLINK_WAIT_PACKET_TIMEOUT__	360
-#define __XLINK_ATTEMPT_RETRY_MAXIMUM__ 80
+#define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
+#define __XLINK_TRANSACTION_TIMEOUT__	     120000
+#define __XLINK_WAIT_PACKET_TIMEOUT__        440
+#define __XLINK_ATTEMPT_RETRY_MAXIMUM__      80
 
 /*************** Firmware Version ******************/
 #define __FIRMWARE_VERSION	"1.0.0"

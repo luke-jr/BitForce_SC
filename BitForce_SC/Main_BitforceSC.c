@@ -26,7 +26,8 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "OperationProtocols.h"
+#include "HostInteractionProtocols.h"
+#include "HighLevel_Operations.h"
 
 // Information about the result we're holding
 extern buf_job_result_packet  __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
@@ -160,13 +161,18 @@ void MCU_Main_Loop()
 	
 	for (umx = 0; umx < 1024; umx++) sz_cmd[umx] = 0;
 	
+	//////////////////////////////////////////
+	// Turn the LED on
+	//////////////////////////////////////////
+	MCU_MainLED_Set();
+	
 	while (1)
 	{
-		//////////////////////////////////////////
-		// Turn the LED on
-		//////////////////////////////////////////
-		MCU_MainLED_Set();
+		// HighLevel Functions Spin
+		HighLevel_Operations_Spin();
 
+		//////////////////////////////////////////
+		// If we are master, we'll listen to the USB
 		//////////////////////////////////////////
 		if (XLINK_ARE_WE_MASTER)
 		{
@@ -258,17 +264,21 @@ void MCU_Main_Loop()
 					continue; // We'll continue...			
 			}
 		}
-		else // We listen to XLINK, as we are a chain-slave
+		else 
 		{
+			///////////////////////////////////////////////
+			// We listen to XLINK, as we are a chain-slave
+			///////////////////////////////////////////////
+						
 			// Wait for incoming transactions
 			bTimeoutDetectedOnXLINK = FALSE;
 			
 			// Run the procedure
 			XLINK_SLAVE_wait_transact(sz_cmd, 
-									 &i_count, 
-									 256, 
-									 __XLINK_TRANSACTION_TIMEOUT__, 
-									 &bTimeoutDetectedOnXLINK, FALSE);
+									  &i_count, 
+									  256, 
+									  500,  // 500us, half a ms
+									  &bTimeoutDetectedOnXLINK, FALSE);
 			
 			// Check for sz_cmd, if it's PUSH then we have an invalid command
 			if ((sz_cmd[0] == 'P') && (sz_cmd[1] == 'U') && (sz_cmd[2] == 'S') && (sz_cmd[3] == 'H'))
@@ -298,7 +308,7 @@ void MCU_Main_Loop()
 
 		// Check number of bytes received so far.
 		// If they are 3, we may have a command here (4 for the AMUX Read)...
-		if (1)
+		if (TRUE)
 		{
 			// Reset the count anyway
 			i_count = 0;
@@ -415,6 +425,13 @@ static int Management_MASTER_Initialize_XLINK_Chain()
 	
 	// Our device detection counter...
 	int iDevDetectionCount = 0;
+	
+	// Check CPLD, is CHAIN_OUT connected?
+	if ((MCU_CPLD_Read(CPLD_ADDRESS_CHAIN_STATUS) & CHAIN_OUT_BIT) == 0)
+	{
+		// Meaning there is not chain-out connection
+		return TRUE;	
+	}		
 		
 	// Main loop
 	while (iActualID < 0x01F) // Maximum 31 devices supported
@@ -444,13 +461,16 @@ static int Management_MASTER_Initialize_XLINK_Chain()
 		if (bDeviceNotResponded || bTimeoutDetected)
 		{
 			// We will try for 80 times here
-			if (iDevDetectionCount++ > 80)
+			if (iDevDetectionCount++ > 10) 
 			{
 				// Then we have no more devices, exit the loop
 				break;
 			}
 			else continue;
 		}
+		
+		// reset iDevDetectionCount since we've succeeded in getting a response
+		iDevDetectionCount = 0;
 
 		// Check response, is it 'Present'?
 		if ((szRespData[0] == 'P') && (szRespData[1] == 'R') && (szRespData[2] == 'S') && (szRespData[3] == 'N') && (iRespLen == 4))

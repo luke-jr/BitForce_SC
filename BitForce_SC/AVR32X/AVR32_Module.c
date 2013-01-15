@@ -57,7 +57,7 @@ void __AVR32_LowLevelInitialize()
 		AVR32_GCCTRL = 0b00000000000000000000000000100110; // This is for 64MHz, with DIVEN=1 (thus 64 / 2 = 32MHz for the IO)
 		// Second bit in this block is our PLL-SEL=1, OSCSEL=0, DIVEN=0, DIV=0
 	#elif defined(__OPERATING_FREQUENCY_48MHz__)
-		AVR32_GCCTRL = 0b00000000000000000000000000000110; // This is for 64MHz, with DIVEN=0 (thus 48MHz for the IO)
+		AVR32_GCCTRL = 0b00000000000000000000000000000110; // This is for 48MHz, with DIVEN=0 (thus 48MHz for the IO)
 		// Second bit in this block is our PLL-SEL=1, OSCSEL=0, DIVEN=0, DIV=0		
 	#elif defined(__OPERATING_FREQUENCY_16MHz__)
 		AVR32_GCCTRL = 0b00000000000000000000000000000100; // This is for 16MHz, with DIVEN=0
@@ -94,13 +94,13 @@ void  __AVR32_A2D_Initialize()
 	
 	// Enable A2D Channel
 	AVR32_A2D_CHANNEL_ENABLE_REGISTER = MAKE_DWORD(0b00000000,
-													0b00000000,
-													0b00000000,
-													(1<<AVR32_A2D_TEMP1_CHANNEL) |
-													(1<<AVR32_A2D_TEMP2_CHANNEL) |
-													(1<<AVR32_A2D_VCHANNEL_3P3V) |
-													(1<<AVR32_A2D_VCHANNEL_1V)   |
-													(1<<AVR32_A2D_VCHANNEL_PWR_MAIN)); // Enables channel 1 by default (CORRECT THIS!)
+												   0b00000000,
+												   0b00000000,
+												   (1<<AVR32_A2D_TEMP1_CHANNEL) |
+												   (1<<AVR32_A2D_TEMP2_CHANNEL) |
+												   (1<<AVR32_A2D_VCHANNEL_3P3V) |
+												   (1<<AVR32_A2D_VCHANNEL_1V)   |
+												   (1<<AVR32_A2D_VCHANNEL_PWR_MAIN)); // Enables channel 1 by default (CORRECT THIS!)
 }
 
 void  __AVR32_A2D_SetAccess()

@@ -49,6 +49,10 @@
 #define XLINK_DEVICE_STATUS_FINISHED	2
 #define XLINK_DEVICE_STATUS_NO_TRANS	3
 
+// Detect if we are real master or not?
+#define CHAIN_IN_BIT	0b0000010
+#define CHAIN_OUT_BIT	0b0000001
+
 // Addressing is as following:
 // 'XLNK' returns the total bytes in XLink General Buffer
 // 'XK<x><y>' Returns the 4 bytes starting at address x * 0x0100 + y

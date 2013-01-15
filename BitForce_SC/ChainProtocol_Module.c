@@ -105,9 +105,7 @@ void init_XLINK()
 	XLINK_set_outbox("",0);
 }
 
-// Detect if we are real master or not?
-#define CHAIN_IN_BIT	0b0000010
-#define CHAIN_OUT_BIT	0b0000001
+
 
 int	XLINK_detect_if_we_are_master()
 {
@@ -450,7 +448,7 @@ RETRY_POINT_1:
 		if (iTimeoutDetected)
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
+			if (iTotalRetryCount ==  (__XLINK_WAIT_PACKET_TIMEOUT__ << 3))
 			{
 				// We've failed
 				*bTimeoutDetected = 1;
@@ -474,7 +472,7 @@ RETRY_POINT_1:
 			(__senders_address != iAdrs)) // Check both for address-match and 'OK' response
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
+			if (iTotalRetryCount ==  (__XLINK_WAIT_PACKET_TIMEOUT__ << 3))
 			{
 				// We've failed
 				*bTimeoutDetected = 2;
@@ -515,8 +513,6 @@ RETRY_POINT_1:
 	// Now we have to wait for data
 	while (iTotalReceived < iMaxRespLen)
 	{
-
-		
 		// Before doing anything, clear the CPLD
 		XLINK_clear_RX();
 		
@@ -541,7 +537,7 @@ RETRY_POINT_1:
 		// Wait for response		
 		XLINK_wait_packet(szDevResponse, 
 						  &__iRespLen,
-						  ((iTotalReceived == 0) ? (__XLINK_WAIT_PACKET_TIMEOUT__ << 2) : (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3)),  // For the first packet (only) we wait long time. For the rest, we'll be fast...
+						  ((iTotalReceived == 0) ? (__XLINK_WAIT_PACKET_TIMEOUT__ << 3) : (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3)),  // For the first packet (only) we wait long time. For the rest, we'll be fast...
 						  &iTimeoutDetected,
 						  &__senders_address,
 						  &__lp,
@@ -562,7 +558,7 @@ RETRY_POINT_1:
 		if (iTimeoutDetected || (__iRespLen == 0))
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
+			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
 			{
 				// We've failed
 				*bTimeoutDetected = 4;
@@ -583,7 +579,7 @@ RETRY_POINT_1:
 		if (__senders_address != iAdrs || __iRespLen == 0 || iExpectedBC != __bc) // Check both for address-match, response-length and bit-corrector
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
+			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
 			{
 				// We've failed
 				*bTimeoutDetected = 5;
@@ -658,7 +654,7 @@ RETRY_POINT_3:
 		// Wait for response
 		XLINK_wait_packet(szDevResponse,
 						  &__iRespLen,
-						  __XLINK_WAIT_PACKET_TIMEOUT__,  // We wait an 8th of the maximum allowed, since we're master
+						  (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3),  // We wait an 8th of the maximum allowed, since we're master
 						  &iTimeoutDetected,
 						  &__senders_address,
 						  &__lp,
@@ -679,7 +675,7 @@ RETRY_POINT_3:
 		if (iTimeoutDetected)
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
+			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
 			{
 				// We've failed
 				*bTimeoutDetected = 7;
@@ -706,7 +702,7 @@ RETRY_POINT_3:
 			(szDevResponse[3] != 'M')) // Check both for address-match and response-length
 		{ 
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == __XLINK_ATTEMPT_RETRY_MAXIMUM__)
+			if (iTotalRetryCount ==  (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
 			{
 				// We've failed
 				*bTimeoutDetected = 8;
@@ -1030,9 +1026,6 @@ RETRY_POINT_1:
 			}
 		}
 		
-		// Reset retry count
-		iTotalRetryCount = 0;
-		
 		// OK, we either have to send new data, or old data (if BitCorrector doesn't match actual)
 		if (__bc != iBC)
 		{
@@ -1089,6 +1082,10 @@ RETRY_POINT_1:
 		
 RETRY_POINT_2:
 		
+		// Response clearing
+		szResp[0] = 0; szResp[1] = 0; szResp[2] = 0;szResp[3] = 0;
+		
+		// Wait for the packet to arrive
 		XLINK_wait_packet(szResp,
 						  &__iRespLen,
 						  __XLINK_WAIT_PACKET_TIMEOUT__,  // 200us Timeout
