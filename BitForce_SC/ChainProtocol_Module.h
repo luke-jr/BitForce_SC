@@ -30,7 +30,7 @@
 
 #define CPLD_ADDRESS_MASTER_CONTROL	 23
 #define CPLD_ADDRESS_CHAIN_STATUS 	 24
-#define CPLD_ADDRESS_TX_CONTROL 	 19
+#define CPLD_ADDRESS_TX_CONTROL 	 34
 #define CPLD_ADDRESS_TX_TARGET_ADRS	 33
 #define CPLD_ADDRESS_RX_CONTROL		 20
 #define CPLD_ADDRESS_TX_STATUS		 21
@@ -42,7 +42,7 @@
 #define CPLD_ADDRESS_IDENTIFICATION	 25
 #define CPLD_ADDRESS_SENDERS_ADRS	 26
 
-#define CPLD_ADDRESS_TX_START		27
+#define CPLD_ADDRESS_TX_START		35
 #define CPLD_ADDRESS_TX_START_SEND	0b01
 
 #define XLINK_DEVICE_STATUS_PROCESSING	1
@@ -194,6 +194,7 @@ char	 XLINK_get_chain_status			(void);
 char	 XLINK_get_TX_status			(void);
 char	 XLINK_get_RX_status			(void);
 void	 XLINK_set_target_address		(char uAdrs);
+char	 XLINK_get_target_address		(void);
 void	 XLINK_clear_RX					(void);
 int		 XLINK_detect_if_we_are_master  (void);
 int		 XLINK_is_cpld_present			(void);

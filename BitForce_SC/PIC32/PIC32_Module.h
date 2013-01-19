@@ -61,6 +61,7 @@
  void	    __PIC32_Timer_SetInterval(unsigned int iPeriod);
  void		__PIC32_Timer_Start();
  void		__PIC32_Timer_Stop();
+ int		__PIC32_Timer_GetValue();
 
 // FAN unit
  void	MCU_FAN_Initialize();

@@ -432,6 +432,17 @@ void	MCU_Timer_Stop()
 	#endif
 }
 
+int	 MCU_Timer_GetValue()
+{
+	#if   defined( __COMPILING_FOR_AVR32__)
+	__AVR32_Timer_GetValue();
+	#elif defined( __COMPILING_FOR_STM32__)
+	__STM32_Timer_GetValue();
+	#elif defined( __COMPILING_FOR_PIC32__)
+	__PIC32_Timer_GetValue();
+	#endif		
+}
+
 // FAN unit
 void	MCU_FAN_Initialize()
 {

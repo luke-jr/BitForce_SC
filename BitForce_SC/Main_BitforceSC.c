@@ -119,6 +119,14 @@ int main(void)
 			XLINK_set_cpld_passthrough(FALSE);
 		}
 	}
+	
+	// Reset global values
+	global_vals[0] = 0;
+	global_vals[1] = 0;
+	global_vals[2] = 0;
+	global_vals[3] = 0;
+	global_vals[4] = 0;
+	global_vals[5] = 0;
 
 	// Go to our protocol main loop
 	MCU_Main_Loop();

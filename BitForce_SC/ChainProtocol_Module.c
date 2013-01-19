@@ -10,6 +10,8 @@
 #include "Generic_Module.h"
 #include "ChainProtocol_Module.h"
 #include <string.h>
+#include "AVR32X\AVR32_Module.h"
+#include <avr32/io.h>
 
 // *** IREG - RX Status (8 Bit)
 //
@@ -82,6 +84,87 @@
 // +-------------+------+---------------------+------+
 //      7           6           5..1             0
 
+//////////////////////////////////////////////////////////////////
+// MACROS
+/////////////////////////////////////////////////////////////////
+
+#define MACRO_GetTickCount ((MAST_TICK_COUNTER << 16) + (AVR32_TC.channel[0].cv))
+
+#define MACRO__AVR32_CPLD_Read(ret_value, address) ({ \
+AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
+AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL; \
+AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS; \
+AVR32_GPIO.port[1].ovr  = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00) | address; \
+AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
+AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
+AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS; \
+AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \
+AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_OE; \
+volatile int iRetVal = (AVR32_GPIO.port[1].pvr & 0x000000FF); \
+AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
+AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \
+											ret_value = iRetVal; })
+
+
+#define MACRO__AVR32_CPLD_Write(address, value) ({ \
+												AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
+												AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL; \
+												AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS; \
+												AVR32_GPIO.port[1].ovr  = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00) | address; \
+												AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
+												AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
+												AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS; \
+												AVR32_GPIO.port[1].ovr  = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00) | value; \
+												AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
+												AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
+												AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; })
+																								
+
+#define MACRO__AVR32_CPLD_BurstTxWrite(szdata, address_begin) ({ \
+		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
+		AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL; \
+		AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS; \
+		AVR32_GPIO.port[1].ovr  = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00) | address_begin; \
+		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
+		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
+		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS; \
+		XLINK_activate_address_increase; \
+		volatile unsigned int iInitialOvrValue = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00); \
+		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | szdata[0]; \
+		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
+		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
+		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | szdata[1]; \
+		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
+		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
+		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | szdata[2]; \
+		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
+		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
+		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | szdata[3]; \
+		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
+		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
+		XLINK_deactivate_address_increase; \
+		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; }) 
+
+#define MACRO_XLINK_get_TX_status(ret_value)  (MACRO__AVR32_CPLD_Read(ret_value, CPLD_ADDRESS_TX_STATUS))
+#define MACRO_XLINK_set_target_address(x)	  (MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_TARGET_ADRS, x & 0b011111))
+
+#define MACRO_XLINK_send_packet(iadrs, szdata, ilen, lp, bc) ({ \
+		char read_tx_status = 0x0FF; \
+		while ((read_tx_status & CPLD_TX_STATUS_TxInProg) != 0) { MACRO_XLINK_get_TX_status(read_tx_status);} \
+		MACRO_XLINK_set_target_address(iadrs); \
+		unsigned char iTotalToSend = (ilen << 1); \
+		char szMMR[4]; \
+		MACRO__AVR32_CPLD_BurstTxWrite(szdata, CPLD_ADDRESS_TX_BUF_BEGIN); \
+		char iTxControlVal = 0b00000000; \
+		iTxControlVal |= iTotalToSend;	\
+		if (lp) iTxControlVal |= CPLD_TX_CONTROL_LP; \
+		iTxControlVal |= (bc != 0) ? CPLD_TX_CONTROL_BC : 0; \
+		MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_CONTROL, iTxControlVal); \
+		MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_START, CPLD_ADDRESS_TX_START_SEND); \
+		})		
+
+
+/////////////////////////////////////////////////////////////////
 
 char __OUR_CPLD_ID = 0;
 char __OUR_CHAIN_LENGTH = 0;
@@ -96,8 +179,8 @@ char XLINK_Outbox_Length;
 void init_XLINK()
 {
 	// Init CPLD XLINK Info
-	MCU_CPLD_SetAccess();
-	MCU_CPLD_Initialize();
+	__AVR32_CPLD_SetAccess();
+	__AVR32_CPLD_Initialize();
 	XLINK_set_cpld_passthrough(0); // Disable pass-through
 	XLINK_set_cpld_id(0); // Initialize our ID
 	XLINK_chain_device_count = 0;
@@ -169,40 +252,16 @@ int XLINK_MASTER_getChainLength()
 	
 }
 
+
 // iAdrs = Target
 // szData and iLen is the data stack
 void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, char BC)
 {
 	// Set CPLD Access
-	MCU_CPLD_SetAccess();
-	
-	// Set the Target Address
-	XLINK_set_target_address(iAdrs);
-		
-	// We send data 4byte by 4byte
-	// First check TX Status
-	volatile char iActualTXStatus = XLINK_get_TX_status();
-	unsigned short iTimeoutHolder;
-	
-	// Are we in progress?
-	iTimeoutHolder = GetTickCount();
-	
+	__AVR32_CPLD_SetAccess();
+
 	// Wait until actual buffer is sent...
-	if ((iActualTXStatus & CPLD_TX_STATUS_TxInProg) != 0)
-	{
-		// Wait for 25uS
-		while (GetTickCount() - iTimeoutHolder < 25); 
-		
-		// Did we timeout?
-		if (GetTickCount() - iTimeoutHolder >= 25)
-		{
-			// Ok we've timed out....
-			// TODO: We must do something important
-		}		
-		
-		// This is not usual however, if we have a pending data
-		// It means we're out of sync... Otherwise we would not have had any data pending...!!!!!
-	}
+	while ((XLINK_get_TX_status() & CPLD_TX_STATUS_TxInProg) != 0);
 	
 	// We're ready to send...
 	// Send data in 4byte packets. Each time we send, we wait for a reception of response package
@@ -212,6 +271,7 @@ void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, c
 	// BitCorrect will handle the flip-flop correction indicator
 	
 	// Set the target device
+	//while (XLINK_get_target_address() != iAdrs)
 	XLINK_set_target_address(iAdrs);
 	
 	// *** IREG - TX Control (8 Bit)
@@ -223,37 +283,25 @@ void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, c
 	//      7         6..5     4        3 .. 1        0
 	
 	// Also bitStuff position
-	unsigned short iTotalToSend = iLen;
+	unsigned char iTotalToSend = (iLen << 1);
 
-	// Set the packet length
-	char x_plen = (iTotalToSend > 4) ? 4 : iTotalToSend;
+	char szMMR[4];
 				
 	// Set Data
-	while (MCU_CPLD_Read(CPLD_ADDRESS_TX_BUF_BEGIN) != szData[0]) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN, szData[0]);
-	if (x_plen > 1) while (MCU_CPLD_Read(CPLD_ADDRESS_TX_BUF_BEGIN+1) != szData[1]) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN+1, szData[1]);
-	if (x_plen > 2) while (MCU_CPLD_Read(CPLD_ADDRESS_TX_BUF_BEGIN+2) != szData[2]) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN+2, szData[2]);
-	if (x_plen > 3) while (MCU_CPLD_Read(CPLD_ADDRESS_TX_BUF_BEGIN+3) != szData[3]) MCU_CPLD_Write(CPLD_ADDRESS_TX_BUF_BEGIN+3, szData[3]);
-		
+	__AVR32_CPLD_BurstTxWrite(szData, CPLD_ADDRESS_TX_BUF_BEGIN);
+
 	// What's the value to write to our TX Control
 	char iTxControlVal = 0b00000000;	
-	iTxControlVal |= (x_plen << 1);		//
+	iTxControlVal |= iTotalToSend;		//
 	if (LP) iTxControlVal |= CPLD_TX_CONTROL_LP;
 		
 	// Set BitStuff value
 	iTxControlVal |= (BC != 0) ? CPLD_TX_CONTROL_BC : 0;
 	
 	// Send packet info
-	while (MCU_CPLD_Read(CPLD_ADDRESS_TX_CONTROL) != iTxControlVal) MCU_CPLD_Write(CPLD_ADDRESS_TX_CONTROL, iTxControlVal);
-	
-	// Send the start command
-	MCU_CPLD_Write(CPLD_ADDRESS_TX_START, CPLD_ADDRESS_TX_START_SEND);
-			
-	// Wait until send is completed
-	volatile int iTimeoutGuard = 0; // Maximum overflow is 5000 increments
-	
-POINTX:	
-	while (((MCU_CPLD_Read(CPLD_ADDRESS_TX_STATUS) & CPLD_TX_STATUS_TxInProg) != 0) && (iTimeoutGuard++ < 10000));
-			
+	 __AVR32_CPLD_Write(CPLD_ADDRESS_TX_CONTROL, iTxControlVal);
+	__AVR32_CPLD_Write(CPLD_ADDRESS_TX_START, CPLD_ADDRESS_TX_START_SEND);
+
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -268,7 +316,7 @@ void XLINK_wait_packet (char  *data,
 						char  *BC)
 {
 	// Wait to something...
-	MCU_CPLD_SetAccess();
+	__AVR32_CPLD_SetAccess();
 	
 	// Reset all variables
 	*BC = 0;
@@ -286,12 +334,12 @@ void XLINK_wait_packet (char  *data,
 	volatile unsigned char us1 = 0;
 	volatile unsigned char us2 = 0;
 		
-	do
-	{
+	//do
+	//{
 		us1 = XLINK_get_RX_status();
-		us2 = XLINK_get_RX_status();
+	//	us2 = XLINK_get_RX_status();
 		iActualRXStatus = us1;
-	} while (us1 != us2);
+	//} while (us1 != us2);
 	
 	 
 	long iTimeoutHolder;
@@ -307,12 +355,12 @@ void XLINK_wait_packet (char  *data,
 		while (GetTickCount() - iTimeoutHolder < time_out)
 		{
 			// Get the status
-			do
-			{
+			//do
+			//{
 				us1 = XLINK_get_RX_status();
-				us2 = XLINK_get_RX_status();
+			//	us2 = XLINK_get_RX_status();
 				iActualRXStatus = us1;
-			} while (us1 != us2);
+			//} while (us1 != us2);
 			
 			// Check for data
 			if ((iActualRXStatus & CPLD_RX_STATUS_DATA) != 0) break;
@@ -333,6 +381,8 @@ void XLINK_wait_packet (char  *data,
 		// It means we're out of sync... Otherwise we would not have had any data pending...!!!!!
 	}
 	
+	
+	
 	// We've received data
 	volatile char imrLen = 0;
 	
@@ -340,24 +390,25 @@ void XLINK_wait_packet (char  *data,
 	*length = imrLen;
 	*LP = ((iActualRXStatus & CPLD_RX_STATUS_LP) != 0) ? 1 : 0;
 	*BC = ((iActualRXStatus & CPLD_RX_STATUS_BC) != 0) ? 1 : 0;
-	*senders_address = MCU_CPLD_Read(CPLD_ADDRESS_SENDERS_ADRS);
+	*senders_address = __AVR32_CPLD_Read(CPLD_ADDRESS_SENDERS_ADRS);
 	
-	for (char ux = 0; ux < imrLen; ux++)
+	/*for (char ux = 0; ux < imrLen; ux++)
 	{
 		unsigned char u1;
 		unsigned char u2;
 		
 		do
 		{
-			u1 = MCU_CPLD_Read(CPLD_ADDRESS_RX_BUF_BEGIN + ux);
-			u2 = MCU_CPLD_Read(CPLD_ADDRESS_RX_BUF_BEGIN + ux);
+			u1 = __AVR32_CPLD_Read(CPLD_ADDRESS_RX_BUF_BEGIN + ux);
+			u2 = __AVR32_CPLD_Read(CPLD_ADDRESS_RX_BUF_BEGIN + ux);
 			data[ux] = u1;	
 		} while (u1 != u2);		
-	}		
-	
+	}	*/	
+	__AVR32_CPLD_BurstRxRead(data, CPLD_ADDRESS_RX_BUF_BEGIN);
+		
 	// Clear READ buffer
-	while ((XLINK_get_RX_status() & CPLD_RX_STATUS_DATA) == CPLD_RX_STATUS_DATA)
-		MCU_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR);
+	// while ((XLINK_get_RX_status() & CPLD_RX_STATUS_DATA) == CPLD_RX_STATUS_DATA)
+	__AVR32_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR);
 	
 	// OK we have all we need
 }
@@ -410,8 +461,9 @@ RETRY_POINT_1:
 		XLINK_clear_RX();
 		
 		// Send these bytes
-		XLINK_send_packet(iAdrs, (char*)(szData + iTotalSent), iBytesToSend, iLP, iBC);
-			
+		char* szDest = (char*)(szData + iTotalSent);
+		MACRO_XLINK_send_packet(iAdrs, szDest, iBytesToSend, iLP, iBC);
+	
 		// Reset variables
 		iTimeoutDetected = 0;
 		__iRespLen = 0;
@@ -517,7 +569,7 @@ RETRY_POINT_1:
 		XLINK_clear_RX();
 		
 		// Proceed
-		XLINK_send_packet(iAdrs,"PUSH", 4, iLP, iBC);
+		MACRO_XLINK_send_packet(iAdrs,"PUSH", 4, iLP, iBC);
 		
 		// Reset variables
 		iTimeoutDetected = 0;
@@ -546,7 +598,7 @@ RETRY_POINT_1:
 		// Check master timeout
 		if (GetTickCount() - iActualTickcount > transaction_timeout)
 		{
-			*bTimeoutDetected = 3;
+			*bTimeoutDetected = (iTotalReceived == 0) ? 3 : 77;
 			if (iTotalSent == 0) *bDeviceNotResponded = 1;
 			
 			// Before doing anything, clear the CPLD
@@ -637,7 +689,7 @@ RETRY_POINT_3:
 		XLINK_clear_RX();
 		
 		// Proceed
-		XLINK_send_packet(iAdrs,"TERM", 4, iLP, 0);
+		MACRO_XLINK_send_packet(iAdrs,"TERM", 4, iLP, 0);
 			
 		// Reset variables
 		iTimeoutDetected = 0;
@@ -968,12 +1020,21 @@ RETRY_POINT_1:
 		}
 		
 		// Check for issues
-		if (iTimeoutDetected)
+		if (iTimeoutDetected == TRUE)
 		{
-			// Ok we've timed out, try for 3 times
-			*bTimeoutDetected = 1;
-			XLINK_clear_RX();
-			return;
+			// Did we time out?
+			if (iTotalRetryCount > __XLINK_ATTEMPT_RETRY_MAXIMUM__)
+			{
+				// Ok we've timed out, try for 3 times
+				*bTimeoutDetected = 1;
+				XLINK_clear_RX();
+				return;	
+			}
+			else
+			{
+				iTotalRetryCount++;
+				continue;
+			}
 		}
 		
 		// No timeout was detected, check resp. If it was not ok, try again
@@ -985,6 +1046,7 @@ RETRY_POINT_1:
 			{
 				// We've failed
 				*bTimeoutDetected = 2;
+				XLINK_clear_RX();				
 				return;			
 			}
 			else
@@ -1206,10 +1268,10 @@ char XLINK_data_inbound(void)
 							  
 void  XLINK_set_cpld_id(char iID)
 {
-	MCU_CPLD_SetAccess();
-	char iValueToSet = MCU_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(0b0111110);
+	__AVR32_CPLD_SetAccess();
+	char iValueToSet = __AVR32_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(0b0111110);
 	iValueToSet |= ((iID & 0b011111) << 1);	
-	MCU_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);	
+	__AVR32_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);	
 	__OUR_CPLD_ID = iID;
 }
 
@@ -1220,55 +1282,61 @@ char XLINK_get_cpld_id(void)
 
 void  XLINK_set_cpld_master(char bMaster)
 {
-	MCU_CPLD_SetAccess();	
-	char iValueToSet = MCU_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(CPLD_MASTER_CONTROL_MSTR);
+	__AVR32_CPLD_SetAccess();	
+	char iValueToSet = __AVR32_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(CPLD_MASTER_CONTROL_MSTR);
 	if (bMaster) iValueToSet |= CPLD_MASTER_CONTROL_MSTR;
-	MCU_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);
+	__AVR32_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);
 }
 
 void  XLINK_set_cpld_passthrough(char bPassthrough)
 {
-	MCU_CPLD_SetAccess();
-	char iValueToSet = MCU_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(CPLD_MASTER_CONTROL_PASSTHROUGH);
+	__AVR32_CPLD_SetAccess();
+	char iValueToSet = __AVR32_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(CPLD_MASTER_CONTROL_PASSTHROUGH);
 	if (bPassthrough == TRUE) iValueToSet |= CPLD_MASTER_CONTROL_PASSTHROUGH;	
-	MCU_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);	
+	__AVR32_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);	
 }
 
 char XLINK_get_chain_status(void)
 {
-	MCU_CPLD_SetAccess();	
-	return MCU_CPLD_Read(CPLD_ADDRESS_CHAIN_STATUS);
+	__AVR32_CPLD_SetAccess();	
+	return __AVR32_CPLD_Read(CPLD_ADDRESS_CHAIN_STATUS);
 }
 
 char XLINK_get_TX_status(void)
 {
-	MCU_CPLD_SetAccess();		
-	return MCU_CPLD_Read(CPLD_ADDRESS_TX_STATUS);
+	__AVR32_CPLD_SetAccess();		
+	return __AVR32_CPLD_Read(CPLD_ADDRESS_TX_STATUS);
 }
 
 char XLINK_get_RX_status(void)
 {
-	MCU_CPLD_SetAccess();	
-	return MCU_CPLD_Read(CPLD_ADDRESS_RX_STATUS);		
+	__AVR32_CPLD_SetAccess();	
+	return __AVR32_CPLD_Read(CPLD_ADDRESS_RX_STATUS);		
 }
 
 void XLINK_set_target_address(char uAdrs)
 {
-	MCU_CPLD_SetAccess();	
-	MCU_CPLD_Write(CPLD_ADDRESS_TX_TARGET_ADRS, uAdrs & 0b011111);
+	__AVR32_CPLD_SetAccess();	
+	__AVR32_CPLD_Write(CPLD_ADDRESS_TX_TARGET_ADRS, uAdrs & 0b011111);
+}
+
+char XLINK_get_target_address(void)
+{
+	__AVR32_CPLD_SetAccess();
+	return __AVR32_CPLD_Read(CPLD_ADDRESS_TX_TARGET_ADRS);
 }
 
 void XLINK_clear_RX(void)
 {
-	MCU_CPLD_SetAccess();											
-    while ((MCU_CPLD_Read(CPLD_ADDRESS_RX_STATUS) & CPLD_RX_STATUS_DATA) == CPLD_RX_STATUS_DATA) 
-		MCU_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR);
+	__AVR32_CPLD_SetAccess();											
+    while ((__AVR32_CPLD_Read(CPLD_ADDRESS_RX_STATUS) & CPLD_RX_STATUS_DATA) == CPLD_RX_STATUS_DATA) 
+		__AVR32_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR);
 }
 
 int	XLINK_is_cpld_present(void)
 {
-	MCU_CPLD_SetAccess();
-	return (MCU_CPLD_Read(CPLD_ADDRESS_IDENTIFICATION) == 0x0A4);
+	__AVR32_CPLD_SetAccess();
+	return (__AVR32_CPLD_Read(CPLD_ADDRESS_IDENTIFICATION) == 0x0A4);
 }
 
 char XLINK_get_device_status()
@@ -1286,3 +1354,4 @@ void XLINK_set_outbox(char* szData, short iLen)
 	XLINK_Outbox_Length = iLen;
 	for (unsigned int x = 0; x < iLen; x++) XLINK_Outbox[x] = szData[x];
 }
+;

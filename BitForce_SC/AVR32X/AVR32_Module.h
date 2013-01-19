@@ -115,6 +115,8 @@
 #define __AVR32_CPLD_BUS6	 (1<<6) // PORT B
 #define __AVR32_CPLD_BUS7	 (1<<7) // PORT B
 #define __AVR32_CPLD_BUS_ALL (__AVR32_CPLD_BUS0 | __AVR32_CPLD_BUS1 | __AVR32_CPLD_BUS2 | __AVR32_CPLD_BUS3 | __AVR32_CPLD_BUS4 | __AVR32_CPLD_BUS5 | __AVR32_CPLD_BUS6 | __AVR32_CPLD_BUS7)
+
+#define __AVR32_CPLD_INCREASE_ADDRESS (1<<10) // PORT B
 							 
 #define __AVR32_CPLD_ADRS	 (1<<8) // PORT B
 #define __AVR32_CPLD_OE		 (1<<9) // PORT B
@@ -153,6 +155,11 @@
 #define __AVR32_ENGINE_LED7  (1<<30)   // PORT B
 #define __AVR32_ENGINE_LED8  (1<<31)   // PORT B
 
+
+// Auto address increase function
+#define XLINK_activate_address_increase     AVR32_GPIO.port[1].ovrs  = __AVR32_CPLD_INCREASE_ADDRESS;
+#define XLINK_deactivate_address_increase   AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
+
 //////////////////////////////////////////////
 // FUNCTIONS
 /////////////////////////////////////////////
@@ -188,6 +195,9 @@ void			__AVR32_CPLD_Initialize(void);
 void			__AVR32_CPLD_SetAccess(void);
 void			__AVR32_CPLD_Write (char iAdrs, char iData);
 unsigned int	__AVR32_CPLD_Read (char iAdrs);
+void			__AVR32_CPLD_BurstTxWrite(char* iData, char iAddress);
+void			__AVR32_CPLD_BurstRxRead(char* iData, char iAddress);
+void			__AVR32_CPLD_StartTX(char iTxControlValue);
 
 //////////////////////////////////////////////
 // SC Chips
@@ -226,6 +236,7 @@ void	__AVR32_Timer_Initialize(void);
 void	__AVR32_Timer_SetInterval(unsigned int iPeriod);
 void	__AVR32_Timer_Start(void);
 void	__AVR32_Timer_Stop(void);
+int		__AVR32_Timer_GetValue();
 
 /////////////////////////////////////////////////
 // FAN Controller

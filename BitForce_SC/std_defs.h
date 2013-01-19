@@ -17,7 +17,7 @@
 // #define __OPERATING_FREQUENCY_16MHz__
 #define __OPERATING_FREQUENCY_32MHz__ 
 // #define __OPERATING_FREQUENCY_48MHz__
-// #define __OPERATING_FREQUENCY_64MHz__
+//#define __OPERATING_FREQUENCY_64MHz__
 
 /*************** Product Model *********************/
 // #define __PRODUCT_MODEL_JALAPENO__
@@ -85,6 +85,8 @@ typedef struct _tag_buf_job_result_packet
 } buf_job_result_packet, *pbuf_job_result_packet;
 
 int XLINK_ARE_WE_MASTER;
+int global_vals[6];
+
 
 // Used for ASIC handling
 #define ASIC_SPI_RW_COMMAND						    0b01000000000000000

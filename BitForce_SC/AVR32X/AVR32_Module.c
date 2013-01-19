@@ -14,6 +14,8 @@
 // FUNCTIONS
 /////////////////////////////////////////////
 
+#define AVR32_FLASH_ADDRESSx 
+
 // General MCU Functions
 void __AVR32_LowLevelInitialize()
 {
@@ -32,8 +34,12 @@ void __AVR32_LowLevelInitialize()
 	#elif defined(__OPERATING_FREQUENCY_64MHz__)
 		// ********* Enable PLL0
 		// Value for PLL0 is 00011111    00000111    0000010   -----------00000101----------
-		//                   PLLCNT=31   PLLMUL=7+1  PLLDIV=2   PLLOPT=001, PLLOSC=1, PLLEN=1
+		//                   PLLCNT=31   PLLMUL=7+1  PLLDIV=2   PLLOPT=001, PLLOSC=0, PLLEN=1
 		AVR32_PLL0 = 0b00011111000001110000001000000101; // PLL0 at 32MHz
+		
+		// Set wait-state to 1
+		AVR32_FLASHC = ((1 << 8) | (1 << 6)) | 0x00000000;
+		
 	#elif defined(__OPERATING_FREQUENCY_48MHz__)
 		// ********* Enable PLL0
 		// Value for PLL0 is 00011111    00000011    00000000   -----------00000101----------
@@ -54,7 +60,7 @@ void __AVR32_LowLevelInitialize()
 		AVR32_GCCTRL = 0b00000000000000000000000000000110; // This is for 32MHz, with DIVEN=0
 		// Second bit in this block is our PLL-SEL=1, OSCSEL=0, DIVEN=0, DIV=0
 	#elif defined(__OPERATING_FREQUENCY_64MHz__)
-		AVR32_GCCTRL = 0b00000000000000000000000000100110; // This is for 64MHz, with DIVEN=1 (thus 64 / 2 = 32MHz for the IO)
+		AVR32_GCCTRL = 0b00000000000000000000000000000110; // This is for 64MHz, with DIVEN=0
 		// Second bit in this block is our PLL-SEL=1, OSCSEL=0, DIVEN=0, DIV=0
 	#elif defined(__OPERATING_FREQUENCY_48MHz__)
 		AVR32_GCCTRL = 0b00000000000000000000000000000110; // This is for 48MHz, with DIVEN=0 (thus 48MHz for the IO)
@@ -423,15 +429,20 @@ void __AVR32_CPLD_Initialize()
 	// Deselect CPLD and deactivate OE
 	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
 	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_CS;
+	
+	// We activate address-increase pin and de-assert it
+	AVR32_GPIO.port[1].oders = __AVR32_CPLD_INCREASE_ADDRESS;
+	AVR32_GPIO.port[1].gpers = __AVR32_CPLD_INCREASE_ADDRESS;	
+	AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
 }
 
-void __AVR32_CPLD_SetAccess()
+inline void __AVR32_CPLD_SetAccess()
 {
 	// Nothing needed, the bus is not multiplexed here...
 	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_CS; // Activate CS and leave it active...
 }
 
-void __AVR32_CPLD_Write (char iAdrs, char iData)
+inline void __AVR32_CPLD_Write (char iAdrs, char iData)
 {
 	// Disable CPLDs OE and Select the chip
 	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
@@ -459,7 +470,152 @@ void __AVR32_CPLD_Write (char iAdrs, char iData)
 	AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL;
 }
 
-unsigned int	__AVR32_CPLD_Read (char iAdrs)
+inline void __AVR32_CPLD_StartTX(char iTxControlValue)
+{
+	// Disable CPLDs OE and Select the chip
+	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
+
+	// Activate bus output first AND set the ADRS pin
+	AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL;
+
+	// Set address
+	AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS;
+	AVR32_GPIO.port[1].ovr  = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00) | 34; // 34 is CPLD_TX_ADDRESS_COTROL
+
+	// Strobe
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;
+
+	// Set Data and disable address
+	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS;
+
+	// Activate Address-increase
+	XLINK_activate_address_increase;
+
+	// Write data
+	volatile unsigned int iInitialOvrValue = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00);
+	AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | iTxControlValue;
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | 0b01;
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;
+
+	// Disable Address-Increase
+	XLINK_deactivate_address_increase;
+
+	// Ok now disable output bus
+	AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL;
+}
+
+
+inline void __AVR32_CPLD_BurstTxWrite(char* iData, char iAddress)
+{
+	// Disable CPLDs OE and Select the chip
+	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
+	
+	// Activate bus output first AND set the ADRS pin
+	AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL;
+	
+	// Set address
+	AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS;
+	AVR32_GPIO.port[1].ovr  = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00) | iAddress;
+	
+	// Strobe
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;
+	
+	// Set Data and disable address
+	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS;
+	
+	// Activate Address-increase
+	XLINK_activate_address_increase;
+
+	// Write data
+	volatile unsigned int iInitialOvrValue = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00);
+	AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | iData[0];
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | iData[1];
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | iData[2];
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | iData[3];
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;	
+	
+	// Disable Address-Increase
+	XLINK_deactivate_address_increase;		
+	
+	// Ok now disable output bus
+	AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL;
+}
+
+inline void __AVR32_CPLD_BurstRxRead(char* iData, char iAddress)
+{
+	// Disable CPLD's OE and Select the chip
+	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
+	
+	// Activate bus output first AND set the ADRS pin
+	AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL;
+	
+	// Set address
+	AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS;
+	AVR32_GPIO.port[1].ovr  = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00) | iAddress;
+	
+	// Strobe
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;
+	
+	// Disable address
+	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS;
+	
+	// Ok now set bus to input mode
+	AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL;
+	
+	// Activate OE
+	AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_OE;
+	
+	// Activate Address-increase
+	XLINK_activate_address_increase;
+	
+	// Get the result
+	iData[0] = (AVR32_GPIO.port[1].pvr & 0x000000FF);
+	
+	// Strobe
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;
+	
+	// Get the result
+	iData[1] = (AVR32_GPIO.port[1].pvr & 0x000000FF);
+	
+	// Strobe
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;	
+	
+	// Get the result
+	iData[2] = (AVR32_GPIO.port[1].pvr & 0x000000FF);
+	
+	// Strobe
+	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE;
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE;	
+	
+	// Get the result
+	iData[3] = (AVR32_GPIO.port[1].pvr & 0x000000FF);
+	
+	// Disable OE
+	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
+	
+	// Disable Address-Increase
+	XLINK_deactivate_address_increase;	
+	
+	// Ok now disable output bus
+	AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL;
+}
+
+inline unsigned int	__AVR32_CPLD_Read (char iAdrs)
 {
 	// Disable CPLD's OE and Select the chip
 	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
@@ -683,17 +839,7 @@ void	__AVR32_LED_Reset(char iLed)
 ISR(__avr32_tmr0_interrupt, 0, 3)
 {
 	// Just increase our counter
-#if defined(__OPERATING_FREQUENCY_32MHz__)
-	MAST_TICK_COUNTER += 20;
-#elif defined(__OPERATING_FREQUENCY_48MHz__)	
-	MAST_TICK_COUNTER += 13;
-#elif defined(__OPERATING_FREQUENCY_64MHz__)
-	MAST_TICK_COUNTER += 10;
-#elif defined(__OPERATING_FREQUENCY_16MHz__)
-	MAST_TICK_COUNTER += 40;
-#else	
 	MAST_TICK_COUNTER += 1;
-#endif
 	
 	// Clear the RTC interrupt.
 	volatile unsigned int umx = AVR32_TC.channel[0].sr; // Read the SR flag to clear the interrupt
@@ -711,10 +857,10 @@ void __AVR32_Timer_Initialize()
 	AVR32_TC.BMR.tc2xc2s = 0b01;
 	
 	AVR32_TC.channel[0].CMR.waveform.wave = 1; // Activate Wave-Form mode
-	AVR32_TC.channel[0].CMR.waveform.tcclks = 0b001; // TIMER_CLOCK2 , equals PBA Clock / 2
+	AVR32_TC.channel[0].CMR.waveform.tcclks = 0b011; // TIMER_CLOCK4 , equals PBA Clock / 32 (equals 1us on 32MHz clock)
 	AVR32_TC.channel[0].CMR.waveform.wavsel = 0b010; // Reset counter on RC Compare match
 	
-	AVR32_TC.channel[0].RC.rc = 500;
+	AVR32_TC.channel[0].RC.rc = 65535; // Value set to maximum
 	
 	// Enable interrupt
 	AVR32_TC.channel[0].IER.cpcs = 1;
@@ -752,6 +898,12 @@ void __AVR32_Timer_Stop()
 {
 	// Enable the Timer
 	AVR32_RTC.CTRL.en = 0;
+}
+
+int __AVR32_Timer_GetValue()
+{
+	// Return the RC Value of the timer
+	return 	AVR32_TC.channel[0].cv;
 }
 
 /////////////////////////////////////////////////

@@ -12,8 +12,9 @@
 #include "USBProtocol_Module.h"
 #include "A2D_Module.h"
 #include "ASIC_Engine.h"
-
+#include <avr32/io.h>
 #include "HostInteractionProtocols.h"
+#include "AVR32X/AVR32_Module.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -101,6 +102,33 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"FIRMWARE: %s\n", __FIRMWARE_VERSION);
 	strcat(szInfoReq, szTemp);
 	
+	/*
+	// Atomic operation latency
+	sprintf(szTemp,"ATOMIC IO LATENCY: %d us\n", uLRes);
+	strcat(szInfoReq, szTemp);
+	
+	// Atomic func latency
+	uL1 = GetTickCount();
+	uL2 = GetTickCount();
+	uLRes = uL2 - uL1;
+	sprintf(szTemp,"ATOMIC FUNC LATENCY: %d us\n", uLRes);
+	strcat(szInfoReq, szTemp);
+	
+	// Atomic IO Macro latency
+	uL1 = MACRO_GetTickCount;
+	MACRO_XLINK_send_packet(0, "ABCD", 4, 1, 0);
+	uL2 = MACRO_GetTickCount;
+	uLRes = (uL2 - uL1);
+	sprintf(szTemp,"ATOMIC IO MACRO LATENCY: %d us\n", uLRes);
+	strcat(szInfoReq, szTemp);
+	
+	// Atomic MARCO latency
+	uL1 = MACRO_GetTickCount;
+	uL2 = MACRO_GetTickCount;
+	uLRes = uL2 - uL1;
+	sprintf(szTemp,"ATOMIC FUNC MACRO LATENCY: %d us\n", uLRes);
+	strcat(szInfoReq, szTemp);*/
+		
 	// Add Engine count
 	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_chip_count());
 	strcat(szInfoReq, szTemp);
@@ -215,6 +243,48 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	char bDevNotResponded = FALSE;
 	char bTimedOut = FALSE;
 	
+	///////////////////////////////////////////////////////////
+	// CPLD TEST Write different values to CPLD and read back
+	//////////////////////////////////////////////////////////
+	
+	long iActualTickTick = GetTickCount();
+	
+	int iTotalWrongReads = 0;
+	unsigned int umi = 0;
+	char burst_write[4] = {0,0,0,0};
+	char burst_read[4]  = {0,0,0,0};
+	
+	/*for (unsigned int umm = 0; umm < 1000; umm++)
+	{
+		burst_write[0] = umm & 0x0FF;
+		burst_write[1] = (umm+1) & 0x0FF;
+		burst_write[2] = (umm+2) & 0x0FF;
+		burst_write[3] = (umm+3) & 0x0FF;
+		__AVR32_CPLD_BurstTxWrite(burst_write, CPLD_ADDRESS_TX_BUF_BEGIN);
+		if (MCU_CPLD_Read(31) != iVal) iTotalWrongReads++;	
+		
+		// TO BE COMPLETED, We need to test burst-read and burst-write
+																																		
+	}
+	
+	sprintf(szReportResult, "Total wrong results: %d, operation took %d us\n", iTotalWrongReads, GetTickCount() - iActualTickTick);
+	
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string(szReportResult);  // Send it to USB
+	}
+	else // We're a slave... send it by XLINK
+	{
+		// We do nothing here...
+	}
+	
+	
+	//////////////////////
+	/// WE RETURN HERE...
+	//////////////////////
+	return res; 
+	*/
+	
 	// Now we send message to XLINK_GENERAL_DISPATCH_ADDRESS for an ECHO and count the successful iterations
 	for (unsigned int x = 0; x < 100000; x++)
 	{
@@ -244,7 +314,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		szResponse[0] = 0; szResponse[1] = 0; szResponse[2] = 0; szResponse[3] = 0;
 		iRespLen = 0;
 	
-		XLINK_wait_packet(szResponse, &iRespLen, 20, &bTimedOut, &iSendersAddress, &iLP, &iBC );
+		XLINK_wait_packet(szResponse, &iRespLen, 90, &bTimedOut, &iSendersAddress, &iLP, &iBC );
 	
 		//if (x < 30) iTransactionTimes[x] = (GetTickCount() - iActualTickTemp);
 	
@@ -267,6 +337,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 			// Increase our success counter			
 			iSuccessCounter++;
 		}
+
 	}
 
 	// Total time taken
@@ -276,12 +347,12 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	char szTempex[128];
 	strcpy(szReportResult,"");
 	
-	for (int x = 0; x < 30; x++)
+	/*for (int x = 0; x < 30; x++)
 	{
 		sprintf(szTempex,"%d,", iTransactionTimes[x]);
 		strcat(szReportResult, szTempex);
 		
-	}
+	}*/
 	
 	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %d us\nAverage transact: %d us\n",
 			iSuccessCounter, 100000, iTotalTimeTaken, iTurnaroundTime );

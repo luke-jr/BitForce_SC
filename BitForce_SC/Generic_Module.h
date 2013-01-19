@@ -61,6 +61,7 @@ void    MCU_Timer_Initialize();
 void    MCU_Timer_SetInterval(unsigned int iPeriod);
 void	MCU_Timer_Start();
 void	MCU_Timer_Stop();
+int		MCU_Timer_GetValue();
 
 // FAN unit
 void	MCU_FAN_Initialize();

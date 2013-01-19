@@ -63,6 +63,7 @@
  void	    __STM32_Timer_SetInterval(unsigned int iPeriod);
  void		__STM32_Timer_Start();
  void		__STM32_Timer_Stop();
+ int		__STM32_Timer_GetValue();
 
 
 #endif /* STM32_MODULE_H_ */
