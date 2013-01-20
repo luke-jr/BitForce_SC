@@ -15,6 +15,7 @@
 #include <avr32/io.h>
 #include "HostInteractionProtocols.h"
 #include "AVR32X/AVR32_Module.h"
+#include "AVR32_OptimizedTemplates.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -86,6 +87,21 @@ PROTOCOL_RESULT Protocol_id(void)
 	return res;
 }
 
+
+
+int iAssemblyTestFunction(int a, int b, int c, int d, int e);
+int iAssemblyTestFunction(int a, int b, int c, int d, int e)
+{
+	register int retVal asm("r0");
+	
+	asm volatile
+	(
+		"mov r0, r11""\n"
+	);
+	
+	return retVal;
+}
+
 PROTOCOL_RESULT Protocol_info_request(void)
 {
 	// Our result
@@ -102,18 +118,19 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"FIRMWARE: %s\n", __FIRMWARE_VERSION);
 	strcat(szInfoReq, szTemp);
 	
-	/*
-	// Atomic operation latency
-	sprintf(szTemp,"ATOMIC IO LATENCY: %d us\n", uLRes);
-	strcat(szInfoReq, szTemp);
-	
+	long uL1;
+	long uL2;
+	long uLRes;
+
 	// Atomic func latency
-	uL1 = GetTickCount();
-	uL2 = GetTickCount();
+	uL1 = MACRO_GetTickCountRet;
+	MACRO_XLINK_send_packet(0, "ABCD", 4, 1, 0);
+	uL2 = MACRO_GetTickCountRet;
 	uLRes = uL2 - uL1;
 	sprintf(szTemp,"ATOMIC FUNC LATENCY: %d us\n", uLRes);
 	strcat(szInfoReq, szTemp);
 	
+	/*
 	// Atomic IO Macro latency
 	uL1 = MACRO_GetTickCount;
 	MACRO_XLINK_send_packet(0, "ABCD", 4, 1, 0);
@@ -128,6 +145,10 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	uLRes = uL2 - uL1;
 	sprintf(szTemp,"ATOMIC FUNC MACRO LATENCY: %d us\n", uLRes);
 	strcat(szInfoReq, szTemp);*/
+	
+	// Add Engine count
+	sprintf(szTemp,"ASM Test Res: %d\n", iAssemblyTestFunction(10,20,30,40,50));
+	strcat(szInfoReq, szTemp);
 		
 	// Add Engine count
 	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_chip_count());
@@ -172,9 +193,9 @@ PROTOCOL_RESULT Protocol_Blink(void)
 	// Send the OK back first
 	// All is good... sent the identifier and get out of here...
 	if (XLINK_ARE_WE_MASTER)
-	USB_send_string("OK\n");  // Send it to USB
+		USB_send_string("OK\n");  // Send it to USB
 	else // We're a slave... send it by XLINK
-	XLINK_SLAVE_respond_string("OK\n");
+		XLINK_SLAVE_respond_string("OK\n");
 	
 	// All is good... sent the identifier and get out of here...
 	blink_medium();
@@ -193,6 +214,9 @@ PROTOCOL_RESULT Protocol_Blink(void)
 	blink_medium();
 	blink_medium();
 	blink_medium();
+	
+	// Set the LED
+	MCU_MainLED_Set();
 
 	// Return our result...
 	return res;
@@ -214,6 +238,7 @@ PROTOCOL_RESULT Protocol_Echo(void)
 	// Return our result...
 	return res;
 }
+
 
 PROTOCOL_RESULT Protocol_Test_Command(void)
 {
@@ -289,19 +314,8 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	for (unsigned int x = 0; x < 100000; x++)
 	{
 		// Clear input
-		XLINK_clear_RX();
-		
-		// Calculate single turn-around time
-		long iActualTickTemp = GetTickCount();
-		long iSecondaryTickTemp = 0;		
-		
-		// Send the command
-		XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
-		
-		/*iResponseLenFromDev = 0;
-		bDevNotResponded = FALSE;
-		bTimedOut = FALSE;
-		XLINK_MASTER_transact(1, "ZGX", 3, szResponseFromDev, &iResponseLenFromDev, 395, __XLINK_TRANSACTION_TIMEOUT__, &bDevNotResponded, &bTimedOut, TRUE );*/
+		MACRO_XLINK_clear_RX;
+
 		
 		// Now we wait for response
 		char bTimedOut = FALSE;
@@ -310,24 +324,29 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		char iBC = 0;
 		char iLP = 0;
 		char iSendersAddress = 0;
-	
+		
 		szResponse[0] = 0; szResponse[1] = 0; szResponse[2] = 0; szResponse[3] = 0;
-		iRespLen = 0;
+		iRespLen = 0;	
+		
+		// Calculate single turn-around time
+		long iActualTickTemp = MACRO_GetTickCountRet;
+		long iSecondaryTickTemp = 0;
+		
+		// Send the command
+		MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
+		MACRO_XLINK_wait_packet(szResponse, iRespLen, 90, bTimedOut, iSendersAddress, iLP, iBC );
 	
-		XLINK_wait_packet(szResponse, &iRespLen, 90, &bTimedOut, &iSendersAddress, &iLP, &iBC );
-	
-		//if (x < 30) iTransactionTimes[x] = (GetTickCount() - iActualTickTemp);
-	
-		// Check the response
-		// if ((bDevNotResponded == FALSE) && (bTimedOut == FALSE) && (iResponseLenFromDev > 12))
+		// Update turnaround time
+		iSecondaryTickTemp = MACRO_GetTickCountRet;
+
+		
 		if ((iRespLen == 4) &&
 		(szResponse[0] == 'E') &&
 		(szResponse[1] == 'C') &&
 		(szResponse[2] == 'H') &&
 		(szResponse[3] == 'O'))
 		{
-			// Update turnaround time
-			iSecondaryTickTemp = GetTickCount();
+
 			
 			if (x == 0) iTurnaroundTime = (iSecondaryTickTemp - iActualTickTemp);
 			

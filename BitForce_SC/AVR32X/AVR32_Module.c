@@ -14,7 +14,8 @@
 // FUNCTIONS
 /////////////////////////////////////////////
 
-#define AVR32_FLASH_ADDRESSx 
+#define XLINK_activate_address_increase     AVR32_GPIO.port[1].ovrs  = __AVR32_CPLD_INCREASE_ADDRESS;
+#define XLINK_deactivate_address_increase   AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
 
 // General MCU Functions
 void __AVR32_LowLevelInitialize()

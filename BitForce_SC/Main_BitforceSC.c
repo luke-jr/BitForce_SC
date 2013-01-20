@@ -22,13 +22,15 @@
 #include "USBProtocol_Module.h"
 #include "A2D_Module.h"
 #include "ASIC_Engine.h"
+#include <avr32/io.h>
 
 #include <string.h>
 #include <stdio.h>
 
 #include "HostInteractionProtocols.h"
 #include "HighLevel_Operations.h"
-
+#include "AVR32_OptimizedTemplates.h"
+#include "AVR32X/AVR32_Module.h"
 // Information about the result we're holding
 extern buf_job_result_packet  __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
 extern char 		   __buf_job_results_count;  // Total of results in our __buf_job_results
@@ -291,7 +293,7 @@ void MCU_Main_Loop()
 			// Check for sz_cmd, if it's PUSH then we have an invalid command
 			if ((sz_cmd[0] == 'P') && (sz_cmd[1] == 'U') && (sz_cmd[2] == 'S') && (sz_cmd[3] == 'H'))
 			{
-				XLINK_send_packet(XLINK_get_cpld_id(), "INVA", 4, TRUE, FALSE);
+				MACRO_XLINK_send_packet(XLINK_get_cpld_id(), "INVA", 4, TRUE, FALSE);
 				continue;
 			}
 			

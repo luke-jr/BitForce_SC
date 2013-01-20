@@ -155,11 +155,6 @@
 #define __AVR32_ENGINE_LED7  (1<<30)   // PORT B
 #define __AVR32_ENGINE_LED8  (1<<31)   // PORT B
 
-
-// Auto address increase function
-#define XLINK_activate_address_increase     AVR32_GPIO.port[1].ovrs  = __AVR32_CPLD_INCREASE_ADDRESS;
-#define XLINK_deactivate_address_increase   AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
-
 //////////////////////////////////////////////
 // FUNCTIONS
 /////////////////////////////////////////////
