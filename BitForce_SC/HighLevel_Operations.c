@@ -23,6 +23,14 @@
 
 void HighLevel_Operations_Spin()
 {
-	// Nothing for the moment
+	// We have to execute Tasks here
 	
+	// This functions sends the next job in the queue
+	// should the engines have finished the previously issue job
+	/*Flush_p2p_buffer_into_engines(); 
+		
+	// Switch the LED
+	static char iVal = 0;
+	if (iVal == 0) MCU_MainLED_Set(); else MCU_MainLED_Reset();
+	iVal = (iVal == 0) ? 1 : 0;	*/
 }

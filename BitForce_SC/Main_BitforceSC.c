@@ -67,6 +67,7 @@ int main(void)
 	init_XLINK(); // TEMPORARY!
 	init_ASIC();
 	init_USB();
+	MCU_FAN_Initialize();
 	
 	// Initialize A2D
 	a2d_init();
@@ -80,6 +81,9 @@ int main(void)
 	MCU_Timer_Initialize();
 	MCU_Timer_SetInterval(10);
 	MCU_Timer_Start();
+	
+	// Initialize our LEDs
+	MCU_LED_Initialize();
 	
 	// Turn on the front LED
 	MCU_MainLED_Initialize();
@@ -129,6 +133,37 @@ int main(void)
 	global_vals[3] = 0;
 	global_vals[4] = 0;
 	global_vals[5] = 0;
+	
+	// *** DEBUG
+	// FAN CYCLING
+	/* int iFanLevel = 0;
+	
+	while (TRUE)
+	{
+		// Wait for 2 seconds
+		volatile long iExpectedTime = GetTickCount();
+		volatile long iActualValue = 0;
+		volatile long iDiff = 0;
+		
+		do
+		{
+			iActualValue = GetTickCount();
+			iDiff = iActualValue - iExpectedTime;
+						
+		}
+		while (iDiff < 5000000); 
+		
+		// Set the FAN level
+		if (iFanLevel == 16) iFanLevel = 0;
+		MCU_LED_AssignValue(iFanLevel);
+		
+		// Set the new fan level
+		MCU_FAN_SetSpeed((char)iFanLevel);
+		
+		// Increase fan level
+		iFanLevel++;		
+	} */
+	
 
 	// Go to our protocol main loop
 	MCU_Main_Loop();
@@ -199,11 +234,6 @@ void MCU_Main_Loop()
 				sz_cmd[1] = 0;
 				sz_cmd[2] = 0;
 			}
-
-			// We've reduced timeout counter to 5000, so we can run this function periodically
-			// Flush the job (should they exist)
-			// This must be called on a timer running 
-			// Management_flush_p2p_buffer_into_engines();
 
 			// Check if there is data, or we just had
 			// an overflow?
@@ -293,7 +323,8 @@ void MCU_Main_Loop()
 			// Check for sz_cmd, if it's PUSH then we have an invalid command
 			if ((sz_cmd[0] == 'P') && (sz_cmd[1] == 'U') && (sz_cmd[2] == 'S') && (sz_cmd[3] == 'H'))
 			{
-				MACRO_XLINK_send_packet(XLINK_get_cpld_id(), "INVA", 4, TRUE, FALSE);
+				unsigned char iOurID = XLINK_get_cpld_id();
+				MACRO_XLINK_send_packet(iOurID, "INVA", 4, TRUE, FALSE);
 				continue;
 			}
 			

@@ -149,7 +149,7 @@ void XLINK_MASTER_transact (char   iAdrs,
 							char*  szResp,
 							unsigned short* response_length,
 							unsigned short  iMaxRespLen,
-							long    transaction_timeout, // Master timeout
+							unsigned long    transaction_timeout, // Master timeout
 							char   *bDeviceNotResponded, // Device did not respond, even to the first packet
 							char   *bTimeoutDetected, // Was a timeout detected?
 							char   bWeAreMaster); // The address we expect from the device to respond to
@@ -165,21 +165,21 @@ int XLINK_MASTER_getChainLength(void);
 void XLINK_SLAVE_wait_transact (char  *data,
 								unsigned int *length,
 								unsigned int  max_len,
-								long transaction_timeout,
+								unsigned long transaction_timeout,
 								char  *bTimeoutDetected,
 								char  bWeAreMaster);
 								
 // This is used by slave as well								
 void XLINK_SLAVE_respond_transact  (char  *data,
 									unsigned int length,
-									long transaction_timeout,
+									unsigned long transaction_timeout,
 									char  *bTimeoutDetected,
 									char  bWeAreMaster); // If zero, we'll use CPLDs address
 
 // This function receives data
 void XLINK_wait_packet (char  *data,
 						unsigned int   *length,
-						long  time_out,
+						unsigned long  time_out,
 						char  *timeout_detected,
 						char  *senders_address,
 						char  *LP,

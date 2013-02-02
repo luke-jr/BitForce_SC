@@ -57,6 +57,7 @@
  void		__STM32_LED_SetAccess();
  void		__STM32_LED_Set  (char iLed);
  void		__STM32_LED_Reset(char iLed);
+ void		__STM32_LED_AssignValue(char iValue);
 
 // Timer
  void	    __STM32_Timer_Initialize();

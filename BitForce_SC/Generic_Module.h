@@ -55,6 +55,7 @@ void	MCU_LED_Initialize();
 void	MCU_LED_SetAccess();
 void	MCU_LED_Set(char iLed);
 void	MCU_LED_Reset(char iLed);
+void    MCU_LED_AssignValue(char iValue);
 
 // Timer
 void    MCU_Timer_Initialize();

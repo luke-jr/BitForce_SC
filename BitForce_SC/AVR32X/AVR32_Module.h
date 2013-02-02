@@ -223,6 +223,7 @@ void	__AVR32_LED_Initialize(void);
 void	__AVR32_LED_SetAccess(void);
 void	__AVR32_LED_Set  (char iLed);
 void	__AVR32_LED_Reset(char iLed);
+void    __AVR32_LED_AssignValue(char iValue);
 
 /////////////////////////////////////////////
 // Timer

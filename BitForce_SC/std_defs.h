@@ -15,9 +15,9 @@
 
 /*************** Operating Frequency ******************/
 // #define __OPERATING_FREQUENCY_16MHz__
-#define __OPERATING_FREQUENCY_32MHz__ 
-// #define __OPERATING_FREQUENCY_48MHz__
-//#define __OPERATING_FREQUENCY_64MHz__
+// #define __OPERATING_FREQUENCY_32MHz__ 
+#define __OPERATING_FREQUENCY_48MHz__
+// #define __OPERATING_FREQUENCY_64MHz__
 
 /*************** Product Model *********************/
 // #define __PRODUCT_MODEL_JALAPENO__
@@ -46,9 +46,9 @@
 
 ///////////////////////////////////////// typedefs
 // Master Tick Counter (Holds clock in 1uS ticks)
-long MAST_TICK_COUNTER;
+unsigned long MAST_TICK_COUNTER;
 
-long GetTickCount(void);
+unsigned long GetTickCount(void);
 void IncrementTickCounter(void);
 
 // Other definitions

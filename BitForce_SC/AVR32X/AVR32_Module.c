@@ -17,6 +17,8 @@
 #define XLINK_activate_address_increase     AVR32_GPIO.port[1].ovrs  = __AVR32_CPLD_INCREASE_ADDRESS;
 #define XLINK_deactivate_address_increase   AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
 
+#define AVR32_FLASH_CONTROLLER_ADDRESS (*((volatile unsigned int*)0xFFFE1400))
+
 // General MCU Functions
 void __AVR32_LowLevelInitialize()
 {
@@ -39,7 +41,7 @@ void __AVR32_LowLevelInitialize()
 		AVR32_PLL0 = 0b00011111000001110000001000000101; // PLL0 at 32MHz
 		
 		// Set wait-state to 1
-		AVR32_FLASHC = ((1 << 8) | (1 << 6)) | 0x00000000;
+		AVR32_FLASH_CONTROLLER_ADDRESS = ((1 << 8) | (1 << 6)) | 0x00000000;
 		
 	#elif defined(__OPERATING_FREQUENCY_48MHz__)
 		// ********* Enable PLL0
@@ -332,7 +334,7 @@ char __AVR32_USB_WriteData(char* iData, char iCount)
 	AVR32_GPIO.port[0].oderc =  __AVR32_USB_AD0 | __AVR32_USB_AD1 |	__AVR32_USB_AD2 | __AVR32_USB_AD3 |
 								__AVR32_USB_AD4 | __AVR32_USB_AD5 |	__AVR32_USB_AD6 | __AVR32_USB_AD7;
 	// Return
-	return iCount;
+	return iCount;	
 }
 
 int  __AVR32_USB_GetInformation()
@@ -435,12 +437,14 @@ void __AVR32_CPLD_Initialize()
 	AVR32_GPIO.port[1].oders = __AVR32_CPLD_INCREASE_ADDRESS;
 	AVR32_GPIO.port[1].gpers = __AVR32_CPLD_INCREASE_ADDRESS;	
 	AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
+	
+	// Nothing needed, the bus is not multiplexed here...
+	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_CS; // Activate CS and leave it active...
 }
 
 inline void __AVR32_CPLD_SetAccess()
 {
-	// Nothing needed, the bus is not multiplexed here...
-	AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_CS; // Activate CS and leave it active...
+	// Nothing
 }
 
 inline void __AVR32_CPLD_Write (char iAdrs, char iData)
@@ -792,6 +796,50 @@ void	__AVR32_LED_SetAccess()
 	// return
 }
 
+void    __AVR32_LED_AssignValue(char iValue)
+{
+	if ((iValue & 0b00000001) != 0)
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED1;
+	else
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED1;
+		
+	if ((iValue & 0b00000010) != 0)
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED2;
+	else
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED2;
+	
+	if ((iValue & 0b00000100) != 0)
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED3;
+	else
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED3;
+		
+	if ((iValue & 0b00001000) != 0)
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED4;
+	else
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED4;
+	
+	if ((iValue & 0b00010000) != 0)
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED5;
+	else
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED5;
+	
+	if ((iValue & 0b00100000) != 0)
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED6;
+	else
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED6;
+	
+	if ((iValue & 0b01000000) != 0)
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED7;
+	else
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED7;					
+		
+	if ((iValue & 0b10000000) != 0)
+		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED8;
+	else
+		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED8;		
+
+}
+
 void	__AVR32_LED_Set  (char iLed)
 {
 	if (iLed == 1)
@@ -925,17 +973,17 @@ int __AVR32_Timer_GetValue()
 
  void __AVR32_FAN_SetSpeed(char iSpeed)
 {
-	volatile unsigned int ovr_value = AVR32_GPIO.port[1].ovr;
+	volatile unsigned int ovr_value = 0;
 	ovr_value = ~( __AVR32_FAN_CTRL3 | __AVR32_FAN_CTRL2 | __AVR32_FAN_CTRL1 | __AVR32_FAN_CTRL0);
 	
 	volatile unsigned int iFinalVal = AVR32_GPIO.port[1].ovr & ovr_value;
 	volatile unsigned int iMXVal = 0;
 	iSpeed ^= 0x0F; // XOR it with 16
 	
-	iMXVal |= (iSpeed & 0b00001) ? __AVR32_FAN_CTRL0 : 0;
-	iMXVal |= (iSpeed & 0b00010) ? __AVR32_FAN_CTRL1 : 0;
-	iMXVal |= (iSpeed & 0b00100) ? __AVR32_FAN_CTRL2 : 0;
-	iMXVal |= (iSpeed & 0b01000) ? __AVR32_FAN_CTRL3 : 0;
+	iMXVal |= (iSpeed & 0b01000) ? __AVR32_FAN_CTRL0 : 0;
+	iMXVal |= (iSpeed & 0b00100) ? __AVR32_FAN_CTRL1 : 0;
+	iMXVal |= (iSpeed & 0b00010) ? __AVR32_FAN_CTRL2 : 0;
+	iMXVal |= (iSpeed & 0b00001) ? __AVR32_FAN_CTRL3 : 0;
 	
 	iFinalVal |= iMXVal;
 	

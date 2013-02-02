@@ -9,7 +9,7 @@
 #include "Generic_Module.h"
 
 
-long	GetTickCount(void)
+unsigned long	GetTickCount(void)
 {
 	#if defined(__OPERATING_FREQUENCY_32MHz__)
 		return ((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF));
