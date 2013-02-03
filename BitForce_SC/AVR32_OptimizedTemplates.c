@@ -6,9 +6,9 @@
  */ 
 
 #include "AVR32_OptimizedTemplates.h"
-#include "AVR32X/AVR32_Module.h"
 #include <avr32/io.h>
 #include "std_defs.h"
+
 
 /*
 	#define AVR32_GPIO_ADDRESS  0xFFFF1000 <BASE> <PORT 0> = -61440
@@ -70,8 +70,10 @@ void OPTIMIZED__AVR32_CPLD_Write(unsigned char iAdrs, unsigned char iData)
 		"ld.w r3, r1[0x50]"		"\n\t" // Load initial value
 		"andh r3, 0x0FFFF"		"\n\t"
 		"andl r3, 0x0FF00"		"\n\t"
+		"andh r12, 0x00"		"\n\t"
+		"andl r12, 0xFF"		"\n\t"
 		"or   r3, r12"			"\n\t" // Set the correct value here
-		"st.w r1[0x50], r12"	"\n\t"	
+		"st.w r1[0x50], r3"		"\n\t"	
 		
 		// Perform Strobe
 		"mov  r2, 0x0000"		"\n\t"
@@ -81,14 +83,14 @@ void OPTIMIZED__AVR32_CPLD_Write(unsigned char iAdrs, unsigned char iData)
 
 		// Port1.ovrc = CPLD_ADRS	
 		"mov  r2, 0x100"		"\n\t"
-		"st.w r1[0x58], r2"		"\n\t"		
+		"st.w r1[0x58], r2"		"\n\t"
 		
 		// Port1.ovr = Data <Note: This is a byte transfer> <Note: r11 is the iData>
 		"ld.w r3, r1[0x50]"		"\n\t" // Load initial value
 		"andh r3, 0x0FFFF"		"\n\t"
 		"andl r3, 0x0FF00"		"\n\t"
 		"or   r3, r11"			"\n\t" // Set the correct value here		
-		"st.w r1[0x50], r11"	"\n\t"
+		"st.w r1[0x50], r3"		"\n\t"
 		
 		// Perform Strobe
 		"mov  r2, 0x0000"		"\n\t"
@@ -98,7 +100,7 @@ void OPTIMIZED__AVR32_CPLD_Write(unsigned char iAdrs, unsigned char iData)
 		
 		// Port1.ODERC = CPLD_BUS_ALL
 		"mov  r2, 0xFF"			"\n\t"
-		"st.w r1[0x48], r2"		"\n\t"						
+		"st.w r1[0x48], r2"		"\n\t"	
 	);
 	
 	// Pop all registers
@@ -410,5 +412,4 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress)
 	// Pop all registers
 	asm volatile ("popm	r0-r3, r4-r7" "\n\t");
 }
-
 

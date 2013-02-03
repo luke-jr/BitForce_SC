@@ -107,6 +107,8 @@ void init_XLINK()
 	XLINK_set_outbox("",0);
 }
 
+
+
 int	XLINK_detect_if_we_are_master()
 {
 	// First check to see if CPLD is present. If it's not, then we're master for sure... (Either Jalapeno or Single)
@@ -169,16 +171,20 @@ int XLINK_MASTER_getChainLength()
 	
 }
 
+
 // iAdrs = Target
 // szData and iLen is the data stack
 void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, char BC)
 {
+	// Set CPLD Access
+	__AVR32_CPLD_SetAccess();
 
 	// Wait until actual buffer is sent...
-	char iTX_STATUS = 0x0FF;
-	while ((iTX_STATUS & CPLD_TX_STATUS_TxInProg) != 0)
+	while (TRUE)
 	{
-		iTX_STATUS = XLINK_get_TX_status();
+		char iTX_STATUS = 0;
+		MACRO_XLINK_get_TX_status(iTX_STATUS);
+		if ((iTX_STATUS & CPLD_TX_STATUS_TxInProg) == 0) break;
 	}
 	
 	// We're ready to send...
@@ -189,7 +195,8 @@ void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, c
 	// BitCorrect will handle the flip-flop correction indicator
 	
 	// Set the target device
-	XLINK_set_target_address(iAdrs);
+	//while (XLINK_get_target_address() != iAdrs)
+	MACRO_XLINK_set_target_address(iAdrs);
 	
 	// *** IREG - TX Control (8 Bit)
 	//
@@ -205,7 +212,7 @@ void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, c
 	char szMMR[4];
 				
 	// Set Data
-	__AVR32_CPLD_BurstTxWrite(szData, CPLD_ADDRESS_TX_BUF_BEGIN);
+	MACRO__AVR32_CPLD_BurstTxWrite(szData, CPLD_ADDRESS_TX_BUF_BEGIN);
 
 	// What's the value to write to our TX Control
 	char iTxControlVal = 0b00000000;	
@@ -216,8 +223,8 @@ void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, c
 	iTxControlVal |= (BC != 0) ? CPLD_TX_CONTROL_BC : 0;
 	
 	// Send packet info
-	__AVR32_CPLD_Write(CPLD_ADDRESS_TX_CONTROL, iTxControlVal);
-	__AVR32_CPLD_Write(CPLD_ADDRESS_TX_START, CPLD_ADDRESS_TX_START_SEND);
+	MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_CONTROL, iTxControlVal);
+	MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_START, CPLD_ADDRESS_TX_START_SEND);
 
 }
 
@@ -226,7 +233,7 @@ void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, c
 //////////////////////////////////////////////////////////////////////////////
 void XLINK_wait_packet (char  *data,
 						unsigned int *length,
-						unsigned long  time_out,
+						UL64  time_out,
 						char  *timeout_detected,
 						char  *senders_address,
 						char  *LP,
@@ -245,7 +252,7 @@ void XLINK_wait_packet (char  *data,
 
 	iActualRXStatus = XLINK_get_RX_status();
 		 
-	unsigned long iTimeoutHolder;
+	UL64 iTimeoutHolder;
 	iTimeoutHolder = GetTickCount();
 
 	// Wait until actual buffer is sent...
@@ -290,7 +297,7 @@ void XLINK_MASTER_transact(char   iAdrs,
 						   char*  szResp,
 						   unsigned short* response_length,
 						   unsigned short  iMaxRespLen,
-						   unsigned long transaction_timeout, // Master timeout
+						   UL64    transaction_timeout, // Master timeout
 						   char   *bDeviceNotResponded, // Device did not respond, even to the first packet
 						   char   *bTimeoutDetected, // Was a timeout detected?
 					       char   bWeAreMaster)
@@ -304,7 +311,7 @@ void XLINK_MASTER_transact(char   iAdrs,
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	volatile unsigned long iActualTickcount = GetTickCount();
+	volatile UL64 iActualTickcount = GetTickCount();
 	volatile unsigned short iTotalSent = 0;
 	volatile char  iBytesToSend = 0;
 	volatile char  iLP = 0; // LastPacket
@@ -332,8 +339,7 @@ RETRY_POINT_1:
 		
 		// Send these bytes
 		char* szDest = (char*)(szData + iTotalSent);
-		// MACRO_XLINK_send_packet(iAdrs, szDest, iBytesToSend, iLP, iBC);
-		XLINK_send_packet(iAdrs, szDest, iBytesToSend, iLP, iBC);
+		MACRO_XLINK_send_packet(iAdrs, szDest, iBytesToSend, iLP, iBC);
 	
 		// Reset variables
 		iTimeoutDetected = 0;
@@ -426,8 +432,8 @@ RETRY_POINT_1:
 	volatile unsigned short iTotalReceived = 0;
 	iTotalRetryCount = 0;
 	
-	volatile unsigned long imrActualHolder = 0;
-	volatile unsigned long imrActualTime = 0;
+	volatile UL64 imrActualHolder = 0;
+	volatile UL64 imrActualTime = 0;
 	
 	// We have to reset the BitCorrector, as it will start from 0 for the PUSH part
 	iBC = TRUE; // Push must be set to one
@@ -440,8 +446,7 @@ RETRY_POINT_1:
 		XLINK_clear_RX();
 		
 		// Proceed
-		// MACRO_XLINK_send_packet(iAdrs,"PUSH", 4, iLP, iBC);
-		XLINK_send_packet(iAdrs,"PUSH", 4, iLP, iBC);
+		MACRO_XLINK_send_packet(iAdrs,"PUSH", 4, iLP, iBC);
 		
 		// Reset variables
 		iTimeoutDetected = 0;
@@ -461,7 +466,7 @@ RETRY_POINT_1:
 		// Wait for response		
 		XLINK_wait_packet(szDevResponse, 
 						  &__iRespLen,
-						  ((iTotalReceived == 0) ? (__XLINK_WAIT_PACKET_TIMEOUT__ << 3) : (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3)),  // For the first packet (only) we wait long time. For the rest, we'll be fast...
+						  ((iTotalReceived == 0) ? (__XLINK_WAIT_PACKET_TIMEOUT__ << 3) : (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3)),  // For the first packet (only) we wait UL64 time. For the rest, we'll be fast...
 						  &iTimeoutDetected,
 						  &__senders_address,
 						  &__lp,
@@ -524,10 +529,10 @@ RETRY_POINT_1:
 		iTotalRetryCount = 0;
 		
 		// Resp was OK... Take the data
-		if ((__iRespLen >= 1) && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[0];
-		if ((__iRespLen >= 2) && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[1];
-		if ((__iRespLen >= 3) && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[2];
-		if ((__iRespLen >= 4) && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[3];
+		if (__iRespLen >= 1 && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[0];
+		if (__iRespLen >= 2 && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[1];
+		if (__iRespLen >= 3 && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[2];
+		if (__iRespLen >= 4 && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[3];
 		
 		// We've sent 4 more bytes
 		iBC = (iBC == 0) ? 1 : 0; // Flip BitCorrector
@@ -561,8 +566,7 @@ RETRY_POINT_3:
 		XLINK_clear_RX();
 		
 		// Proceed
-		// MACRO_XLINK_send_packet(iAdrs,"TERM", 4, iLP, 0);
-		XLINK_send_packet(iAdrs,"TERM", 4, iLP, 0);
+		MACRO_XLINK_send_packet(iAdrs,"TERM", 4, iLP, 0);
 			
 		// Reset variables
 		iTimeoutDetected = 0;
@@ -661,7 +665,7 @@ RETRY_POINT_3:
 void XLINK_SLAVE_wait_transact (char  *data,
 							    unsigned int *length,
 							    unsigned int  max_len,
-							    unsigned long transaction_timeout,
+							    UL64 transaction_timeout,
 							    char  *bTimeoutDetected,
 							    char  bWeAreMaster)
 {
@@ -673,7 +677,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	volatile unsigned long  iActualTickcount;
+	volatile UL64  iActualTickcount;
 	MACRO_GetTickCount(iActualTickcount);
 	
 	volatile char  iBC = 0; // BitCorrector
@@ -702,17 +706,14 @@ void XLINK_SLAVE_wait_transact (char  *data,
 		szResp[2] = 0;
 		szResp[3] = 0;
 			
-		/*MACRO_XLINK_wait_packet(szResp,
+		MACRO_XLINK_wait_packet(szResp,
 								__iRespLen,
 								__XLINK_WAIT_PACKET_TIMEOUT__,  // For the first packet (only), we allow 120us delay
 								iTimeoutDetected,
 								__senders_address,
 								__lp,
 								__bc);
-			*/
-		
-		XLINK_wait_packet(szResp, &__iRespLen, __XLINK_WAIT_PACKET_TIMEOUT__, &iTimeoutDetected, &__senders_address, &__lp, &__bc);
-		
+			
 		// Check master timeout
 		if (MACRO_GetTickCountRet - iActualTickcount > transaction_timeout)
 		{
@@ -767,12 +768,10 @@ void XLINK_SLAVE_wait_transact (char  *data,
 				(szResp[3] == 'M'))
 			{
 				// Clear the Input buffer first
-				// MACRO_XLINK_clear_RX;
-				XLINK_clear_RX();				
+				MACRO_XLINK_clear_RX;				
 				
 				// Reply with TERM and repeat the loop
-				// MACRO_XLINK_send_packet(__OUR_CPLD_ID,"TERM",4, 1, 0);
-				XLINK_send_packet(__OUR_CPLD_ID, "TERM", 4, 1, 0);
+				MACRO_XLINK_send_packet(__OUR_CPLD_ID,"TERM",4, 1, 0);
 				continue;
 			}
 			
@@ -782,12 +781,10 @@ void XLINK_SLAVE_wait_transact (char  *data,
 				(szResp[2] == 'X'))
 			{
 				// Clear the Input buffer first
-				// MACRO_XLINK_clear_RX;
-				XLINK_clear_RX();
+				MACRO_XLINK_clear_RX;
 							
 				// Reply with TERM and repeat the loop
-				// MACRO_XLINK_send_packet(__OUR_CPLD_ID,"ECHO",4, TRUE, FALSE);
-				XLINK_send_packet(__OUR_CPLD_ID, "ECHO", 4, TRUE, FALSE);
+				MACRO_XLINK_send_packet(__OUR_CPLD_ID,"ECHO",4, TRUE, FALSE);
 				continue;
 			}
 		}
@@ -820,8 +817,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 		iBC = (iBC == 0) ? 1 : 0; // Flip BitCorrector
 		
 		// Clear the input buffer first
-		// MACRO_XLINK_clear_RX;
-		XLINK_clear_RX();
+		MACRO_XLINK_clear_RX;
 		
 		// At this point, sent an OK back to sender
 		sziMX[0] = 'A';
@@ -829,8 +825,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 		sziMX[2] = 'T';
 		sziMX[3] = 'X';
 		
-		// MACRO_XLINK_send_packet(__OUR_CPLD_ID,sziMX, 4, 1, 0);
-		XLINK_send_packet(__OUR_CPLD_ID, sziMX, 4, 1, 0);
+		MACRO_XLINK_send_packet(__OUR_CPLD_ID,sziMX, 4, 1, 0);
 		
 		// Was it the last packet? if so, exit the loop
 		if (__lp == 1) break;
@@ -845,7 +840,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 
 void XLINK_SLAVE_respond_transact  (char  *data,
 									unsigned int length,
-									unsigned long transaction_timeout,
+									UL64 transaction_timeout,
 									char  *bTimeoutDetected,
 									char  bWeAreMaster)
 {
@@ -888,16 +883,13 @@ RETRY_POINT_1:
 		szResp[2] = 0;
 		szResp[3] = 0;
 		
-	   /*MACRO_XLINK_wait_packet(szResp,
+	   MACRO_XLINK_wait_packet(szResp,
 							  __iRespLen,
 							  __XLINK_WAIT_PACKET_TIMEOUT__,  // We wait for 200us
 							  iTimeoutDetected,
 							  __senders_address,
 							  __lp,
 							  __bc);
-							  */
-	   
-	   XLINK_wait_packet(szResp, &__iRespLen, 90, &iTimeoutDetected, &__senders_address, &__lp, &__bc); 
 		
 		// Check master timeout
 		if (MACRO_GetTickCountRet - iActualTickcount > transaction_timeout)
@@ -959,15 +951,13 @@ RETRY_POINT_1:
 			{
 				// We've failed
 				*bTimeoutDetected = 3;
-				// MACRO_XLINK_clear_RX;				
-				XLINK_clear_RX();
+				MACRO_XLINK_clear_RX;				
 				return;		
 			}
 			else
 			{
 				// Before doing anything, clear the CPLD
-				// MACRO_XLINK_clear_RX;
-				XLINK_clear_RX();
+				MACRO_XLINK_clear_RX;
 				
 				// We will respond with 'OK' (perhaps the host has not received the OK from the time the first command was executed)
 				XLINK_send_packet(iAddressToUseForTransactions, "AR99", 4, TRUE, !iBC); // BitCorrector must never be correct for this				
@@ -982,12 +972,10 @@ RETRY_POINT_1:
 		if (__bc != iBC)
 		{
 			// Before doing anything, clear the CPLD
-			// MACRO_XLINK_clear_RX;
-			XLINK_clear_RX();
+			MACRO_XLINK_clear_RX;
 			
 			// This means we have to send old data and continue the loop
-			// MACRO_XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
-			XLINK_send_packet(iAddressToUseForTransactions,  szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
+			MACRO_XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
 		}
 		else // We send new data
 		{
@@ -1005,12 +993,10 @@ RETRY_POINT_1:
 			if (iBytesToSend == 4) szPrevData[3] = data[iTotalSent+3];
 		
 			// Before doing anything, clear the CPLD
-			// MACRO_XLINK_clear_RX;	
-			XLINK_clear_RX();
+			MACRO_XLINK_clear_RX;	
 			
 			// Now send the data
-			// MACRO_XLINK_send_packet(iAddressToUseForTransactions,szPrevData, iBytesToSend, iPrevLP, iBC);				
-			XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iBytesToSend, iPrevLP, iBC);
+			MACRO_XLINK_send_packet(iAddressToUseForTransactions,szPrevData, iBytesToSend, iPrevLP, iBC);				
 			
 			// Flip the BitCorrector
 			iBC = (iBC == 1) ? 0 : 1;
@@ -1042,23 +1028,19 @@ RETRY_POINT_2:
 		szResp[0] = 0; szResp[1] = 0; szResp[2] = 0;szResp[3] = 0;
 		
 		// Wait for the packet to arrive
-		/* MACRO_XLINK_wait_packet(szResp,
+		MACRO_XLINK_wait_packet(szResp,
 							  __iRespLen,
 							  __XLINK_WAIT_PACKET_TIMEOUT__,  // 200us Timeout
 							  iTimeoutDetected,
 							  __senders_address,
 							  __lp,
-							  __bc); */
-		
-		XLINK_wait_packet(szResp, &__iRespLen, 90, &iTimeoutDetected, &__senders_address, &__lp, &__bc);
-	 	
+							  __bc);
 		
 		// Check master timeout
 		if (MACRO_GetTickCountRet - iActualTickcount > transaction_timeout)
 		{
 			*bTimeoutDetected = 4;
-			// MACRO_XLINK_clear_RX;
-			XLINK_clear_RX();
+			MACRO_XLINK_clear_RX;
 			return;
 		}
 		
@@ -1067,8 +1049,7 @@ RETRY_POINT_2:
 		{
 			// Ok we've timed out, try for 3 times
 			*bTimeoutDetected = 5;
-			// MACRO_XLINK_clear_RX;
-			XLINK_clear_RX();
+			MACRO_XLINK_clear_RX;
 			return;
 		}
 		
@@ -1109,18 +1090,14 @@ RETRY_POINT_2:
 				{
 					// We've failed
 					*bTimeoutDetected = 7;
-					// MACRO_XLINK_clear_RX;					
-					XLINK_clear_RX();
+					MACRO_XLINK_clear_RX;					
 					return;
 				}
 				else
 				{
 					// Resend the packet
-					// MACRO_XLINK_clear_RX;					
-					XLINK_clear_RX();
-					// MACRO_XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
-					
-					XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
+					MACRO_XLINK_clear_RX;					
+					MACRO_XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
 					
 					// We will try again
 					iTotalRetryCount++;
@@ -1133,8 +1110,7 @@ RETRY_POINT_2:
 				{
 					// We've failed
 					*bTimeoutDetected = 8;
-					// MACRO_XLINK_clear_RX;						
-					XLINK_clear_RX();
+					MACRO_XLINK_clear_RX;						
 					return;
 				}
 				else
@@ -1148,12 +1124,10 @@ RETRY_POINT_2:
 		
 
 		// Before doing anything, clear the CPLD
-		// MACRO_XLINK_clear_RX;	
-		XLINK_clear_RX();
+		MACRO_XLINK_clear_RX;	
 		
 		// OK we've received our 
-		// MACRO_XLINK_send_packet(iAddressToUseForTransactions, "TERM", 4, 1, 0);
-		XLINK_send_packet(iAddressToUseForTransactions, "TERM", 4, 1, 0);
+		MACRO_XLINK_send_packet(iAddressToUseForTransactions, "TERM", 4, 1, 0);
 		break; 
 				
 		// Now here is the catch: If the host won't received the TERM signal, it will resend it. The next TERM packet
@@ -1259,3 +1233,4 @@ void XLINK_set_outbox(char* szData, short iLen)
 	XLINK_Outbox_Length = iLen;
 	for (unsigned int x = 0; x < iLen; x++) XLINK_Outbox[x] = szData[x];
 }
+;

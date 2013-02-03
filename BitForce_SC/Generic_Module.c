@@ -387,17 +387,6 @@ void	MCU_LED_Reset(char iLed)
 	#endif
 }
 
-void    MCU_LED_AssignValue(char iValue)
-{
-	#if   defined( __COMPILING_FOR_AVR32__)
-	__AVR32_LED_AssignValue(iValue);
-	#elif defined( __COMPILING_FOR_STM32__)
-	__STM32_LED_AssignValue(iValue);
-	#elif defined( __COMPILING_FOR_PIC32__)
-	__PIC32_LED_AssignValue(iValue);
-	#endif	
-}
-
 // Timer
 void MCU_Timer_Initialize()
 {

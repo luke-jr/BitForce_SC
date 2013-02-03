@@ -47,7 +47,7 @@ void USB_wait_stream (char* data,
 	// Now continue until buffer is empty
 	while ((*length < max_len) && *time_out-- > 1)
 	{
-		// We read as long as there is inbound data, and max-len was not surpassed
+		// We read as UL64 as there is inbound data, and max-len was not surpassed
 		while ((*length < max_len) && 
 			   (USB_inbound_USB_data() != FALSE) && 
 			   (!EOS_detected))
@@ -62,7 +62,7 @@ void USB_wait_stream (char* data,
 			}
 			else
 			{			
-				// We take the byte as long as total length is less than maximum length.
+				// We take the byte as UL64 as total length is less than maximum length.
 				// Like this if we're in a problematic transaction, we won't encounter buffer overrun
 				// and at the same time we will clear FTDI's buffer for the newer transactions
 				if (*length < max_len) data[*length++] = byte_received;
@@ -117,7 +117,7 @@ void USB_wait_packet(char* data,
 		// Reduce timeout
 		*time_out = *time_out - 1;
 
-		// We read as long as there is inbound data, and max-len was not surpassed
+		// We read as UL64 as there is inbound data, and max-len was not surpassed
 		while ((*length < max_len) && (USB_inbound_USB_data() != 0))
 		{
 			data[*length] = USB_read_byte();

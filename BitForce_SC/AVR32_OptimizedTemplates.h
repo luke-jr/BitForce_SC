@@ -18,6 +18,7 @@ void OPTIMIZED__AVR32_CPLD_Read (unsigned char iAdrs, unsigned char *retVal);
 void OPTIMIZED__AVR32_CPLD_BurstTxWrite(char* szData, char iAddress);
 void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 
+
 //////////////////////////////////////////////////////////////////
 // MACROS
 /////////////////////////////////////////////////////////////////
@@ -130,10 +131,9 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \
 	 })
 
-#define MACRO_XLINK_get_TX_status(x)		  (MACRO__AVR32_CPLD_Read(x,CPLD_ADDRESS_TX_STATUS))
-#define MACRO_XLINK_get_RX_status(x)		  (MACRO__AVR32_CPLD_Read(x,CPLD_ADDRESS_RX_STATUS))
+#define MACRO_XLINK_get_TX_status(ret_value)  (MACRO__AVR32_CPLD_Read(ret_value, CPLD_ADDRESS_TX_STATUS))
+#define MACRO_XLINK_get_RX_status(ret_value)  (MACRO__AVR32_CPLD_Read(ret_value, CPLD_ADDRESS_RX_STATUS))
 #define MACRO_XLINK_set_target_address(x)	  (MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_TARGET_ADRS, x & 0b011111))
-
 
 /*
 #define MACRO_XLINK_send_packet(iadrs, szdata, ilen, lp, bc) ({ \
@@ -153,8 +153,8 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 
 
 #define MACRO_XLINK_send_packet(iadrs, szdata, ilen, lp, bc) ({ \
-		char read_tx_status = 0x0FF; \
-		while ((read_tx_status & CPLD_TX_STATUS_TxInProg) != 0) {  MACRO_XLINK_get_TX_status(read_tx_status); } \
+char read_tx_status = 0x0FF; \
+		while ((read_tx_status & CPLD_TX_STATUS_TxInProg) != 0) { MACRO_XLINK_get_TX_status(read_tx_status);} \
 		MACRO_XLINK_set_target_address(iadrs); \
 		unsigned char iTotalToSend = (ilen << 1); \
 		char szMMR[4]; \
@@ -180,9 +180,9 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 			volatile unsigned char us1 = 0; \
 			volatile unsigned char us2 = 0; \
 			MACRO_XLINK_get_RX_status(iActualRXStatus); \
-			long iTimeoutHolder; \
+			UL64 iTimeoutHolder; \
 			MACRO_GetTickCount(iTimeoutHolder); \
-			long iTickHolder; \
+			UL64 iTickHolder; \
 			if ((iActualRXStatus & CPLD_RX_STATUS_DATA) == 0) \
 			{ \
 				while (TRUE) \ 
@@ -190,7 +190,7 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 					MACRO_XLINK_get_RX_status(iActualRXStatus); \
 					if ((iActualRXStatus & CPLD_RX_STATUS_DATA) != 0) break; \
 					MACRO_GetTickCount(iTickHolder); \
-					if ((iTickHolder - iTimeoutHolder) > (long)(time_out)) \
+					if ((iTickHolder - iTimeoutHolder) > time_out) \
 					{ \
 						timeout_detected = TRUE; \
 						length = 0; \
@@ -205,7 +205,7 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 			length = imrLen; \
 			LP = ((iActualRXStatus & CPLD_RX_STATUS_LP) != 0) ? 1 : 0; \
 			BC = ((iActualRXStatus & CPLD_RX_STATUS_BC) != 0) ? 1 : 0; \
-			MACRO__AVR32_CPLD_Read(senders_address,CPLD_ADDRESS_SENDERS_ADRS); \
+			MACRO__AVR32_CPLD_Read(senders_address, CPLD_ADDRESS_SENDERS_ADRS); \
 			MACRO__AVR32_CPLD_BurstRxRead(data, CPLD_ADDRESS_RX_BUF_BEGIN); \
 			MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR); \
 			break; \

@@ -15,9 +15,9 @@
 
 /*************** Operating Frequency ******************/
 // #define __OPERATING_FREQUENCY_16MHz__
-// #define __OPERATING_FREQUENCY_32MHz__ 
-#define __OPERATING_FREQUENCY_48MHz__
-// #define __OPERATING_FREQUENCY_64MHz__
+#define __OPERATING_FREQUENCY_32MHz__ 
+// #define __OPERATING_FREQUENCY_48MHz__
+//#define __OPERATING_FREQUENCY_64MHz__
 
 /*************** Product Model *********************/
 // #define __PRODUCT_MODEL_JALAPENO__
@@ -44,11 +44,15 @@
 #define UNIT_FIRMWARE_TYPE		">>>>JALAPENO>>>>" // OR ">>>>MINIRIG>>>>" OR ">>>>SINGLE>>>>" OR ">>>>LITTLE-SINGLE>>>>"
 #define UNIT_FIRMWARE_SPEED		">>>>32>>>>"
 
+// We define our UL64 and Unsigned Long Long
+typedef long long UL64;
+
+
 ///////////////////////////////////////// typedefs
 // Master Tick Counter (Holds clock in 1uS ticks)
-unsigned long MAST_TICK_COUNTER;
+UL64 MAST_TICK_COUNTER;
 
-unsigned long GetTickCount(void);
+UL64 GetTickCount(void);
 void IncrementTickCounter(void);
 
 // Other definitions
