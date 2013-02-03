@@ -40,7 +40,7 @@
 */
 
 
-void OPTIMIZED__AVR32_CPLD_Write(unsigned char iAdrs, unsigned char iData)
+inline void OPTIMIZED__AVR32_CPLD_Write(unsigned char iAdrs, unsigned char iData)
 {
 	// iAdrs is mapped to r12, iData is mapped to r11
 	// Declare our result character
@@ -110,7 +110,7 @@ void OPTIMIZED__AVR32_CPLD_Write(unsigned char iAdrs, unsigned char iData)
 
 #define DUMMY_REG (*((volatile unsigned int*)0xFFFF1150)) 
 
-void OPTIMIZED__AVR32_CPLD_Read (unsigned char iAdrs, unsigned char *retVal)
+inline void OPTIMIZED__AVR32_CPLD_Read (unsigned char iAdrs, unsigned char *retVal)
 {
 	// iAdrs is mapped to r12, retVal is mapped to r11
 	// Declare our result character	
@@ -187,7 +187,7 @@ void OPTIMIZED__AVR32_CPLD_Read (unsigned char iAdrs, unsigned char *retVal)
 
 }
 
-void OPTIMIZED__AVR32_CPLD_BurstTxWrite(char* szData, char iAddress)
+inline void OPTIMIZED__AVR32_CPLD_BurstTxWrite(char* szData, char iAddress)
 {
 	// In this case, szData is r12, iAddress is r11
 
@@ -196,7 +196,6 @@ void OPTIMIZED__AVR32_CPLD_BurstTxWrite(char* szData, char iAddress)
 
 	// R0 equals PORT0 BASE ADDRESS
 	// R1 equals PORT1 BASE ADDRESS
-
 	asm volatile (
 
 		// Save base addresses in r0 and r1 (we'll be using these a lot)
@@ -294,14 +293,20 @@ void OPTIMIZED__AVR32_CPLD_BurstTxWrite(char* szData, char iAddress)
 	asm volatile ("popm	r0-r3, r4-r7" "\n\t");	
 }
 
-void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress)
+inline void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress)
 {
+	
+	/*OPTIMIZED__AVR32_CPLD_Read(iAddress, &szData[0]);
+	OPTIMIZED__AVR32_CPLD_Read(iAddress+1, &szData[1]);
+	OPTIMIZED__AVR32_CPLD_Read(iAddress+2, &szData[2]);
+	OPTIMIZED__AVR32_CPLD_Read(iAddress+3, &szData[3]);*/
+	
 	// In this case, szData is r12, iAddress is r11 
 	asm volatile ("pushm r0-r3, r4-r7" "\n\t");
 	
 	// R0 equals PORT0 BASE ADDRESS
 	// R1 equals PORT1 BASE ADDRESS
-	
+
 	asm volatile (		
 		// Save base addresses in r0 and r1 (we'll be using these a lot)
 		"mov  r0, -61440"		"\n\t"
@@ -330,6 +335,8 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress)
 		"mov  r2, 0x00000000"	"\n\t"
 		"movh r2, 0x2000"		"\n\t"
 		"st.w r0[0x54], r2"		"\n\t"
+		"nop"					"\n\t"
+		"nop"					"\n\t"			
 		"st.w r0[0x58], r2"		"\n\t"
 		
 		// Port1.ovrc = CPLD_ADRS
@@ -345,7 +352,7 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress)
 		"st.w r1[0x54], r2"		"\n\t"
 		
 		// Enable the CPLD-Address-Increment
-		// Port1.ovrs = CPLD_ADDRESS_DECREMENT
+		// Port1.ovrs = CPLD_ADDRESS_INCREMENT
 		"mov  r2, 0x400"		"\n\t"
 		"st.w r1[0x54], r2"		"\n\t"		
 		
@@ -353,47 +360,49 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress)
 		"mov  r2, 0x0000"		"\n\t"
 		"movh r2, 0x2000"		"\n\t"
 		"nop"					"\n\t"
-		
+		"nop"					"\n\t"
+				
 			// ------------- Read the PVR Byte Value
-			"nop"					"\n\t"
-			"nop"					"\n\t"
-			"nop"					"\n\t"
-			"nop"					"\n\t"			
-			"ld.ub r3, r1[0x60]"	"\n\t"
+			"ld.w  r3, r1[0x60]"	"\n\t"
 			"st.b  r12[0], r3"		"\n\t"		
 			// >> Perform Strobe
 			"st.w r0[0x54], r2"		"\n\t"
+			"nop"					"\n\t"
+			"nop"					"\n\t"
+			"nop"					"\n\t"
+			"nop"					"\n\t"			
 			"st.w r0[0x58], r2"		"\n\t"
 			
 			// ------------- Read the PVR Byte Value
-			"nop"					"\n\t"			
-			"nop"					"\n\t"\
-			"nop"					"\n\t"
-			"nop"					"\n\t"			
-			"ld.ub r3, r1[0x60]"	"\n\t"
+			"ld.w  r3, r1[0x60]"	"\n\t"
 			"st.b  r12[1], r3"		"\n\t"		
 			// >> Perform Strobe
 			"st.w r0[0x54], r2"		"\n\t"
-			"st.w r0[0x58], r2"		"\n\t"					
-					
-			// ------------- Read the PVR Byte Value
-			"nop"					"\n\t"		
-			"nop"					"\n\t"	
+			"nop"					"\n\t"
+			"nop"					"\n\t"
 			"nop"					"\n\t"
 			"nop"					"\n\t"			
-			"ld.ub r3, r1[0x60]"	"\n\t"
+			"st.w r0[0x58], r2"		"\n\t"					
+
+
+			// ------------- Read the PVR Byte Value
+			"ld.w  r3, r1[0x60]"	"\n\t"
 			"st.b  r12[2], r3"		"\n\t"		
 			// >> Perform Strobe
 			"st.w r0[0x54], r2"		"\n\t"
+			"nop"					"\n\t"
+			"nop"					"\n\t"
+			"nop"					"\n\t"
+			"nop"					"\n\t"			
 			"st.w r0[0x58], r2"		"\n\t"	
+	
 			
 			// ------------- Read the PVR Byte Value
-			"nop"					"\n\t"
-			"nop"					"\n\t"		
-			"nop"					"\n\t"
-			"nop"					"\n\t"				
-			"ld.ub r3, r1[0x60]"	"\n\t"
+			"ld.w  r3, r1[0x60]"	"\n\t"
 			"st.b  r12[3], r3"		"\n\t"
+			
+		"nop"					"\n\t"
+		"nop"					"\n\t"			
 				
 		// Port1.ovrc = CPLD_OE (OE Cleared)
 		"mov  r2, 0x200"		"\n\t"
@@ -404,9 +413,11 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress)
 		"mov  r2, 0x400"		"\n\t"
 		"st.w r1[0x58], r2"		"\n\t"		
 		
-		// Port1.ODERC = CPLD_BUS_ALL
-		"mov  r2, 0xFF"			"\n\t"
-		"st.w r1[0x48], r2"		"\n\t"
+		// Port1.ODERC = CPLD_BUS_ALL < NOT NEEDED, It's already in this state >
+		// "mov  r2, 0xFF"			"\n\t"
+		// "st.w r1[0x48], r2"		"\n\t"
+		
+	
 	);
 		
 	// Pop all registers

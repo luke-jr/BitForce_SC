@@ -138,13 +138,14 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	uLRes = (uL2 - uL1);
 	sprintf(szTemp,"ATOMIC IO MACRO LATENCY: %d us\n", uLRes);
 	strcat(szInfoReq, szTemp);
+	*/
 	
 	// Atomic MARCO latency
-	uL1 = MACRO_GetTickCount;
-	uL2 = MACRO_GetTickCount;
+	uL1 = MACRO_GetTickCountRet;
+	uL2 = MACRO_GetTickCountRet;
 	uLRes = uL2 - uL1;
-	sprintf(szTemp,"ATOMIC FUNC MACRO LATENCY: %d us\n", uLRes);
-	strcat(szInfoReq, szTemp);*/
+	sprintf(szTemp,"ATOMIC TICK MACRO LATENCY: %d us\n", (unsigned int)uLRes);
+	strcat(szInfoReq, szTemp);
 	
 	// Add Engine count
 	sprintf(szTemp,"ASM Test Res: %d\n", iAssemblyTestFunction(10,20,30,40,50));
@@ -239,13 +240,13 @@ PROTOCOL_RESULT Protocol_Echo(void)
 	return res;
 }
 
-
+/*
 #define TESTMACRO_XLINK_get_TX_status(ret_value)  (OPTIMIZED__AVR32_CPLD_Read(CPLD_ADDRESS_TX_STATUS, &ret_value))
 #define TESTMACRO_XLINK_get_RX_status(ret_value)  (OPTIMIZED__AVR32_CPLD_Read(CPLD_ADDRESS_RX_STATUS, &ret_value))
 #define TESTMACRO_XLINK_set_target_address(x)	  (OPTIMIZED__AVR32_CPLD_Write(CPLD_ADDRESS_TX_TARGET_ADRS, x))
 
 #define TESTMACRO_XLINK_send_packet(iadrs, szdata, ilen, lp, bc) ({ \
-		char read_tx_status = 0x0FF; \
+char read_tx_status = 0x0FF; \
 		while ((read_tx_status & CPLD_TX_STATUS_TxInProg) != 0) { TESTMACRO_XLINK_get_TX_status(read_tx_status);} \
 		TESTMACRO_XLINK_set_target_address(iadrs); \
 		unsigned char iTotalToSend = (ilen << 1); \
@@ -259,8 +260,6 @@ PROTOCOL_RESULT Protocol_Echo(void)
 		OPTIMIZED__AVR32_CPLD_Write(CPLD_ADDRESS_TX_START, CPLD_ADDRESS_TX_START_SEND); \
 		})	
 		
-
-/*
 #define TESTMACRO_XLINK_wait_packet(data, length, time_out, timeout_detected, senders_address, LP, BC) ({ \
 while(TRUE) \
 { \
@@ -345,6 +344,8 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	unsigned int umi = 0;
 	char burst_write[4] = {0,0,0,0};
 	char burst_read[4]  = {0,0,0,0};
+		
+
 	
 	/*for (unsigned int umm = 0; umm < 1000; umm++)
 	{
@@ -376,6 +377,8 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	//////////////////////
 	return res; 
 	*/
+	// Total time taken
+	UL64 iTotalTimeTaken = 0;
 	
 	// Now we send message to XLINK_GENERAL_DISPATCH_ADDRESS for an ECHO and count the successful iterations
 	for (unsigned int x = 0; x < 100000; x++)
@@ -396,19 +399,18 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		iRespLen = 0;	
 		
 		// Calculate single turn-around time
-		UL64 iActualTickTemp = MACRO_GetTickCountRet;
 		UL64 iSecondaryTickTemp = 0;
+		UL64 iActualTickTemp = MACRO_GetTickCountRet;
 		
 		// Send the command
-		// MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
-		TESTMACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
-		
+		MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
 		MACRO_XLINK_wait_packet(szResponse, iRespLen, 90, bTimedOut, iSendersAddress, iLP, iBC );
-		//TESTMACRO_XLINK_wait_packet(szResponse, iRespLen, 90, bTimedOut, iSendersAddress, iLP, iBC );
 	
 		// Update turnaround time
 		iSecondaryTickTemp = MACRO_GetTickCountRet;
-
+		
+		// Increase total time
+		iTotalTimeTaken += (iSecondaryTickTemp - iActualTickTemp);
 		
 		if ((iRespLen == 4) &&
 		(szResponse[0] == 'E') &&
@@ -419,6 +421,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 
 			
 			if (x == 0) iTurnaroundTime = (iSecondaryTickTemp - iActualTickTemp);
+			if (iTurnaroundTime > 0) iTurnaroundTime -= 1;
 			
 			//  Update turnaround time
 			iTurnaroundTime = (iTurnaroundTime + (iSecondaryTickTemp - iActualTickTemp)) / 2;
@@ -428,9 +431,6 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		}
 
 	}
-
-	// Total time taken
-	UL64 iTotalTimeTaken = GetTickCount() - iActualTick;
 
 	// Generate Report
 	char szTempex[128];
@@ -444,7 +444,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	}*/
 	
 	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %d us\nAverage transact: %d us\n",
-			iSuccessCounter, 100000, iTotalTimeTaken, iTurnaroundTime );
+			iSuccessCounter, 100000, (unsigned int)iTotalTimeTaken, (unsigned int)iTurnaroundTime );
 
 	strcat(szReportResult, szTempex);
 	
