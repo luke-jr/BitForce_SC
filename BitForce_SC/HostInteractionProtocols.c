@@ -87,21 +87,6 @@ PROTOCOL_RESULT Protocol_id(void)
 	return res;
 }
 
-
-
-int iAssemblyTestFunction(int a, int b, int c, int d, int e);
-int iAssemblyTestFunction(int a, int b, int c, int d, int e)
-{
-	register int retVal asm("r0");
-	
-	asm volatile
-	(
-		"mov r0, r11""\n"
-	);
-	
-	return retVal;
-}
-
 PROTOCOL_RESULT Protocol_info_request(void)
 {
 	// Our result
@@ -124,31 +109,17 @@ PROTOCOL_RESULT Protocol_info_request(void)
 
 	// Atomic func latency
 	uL1 = MACRO_GetTickCountRet;
-	MACRO_XLINK_send_packet(0, "ABCD", 4, 1, 0);
+	MACRO_XLINK_send_packet(0,"ABCD",4,0,0);
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = uL2 - uL1;
-	sprintf(szTemp,"ATOMIC FUNC LATENCY: %d us\n", uLRes);
+	sprintf(szTemp,"ATOMIC TX FUNC LATENCY: %d us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);
-	
-	/*
-	// Atomic IO Macro latency
-	uL1 = MACRO_GetTickCount;
-	MACRO_XLINK_send_packet(0, "ABCD", 4, 1, 0);
-	uL2 = MACRO_GetTickCount;
-	uLRes = (uL2 - uL1);
-	sprintf(szTemp,"ATOMIC IO MACRO LATENCY: %d us\n", uLRes);
-	strcat(szInfoReq, szTemp);
-	*/
-	
+		
 	// Atomic MARCO latency
 	uL1 = MACRO_GetTickCountRet;
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = uL2 - uL1;
 	sprintf(szTemp,"ATOMIC TICK MACRO LATENCY: %d us\n", (unsigned int)uLRes);
-	strcat(szInfoReq, szTemp);
-	
-	// Add Engine count
-	sprintf(szTemp,"ASM Test Res: %d\n", iAssemblyTestFunction(10,20,30,40,50));
 	strcat(szInfoReq, szTemp);
 		
 	// Add Engine count
@@ -401,6 +372,9 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		// Calculate single turn-around time
 		UL64 iSecondaryTickTemp = 0;
 		UL64 iActualTickTemp = MACRO_GetTickCountRet;
+	
+		// Clear RX	
+		MACRO_XLINK_clear_RX;
 		
 		// Send the command
 		MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
@@ -424,8 +398,11 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 			if (iTurnaroundTime > 0) iTurnaroundTime -= 1;
 			
 			//  Update turnaround time
-			iTurnaroundTime = (iTurnaroundTime + (iSecondaryTickTemp - iActualTickTemp)) / 2;
-			
+			if (iSecondaryTickTemp - iActualTickTemp < iTurnaroundTime) 
+			{
+				if (iSecondaryTickTemp - iActualTickTemp > 0) iTurnaroundTime = iSecondaryTickTemp - iActualTickTemp;
+			}				
+						
 			// Increase our success counter			
 			iSuccessCounter++;
 		}
@@ -443,7 +420,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		
 	}*/
 	
-	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %d us\nAverage transact: %d us\n",
+	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %d us\nLeast transact: %d us\n",
 			iSuccessCounter, 100000, (unsigned int)iTotalTimeTaken, (unsigned int)iTurnaroundTime );
 
 	strcat(szReportResult, szTempex);
@@ -581,9 +558,9 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 	}
 
 	// Check integrity
-	if (i_read < sizeof(job_packet_p2p)) // Extra 16 bytes are preamble / postamble
+	if (i_read < sizeof(job_packet)) // Extra 16 bytes are preamble / postamble
 	{
-		sprintf(sz_buf, "ERR:INVALID DATA, i_read = %d\n", i_read);
+		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
 		
 		if (XLINK_ARE_WE_MASTER)
 			USB_send_string(sz_buf);  // Send it to USB
@@ -601,19 +578,22 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 	}
 
 	// All is ok, send data to ASIC for processing, and respond with OK
-	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf); // 8 Bytes are for the initial '>>>>>>>>'
+	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf); 
 	__pipe_push_P2P_job(p_job);
+	
+	// SIGNATURE CHECK
+	// Respond with 'ERR:SIGNATURE' if not matched
 
 	// Before we return, we must call this function to get buffer loop going...
 	Flush_p2p_buffer_into_engines();
 
 	// Job was pushed into buffer, let the host know
 	if (XLINK_ARE_WE_MASTER)
-		USB_send_string("OK:BUFFERED\n");  // Send it to USB
+		USB_send_string("OK:QUEUED\n");  // Send it to USB
 	else // We're a slave... send it by XLINK
 	{
 		unsigned int bXTimeoutDetected = 0;
-		XLINK_SLAVE_respond_transact("OK:BUFFERED\n",
+		XLINK_SLAVE_respond_transact("OK:QUEUED\n",
 									sizeof("OK:BUFFERED\n"),
 									__XLINK_TRANSACTION_TIMEOUT__,
 									&bXTimeoutDetected,

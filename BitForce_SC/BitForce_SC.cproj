@@ -109,8 +109,8 @@
   <avr32gcc.common.outputfiles.lss>True</avr32gcc.common.outputfiles.lss>
   <avr32gcc.common.outputfiles.eep>True</avr32gcc.common.outputfiles.eep>
   <avr32gcc.common.outputfiles.srec>True</avr32gcc.common.outputfiles.srec>
+  <avr32gcc.compiler.optimization.PrepareFunctionsForGarbageCollection>True</avr32gcc.compiler.optimization.PrepareFunctionsForGarbageCollection>
   <avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>True</avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>
-  <avr32gcc.compiler.optimization.UseSectionRoDataForReadOnlyData>True</avr32gcc.compiler.optimization.UseSectionRoDataForReadOnlyData>
   <avr32gcc.compiler.optimization.DebugLevel>Maximum (-g3)</avr32gcc.compiler.optimization.DebugLevel>
   <avr32gcc.compiler.warnings.AllWarnings>True</avr32gcc.compiler.warnings.AllWarnings>
   <avr32gcc.linker.libraries.Libraries>

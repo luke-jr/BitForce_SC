@@ -145,6 +145,7 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 #define MACRO_XLINK_get_RX_status(ret_value)  (MACRO__AVR32_CPLD_Read(ret_value, CPLD_ADDRESS_RX_STATUS))
 #define MACRO_XLINK_set_target_address(x)	  (MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_TARGET_ADRS, x & 0b011111))
 
+
 #define MACRO_XLINK_send_packet(iadrs, szdata, ilen, lp, bc) ({ \
 		char read_tx_status = 0x0FF; \
 		while ((read_tx_status & CPLD_TX_STATUS_TxInProg) != 0) { MACRO_XLINK_get_TX_status(read_tx_status);} \
@@ -156,9 +157,11 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 		iTxControlVal |= iTotalToSend;	\
 		iTxControlVal |= (lp != 0) ? CPLD_TX_CONTROL_LP : 0; \
 		iTxControlVal |= (bc != 0) ? CPLD_TX_CONTROL_BC : 0; \
-		MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_CONTROL, iTxControlVal); \
+		 MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_CONTROL, iTxControlVal); \
 		MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_START, CPLD_ADDRESS_TX_START_SEND); \
 		})	
+
+
 
 #define MACRO_XLINK_wait_packet(data, length, time_out, timeout_detected, senders_address, LP, BC) ({ \
 		while(TRUE) \
@@ -203,6 +206,34 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 			break; \
 		} \
 	}) 
+	
+	
+#define MACRO_XLINK_simulate_wait_packet(data, length, time_out, timeout_detected, senders_address, LP, BC) ({ \
+while(TRUE) \
+{ \
+	BC = 0; \
+	LP = 0; \
+	timeout_detected = FALSE; \
+	length = 0; \
+	senders_address = 0; \
+	volatile char iActualRXStatus = 0; \
+	volatile unsigned char us1 = 0; \
+	volatile unsigned char us2 = 0; \
+	MACRO_XLINK_get_RX_status(iActualRXStatus); \
+	UL64 iTimeoutHolder; \
+	MACRO_GetTickCount(iTimeoutHolder); \
+	UL64 iTickHolder; \
+	volatile char imrLen = 0; \
+	imrLen = ((iActualRXStatus & 0b0111000) >> 3); \
+	length = imrLen; \
+	LP = ((iActualRXStatus & CPLD_RX_STATUS_LP) != 0) ? 1 : 0; \
+	BC = ((iActualRXStatus & CPLD_RX_STATUS_BC) != 0) ? 1 : 0; \
+	MACRO__AVR32_CPLD_Read(senders_address, CPLD_ADDRESS_SENDERS_ADRS); \
+	MACRO__AVR32_CPLD_BurstRxRead(data, CPLD_ADDRESS_RX_BUF_BEGIN); \
+	MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR); \
+	break; \
+} \
+}) 	
 
 
 #else

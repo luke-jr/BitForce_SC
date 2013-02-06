@@ -27,7 +27,7 @@
 	PORT1  OVR     ADDRESS  = 0xFFFF1150  OFFSET = 0x50
 	PORT1  ODERS   ADDRESS  = 0xFFFF1144  OFFSET = 0x44
 	PORT1  ODERC   ADDRESS  = 0xFFFF1148  OFFSET = 0x48
-	PORT0  ODER    ADDRESS  = 0xFFFF1140  OFFSET = 0x40
+	PORT1  ODER    ADDRESS  = 0xFFFF1140  OFFSET = 0x40
 	PORT1  PVR	   ADDRESS  = 0xFFFF1160  OFFSET = 0x60
 	
 	<PORT1> AVR32_CPLD_OE		= 0x200	 
@@ -295,12 +295,6 @@ inline void OPTIMIZED__AVR32_CPLD_BurstTxWrite(char* szData, char iAddress)
 
 inline void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress)
 {
-	
-	/*OPTIMIZED__AVR32_CPLD_Read(iAddress, &szData[0]);
-	OPTIMIZED__AVR32_CPLD_Read(iAddress+1, &szData[1]);
-	OPTIMIZED__AVR32_CPLD_Read(iAddress+2, &szData[2]);
-	OPTIMIZED__AVR32_CPLD_Read(iAddress+3, &szData[3]);*/
-	
 	// In this case, szData is r12, iAddress is r11 
 	asm volatile ("pushm r0-r3, r4-r7" "\n\t");
 	
@@ -415,9 +409,7 @@ inline void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress)
 		
 		// Port1.ODERC = CPLD_BUS_ALL < NOT NEEDED, It's already in this state >
 		// "mov  r2, 0xFF"			"\n\t"
-		// "st.w r1[0x48], r2"		"\n\t"
-		
-	
+		// "st.w r1[0x48], r2"		"\n\t"		
 	);
 		
 	// Pop all registers
