@@ -15,9 +15,9 @@
 
 /*************** Operating Frequency ******************/
 // #define __OPERATING_FREQUENCY_16MHz__
-#define __OPERATING_FREQUENCY_32MHz__ 
+// #define __OPERATING_FREQUENCY_32MHz__ 
 // #define __OPERATING_FREQUENCY_48MHz__
-//#define __OPERATING_FREQUENCY_64MHz__
+#define __OPERATING_FREQUENCY_64MHz__
 
 /*************** Product Model *********************/
 // #define __PRODUCT_MODEL_JALAPENO__
@@ -27,10 +27,17 @@
 
 
 /*************** XLINK Operations Timeout ***********/
+
+/* OLD VALUES
 #define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
 #define __XLINK_TRANSACTION_TIMEOUT__	     120000
 #define __XLINK_WAIT_PACKET_TIMEOUT__        440
-#define __XLINK_ATTEMPT_RETRY_MAXIMUM__      80
+*/
+
+#define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   20000   // 10ms
+#define __XLINK_TRANSACTION_TIMEOUT__	     240000
+#define __XLINK_WAIT_PACKET_TIMEOUT__        880
+#define __XLINK_ATTEMPT_RETRY_MAXIMUM__      88
 
 /*************** Firmware Version ******************/
 #define __FIRMWARE_VERSION	"1.0.0"
@@ -45,12 +52,13 @@
 #define UNIT_FIRMWARE_SPEED		">>>>32>>>>"
 
 // We define our UL64 and Unsigned Long Long
-typedef long long UL64;
+typedef unsigned long long UL64;
+typedef unsigned int UL32;
 
 
 ///////////////////////////////////////// typedefs
 // Master Tick Counter (Holds clock in 1uS ticks)
-UL64 MAST_TICK_COUNTER;
+UL32 MAST_TICK_COUNTER;
 
 UL64 GetTickCount(void);
 void IncrementTickCounter(void);
@@ -98,5 +106,14 @@ int global_vals[6];
 // Basic boolean definition
 #define TRUE	1
 #define FALSE	0
+
+// Assembly NOP operation
+#ifdef __OPERATING_FREQUENCY_64MHz__
+	#define NOP_OPERATION asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t");
+#elif defined(__OPERATING_FREQUENCY_48MHz__)	
+	#define NOP_OPERATION asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t");
+#else
+	#define NOP_OPERATION asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t");
+#endif
 
 #endif /* STD_DEFS_H_ */

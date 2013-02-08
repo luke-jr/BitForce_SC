@@ -42,14 +42,9 @@
 
 inline void OPTIMIZED__AVR32_CPLD_Write(unsigned char iAdrs, unsigned char iData)
 {
-	// iAdrs is mapped to r12, iData is mapped to r11
-	// Declare our result character
-	asm volatile ("pushm r0-r3" "\n\t");
-	
-	// R0 equals PORT0 BASE ADDRESS
-	// R1 equals PORT1 BASE ADDRESS
-
 	asm volatile (
+		"pushm r0-r3"			"\n\t"
+		
 		// Save base addresses in r0 and r1 (we'll be using these a lot)
 		"mov  r0, -61440"		"\n\t"
 		"mov  r1, -61184"		"\n\t"
@@ -101,11 +96,11 @@ inline void OPTIMIZED__AVR32_CPLD_Write(unsigned char iAdrs, unsigned char iData
 		// Port1.ODERC = CPLD_BUS_ALL
 		"mov  r2, 0xFF"			"\n\t"
 		"st.w r1[0x48], r2"		"\n\t"	
-	);
-	
-	// Pop all registers
-	asm volatile ("popm	r0-r3" "\n\t");
-	
+		
+		// Pop 
+		"popm	r0-r3" "\n\t"
+	);	
+
 }
 
 #define DUMMY_REG (*((volatile unsigned int*)0xFFFF1150)) 

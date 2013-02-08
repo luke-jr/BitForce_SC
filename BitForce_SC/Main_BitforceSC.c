@@ -437,9 +437,13 @@ static int Management_MASTER_Initialize_XLINK_Chain()
 	int iDevDetectionCount = 0;
 	
 	// Check CPLD, is CHAIN_OUT connected?
-	if ((MCU_CPLD_Read(CPLD_ADDRESS_CHAIN_STATUS) & CHAIN_OUT_BIT) == 0)
+	char iChainOutConnectValue = 0;
+	MACRO__AVR32_CPLD_Read(iChainOutConnectValue, CPLD_ADDRESS_CHAIN_STATUS);
+	
+	if ((iChainOutConnectValue & CHAIN_OUT_BIT) == 0)
 	{
 		// Meaning there is not chain-out connection
+		MAST_TICK_COUNTER += 5;
 		return TRUE;	
 	}		
 		

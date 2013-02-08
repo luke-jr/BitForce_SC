@@ -87,13 +87,14 @@ PROTOCOL_RESULT Protocol_id(void)
 	return res;
 }
 
+
 PROTOCOL_RESULT Protocol_info_request(void)
 {
 	// Our result
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
 	
 	// What is our information request?
-	char szInfoReq[1024];
+	char szInfoReq[2024];
 	char szTemp[256];
 	
 	strcpy(szInfoReq,"DEVICE: BitFORCE SC\n");
@@ -103,24 +104,33 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"FIRMWARE: %s\n", __FIRMWARE_VERSION);
 	strcat(szInfoReq, szTemp);
 	
-	UL64 uL1;
-	UL64 uL2;
-	UL64 uLRes;
+	volatile UL64 uL1;
+	volatile UL64 uL2;
+	volatile UL64 uLRes;
 
 	// Atomic func latency
+	uL1 = GetTickCount();
+	uL2 = GetTickCount();
+	uLRes = uL2 - uL1;
+	sprintf(szTemp,"ATOMIC GetTickCount LATENCY: %d us\n", (unsigned int)uLRes);
+	strcat(szInfoReq, szTemp);
+	
+	// Atomic Full-Asm Special CPLD Write latency
+	uL1 = GetTickCount();
+	MACRO_XLINK_send_packet(0,"ABCD",4,1,1);
+	uL2 = GetTickCount();
+	uLRes = (UL64)((UL64)uL2 - (UL64)uL1);
+	sprintf(szTemp,"ATOMIC MACRO SEND: %d us\n", (unsigned int)uLRes);
+	strcat(szInfoReq, szTemp);	
+	
+	// Atomic ORDINARY CPLD WRITE latency
 	uL1 = MACRO_GetTickCountRet;
-	MACRO_XLINK_send_packet(0,"ABCD",4,0,0);
+	OPTIMIZED__AVR32_CPLD_Write(199,100);
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = uL2 - uL1;
-	sprintf(szTemp,"ATOMIC TX FUNC LATENCY: %d us\n", (unsigned int)uLRes);
+	sprintf(szTemp,"ATOMIC ORDINARY CPLD WRITE LATENCY: %d us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);
 		
-	// Atomic MARCO latency
-	uL1 = MACRO_GetTickCountRet;
-	uL2 = MACRO_GetTickCountRet;
-	uLRes = uL2 - uL1;
-	sprintf(szTemp,"ATOMIC TICK MACRO LATENCY: %d us\n", (unsigned int)uLRes);
-	strcat(szInfoReq, szTemp);
 		
 	// Add Engine count
 	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_chip_count());
@@ -369,13 +379,13 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		szResponse[0] = 0; szResponse[1] = 0; szResponse[2] = 0; szResponse[3] = 0;
 		iRespLen = 0;	
 		
+		// Clear RX
+		MACRO_XLINK_clear_RX;
+						
 		// Calculate single turn-around time
 		UL64 iSecondaryTickTemp = 0;
 		UL64 iActualTickTemp = MACRO_GetTickCountRet;
 	
-		// Clear RX	
-		MACRO_XLINK_clear_RX;
-		
 		// Send the command
 		MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
 		MACRO_XLINK_wait_packet(szResponse, iRespLen, 90, bTimedOut, iSendersAddress, iLP, iBC );
@@ -384,6 +394,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		iSecondaryTickTemp = MACRO_GetTickCountRet;
 		
 		// Increase total time
+		NOP_OPERATION;
 		iTotalTimeTaken += (iSecondaryTickTemp - iActualTickTemp);
 		
 		if ((iRespLen == 4) &&

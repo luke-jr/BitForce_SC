@@ -13,6 +13,7 @@
 #define AVR32_PLL1									(*((volatile unsigned int*)0xFFFF0C24))
 #define AVR32_OSCCTRL0								(*((volatile unsigned int*)0xFFFF0C28))
 #define AVR32_MCCTRL								(*((volatile unsigned int*)0xFFFF0C00))
+#define AVR32_CKSEL									(*((volatile unsigned int*)0xFFFF0C04))
 #define AVR32_GCCTRL								(*((volatile unsigned int*)0xFFFF0C60))
 #define AVR32_PBAMASK								(*((volatile unsigned int*)0xFFFF0C10))
 

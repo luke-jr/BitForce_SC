@@ -17,11 +17,15 @@
 #define XLINK_activate_address_increase     AVR32_GPIO.port[1].ovrs  = __AVR32_CPLD_INCREASE_ADDRESS;
 #define XLINK_deactivate_address_increase   AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
 
+#define AVR32_FLASHC_MAIN  (*((volatile unsigned int*)0xFFFE1400))
+
+
 // General MCU Functions
 void __AVR32_LowLevelInitialize()
 {
 	// ********* Enable OSC0
 	AVR32_MCCTRL  |= 0b100; // OSC0EN = 1
+	AVR32_CKSEL   = 0; // All Clocks equal main-clock
 	AVR32_OSCCTRL0 = 0b00000000000000000000000100000111;
 
 	// Wait until it's active (1 << 7 is OSC0 Status bit)
@@ -39,7 +43,7 @@ void __AVR32_LowLevelInitialize()
 		AVR32_PLL0 = 0b00011111000001110000001000000101; // PLL0 at 32MHz
 		
 		// Set wait-state to 1
-		AVR32_FLASHC = ((1 << 8) | (1 << 6)) | 0x00000000;
+		AVR32_FLASHC_MAIN = ((1 << 8) | (1 << 6)) | 0x00000000;
 		
 	#elif defined(__OPERATING_FREQUENCY_48MHz__)
 		// ********* Enable PLL0
@@ -81,6 +85,8 @@ void __AVR32_LowLevelInitialize()
 	#elif defined(__OPERATING_FREQUENCY_48MHz__)
 		AVR32_MCCTRL |= 0b010; 	// MCSEL = 1 -- PLL0 Selected			
 	#endif
+	
+	
 	
 	// Wait a little, until everything is stable...
 	volatile int i_delay = 0;
@@ -315,6 +321,7 @@ char __AVR32_USB_WriteData(char* iData, char iCount)
 	// Write data...
 	AVR32_GPIO.port[0].oders =  __AVR32_USB_AD0 | __AVR32_USB_AD1 | __AVR32_USB_AD2 | __AVR32_USB_AD3 |
 								__AVR32_USB_AD4 | __AVR32_USB_AD5 | __AVR32_USB_AD6 | __AVR32_USB_AD7;
+	NOP_OPERATION;
 	
 	for (unsigned int vx = 0; vx < iCount; vx++)
 	{
@@ -323,14 +330,18 @@ char __AVR32_USB_WriteData(char* iData, char iCount)
 		
 		// Write data
 		AVR32_GPIO.port[0].ovr  = (AVR32_GPIO.port[0].ovr & 0x0FFFFFF00) | iData[vx];
+		NOP_OPERATION;
 		AVR32_GPIO.port[0].ovrc = __AVR32_USB_WR;
+		NOP_OPERATION;
 		AVR32_GPIO.port[0].ovrs = __AVR32_USB_WR;
+		NOP_OPERATION;
 		
 	}
 	
 	// Disable output drivers on bus lines
 	AVR32_GPIO.port[0].oderc =  __AVR32_USB_AD0 | __AVR32_USB_AD1 |	__AVR32_USB_AD2 | __AVR32_USB_AD3 |
 								__AVR32_USB_AD4 | __AVR32_USB_AD5 |	__AVR32_USB_AD6 | __AVR32_USB_AD7;
+	NOP_OPERATION;
 	// Return
 	return iCount;
 }
@@ -344,19 +355,27 @@ int  __AVR32_USB_GetInformation()
 	// Write data...
 	AVR32_GPIO.port[0].oderc =  __AVR32_USB_AD0 | __AVR32_USB_AD1 |	__AVR32_USB_AD2 | __AVR32_USB_AD3 |
 								__AVR32_USB_AD4 | __AVR32_USB_AD5 |	__AVR32_USB_AD6 | __AVR32_USB_AD7;
+	NOP_OPERATION;
+									
 	// Set A0
 	AVR32_GPIO.port[2].ovrs =  __AVR32_USB_A0;
+	NOP_OPERATION;
 	
 	// Get the value
 	AVR32_GPIO.port[0].ovrc = __AVR32_USB_RD;
+	NOP_OPERATION;
 	iRetVal  = ((AVR32_GPIO.port[0].pvr) & 0x0FF);
+	NOP_OPERATION;
 	AVR32_GPIO.port[0].ovrs = __AVR32_USB_RD;
+	NOP_OPERATION;
 	
 	// Clear A0
 	AVR32_GPIO.port[2].ovrc =  __AVR32_USB_A0;
+	NOP_OPERATION;
 	
 	// Restore state
 	AVR32_GPIO.port[0].oder = (AVR32_GPIO.port[0].oder & 0x0FFFFFF00) | iActualPortState;
+	NOP_OPERATION;
 	
 	// Return the value
 	return iRetVal;
@@ -370,9 +389,10 @@ char __AVR32_USB_GetData(char* iData, char iMaxCount)
 	// Write data...
 	AVR32_GPIO.port[0].oderc =  __AVR32_USB_AD0 | __AVR32_USB_AD1 |	__AVR32_USB_AD2 | __AVR32_USB_AD3 |
 								__AVR32_USB_AD4 | __AVR32_USB_AD5 |	__AVR32_USB_AD6 | __AVR32_USB_AD7 ;
-	
+	NOP_OPERATION;
 	// Clear A0
 	AVR32_GPIO.port[2].ovrc =  __AVR32_USB_A0;
+	NOP_OPERATION;
 	
 	// Write as many bytes as needed
 	volatile unsigned int i_total_read = 0;
@@ -382,9 +402,12 @@ char __AVR32_USB_GetData(char* iData, char iMaxCount)
 		if (USB_inbound_USB_data() == FALSE) break;
 		
 		// Get the value
+		NOP_OPERATION;
 		AVR32_GPIO.port[0].ovrc = __AVR32_USB_RD;
+		NOP_OPERATION;
 		iData[vx]  = ((AVR32_GPIO.port[0].pvr) & 0x0FF);
 		AVR32_GPIO.port[0].ovrs = __AVR32_USB_RD;
+		NOP_OPERATION;
 		
 		// Increase our total read count
 		i_total_read++;
@@ -404,7 +427,9 @@ void __AVR32_USB_FlushInputData()
 	{
 		// Get the value
 		AVR32_GPIO.port[0].ovrc = __AVR32_USB_RD;
+		NOP_OPERATION;
 		AVR32_GPIO.port[0].ovrs = __AVR32_USB_RD;
+		NOP_OPERATION;
 	}
 }
 
@@ -412,7 +437,9 @@ void __AVR32_USB_FlushOutputData()
 {
 	// Set A0
 	AVR32_GPIO.port[2].ovrs =  __AVR32_USB_SIWUA;
+	NOP_OPERATION;
 	AVR32_GPIO.port[2].ovrc =  __AVR32_USB_SIWUA;
+	NOP_OPERATION;
 }
 
 ////////////////////////////////////////////
@@ -422,19 +449,29 @@ void __AVR32_CPLD_Initialize()
 {
 	// Enable GPIOs on Port A
 	AVR32_GPIO.port[1].oderc =  __AVR32_CPLD_BUS_ALL | __AVR32_CPLD_RES0 |  __AVR32_CPLD_RES1; // Disable bus output for this time...
+	NOP_OPERATION;
 	AVR32_GPIO.port[1].gpers =  __AVR32_CPLD_BUS_ALL | __AVR32_CPLD_ADRS | 	__AVR32_CPLD_OE | __AVR32_CPLD_RES0 | __AVR32_CPLD_RES1;
+	NOP_OPERATION;
 	AVR32_GPIO.port[1].oders =  __AVR32_CPLD_ADRS    | __AVR32_CPLD_OE;
+	NOP_OPERATION;
 	AVR32_GPIO.port[0].gpers =  __AVR32_CPLD_CS		 | __AVR32_CPLD_STROBE;
+	NOP_OPERATION;
 	AVR32_GPIO.port[0].oders =  __AVR32_CPLD_CS		 | __AVR32_CPLD_STROBE;
+	NOP_OPERATION;
 	
 	// Deselect CPLD and deactivate OE
 	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
+	NOP_OPERATION;
 	AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_CS;
+	NOP_OPERATION;
 	
 	// We activate address-increase pin and de-assert it
 	AVR32_GPIO.port[1].oders = __AVR32_CPLD_INCREASE_ADDRESS;
+	NOP_OPERATION;
 	AVR32_GPIO.port[1].gpers = __AVR32_CPLD_INCREASE_ADDRESS;	
+	NOP_OPERATION;
 	AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
+	NOP_OPERATION;
 }
 
 inline void __AVR32_CPLD_SetAccess()

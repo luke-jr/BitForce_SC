@@ -311,7 +311,7 @@ void XLINK_MASTER_transact(char   iAdrs,
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	volatile UL64 iActualTickcount = GetTickCount();
+	volatile UL64 iActualTickcount = MACRO_GetTickCountRet;
 	volatile unsigned short iTotalSent = 0;
 	volatile char  iBytesToSend = 0;
 	volatile char  iLP = 0; // LastPacket
@@ -325,6 +325,10 @@ void XLINK_MASTER_transact(char   iAdrs,
 	volatile char __senders_address = 0;
 	volatile char __lp = 0;
 	volatile char __bc = 0;
+	
+	volatile UL64 vTemp1 = 0;
+	volatile UL64 vTemp2 = 0;
+	volatile UL64 vTemp3 = 0;
 	
 	while (iTotalSent < iLen)
 	{
@@ -363,7 +367,10 @@ RETRY_POINT_1:
 								__bc);
 						  
 		// Check master timeout
-		if (GetTickCount() - iActualTickcount > transaction_timeout) 
+		vTemp1 = MACRO_GetTickCountRet;
+		vTemp3 = vTemp1 - iActualTickcount;
+		
+		if (vTemp3 > transaction_timeout) 
 		{
 			*bTimeoutDetected = 1;
 			if (iTotalSent == 0) *bDeviceNotResponded = 1;
@@ -461,7 +468,7 @@ RETRY_POINT_1:
 		szDevResponse[3] = 0;
 		
 		// We would want to measure something here...
-		imrActualHolder = GetTickCount();
+		imrActualHolder = MACRO_GetTickCountRet;
 		
 		// Wait for response		
 		MACRO_XLINK_wait_packet(szDevResponse, 
@@ -473,7 +480,9 @@ RETRY_POINT_1:
 								__bc);
 		
 		// Check master timeout
-		if (GetTickCount() - iActualTickcount > transaction_timeout)
+		vTemp1 = MACRO_GetTickCountRet;
+		vTemp3 = vTemp1 - iActualTickcount;
+		if (vTemp3 > transaction_timeout)
 		{
 			*bTimeoutDetected = (iTotalReceived == 0) ? 3 : 77;
 			if (iTotalSent == 0) *bDeviceNotResponded = 1;
@@ -546,7 +555,9 @@ RETRY_POINT_1:
 		}			 
 		
 		// Update imrTime
-		imrActualTime = GetTickCount() - imrActualHolder;		
+		vTemp1 = MACRO_GetTickCountRet;
+		vTemp2 = vTemp1 - imrActualHolder;
+		imrActualTime = vTemp2;		
 		imrActualTime++;
 	}		
 	
@@ -590,13 +601,16 @@ RETRY_POINT_3:
 								__bc);
 						  
 		// Check master timeout
-		if (GetTickCount() - iActualTickcount > transaction_timeout)
+		vTemp1 = MACRO_GetTickCountRet;
+		vTemp3 = vTemp1 - iActualTickcount;
+		
+		if (vTemp3 > transaction_timeout)
 		{
 			*bTimeoutDetected = 6;
 			if (iTotalSent == 0) *bDeviceNotResponded = 1;
 			
 			// Before doing anything, clear the CPLD
-			XLINK_clear_RX();
+			MACRO_XLINK_clear_RX;
 			return;
 		}
 
@@ -611,7 +625,7 @@ RETRY_POINT_3:
 				*bDeviceNotResponded = (iTotalSent == 0) ? 1 : 0;
 				
 				// Before doing anything, clear the CPLD
-				XLINK_clear_RX();			
+				MACRO_XLINK_clear_RX;			
 				return;
 			}
 			else
@@ -653,7 +667,7 @@ RETRY_POINT_3:
 	}
 
 	// Clear RX
-	XLINK_clear_RX();
+	MACRO_XLINK_clear_RX;
 
 	// Reset errors and exit
 	*bTimeoutDetected = 0;
@@ -678,7 +692,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
 	volatile UL64  iActualTickcount;
-	MACRO_GetTickCount(iActualTickcount);
+	iActualTickcount = MACRO_GetTickCountRet;
 	
 	volatile char  iBC = 0; // BitCorrector
 	volatile char  iTotalRetryCount = 0;
@@ -688,6 +702,9 @@ void XLINK_SLAVE_wait_transact (char  *data,
 	// What is our address?
 	volatile char  our_address = __OUR_CPLD_ID;
 	volatile short iLoopCounter = 0;
+	volatile UL64 vTemp1 = 0;
+	volatile UL64 vTemp2 = 0;
+	volatile UL64 vTemp3 = 0;
 	
 	// Now we have to wait for data
 	while (iTotalReceived < max_len)
@@ -715,7 +732,9 @@ void XLINK_SLAVE_wait_transact (char  *data,
 								__bc);
 			
 		// Check master timeout
-		if (MACRO_GetTickCountRet - iActualTickcount > transaction_timeout)
+		vTemp1 = MACRO_GetTickCountRet;
+		vTemp3 = vTemp1 - iActualTickcount;
+		if (vTemp3 > transaction_timeout)
 		{
 			*bTimeoutDetected = 1;
 			return;
@@ -864,6 +883,10 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 	volatile char  iPrevLP = 0;
 	volatile char  iPrevBC = 0;
 	
+	volatile UL64  vTemp1;
+	volatile UL64  vTemp2;
+	volatile UL64  vTemp3;
+	
 	// Now we have to wait for data
 	while (1)
 	{
@@ -892,7 +915,9 @@ RETRY_POINT_1:
 							  __bc);
 		
 		// Check master timeout
-		if (MACRO_GetTickCountRet - iActualTickcount > transaction_timeout)
+		vTemp1 = MACRO_GetTickCountRet;
+		vTemp3 = vTemp1 - iActualTickcount;
+		if (vTemp3 > transaction_timeout)
 		{
 			*bTimeoutDetected = 1;
 			MACRO_XLINK_clear_RX;			
@@ -1037,7 +1062,9 @@ RETRY_POINT_2:
 							  __bc);
 		
 		// Check master timeout
-		if (MACRO_GetTickCountRet - iActualTickcount > transaction_timeout)
+		vTemp1 = MACRO_GetTickCountRet;
+		vTemp3 = vTemp1 - iActualTickcount;
+		if (vTemp3 > transaction_timeout)
 		{
 			*bTimeoutDetected = 4;
 			MACRO_XLINK_clear_RX;
@@ -1149,9 +1176,11 @@ char XLINK_data_inbound(void)
 void  XLINK_set_cpld_id(char iID)
 {
 	__AVR32_CPLD_SetAccess();
-	char iValueToSet = __AVR32_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(0b0111110);
+	char iValueToSet = 0;
+	MACRO__AVR32_CPLD_Read(iValueToSet,CPLD_ADDRESS_MASTER_CONTROL);
+	iValueToSet &= ~(0b0111110);
 	iValueToSet |= ((iID & 0b011111) << 1);	
-	__AVR32_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);	
+	MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);	
 	__OUR_CPLD_ID = iID;
 }
 
@@ -1163,59 +1192,73 @@ char XLINK_get_cpld_id(void)
 void  XLINK_set_cpld_master(char bMaster)
 {
 	__AVR32_CPLD_SetAccess();	
-	char iValueToSet = __AVR32_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(CPLD_MASTER_CONTROL_MSTR);
+	char iValueToSet = 0;
+	MACRO__AVR32_CPLD_Read(iValueToSet, CPLD_ADDRESS_MASTER_CONTROL);
+	iValueToSet &= ~(CPLD_MASTER_CONTROL_MSTR);
 	if (bMaster) iValueToSet |= CPLD_MASTER_CONTROL_MSTR;
-	__AVR32_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);
+	MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);
 }
 
 void  XLINK_set_cpld_passthrough(char bPassthrough)
 {
 	__AVR32_CPLD_SetAccess();
-	char iValueToSet = __AVR32_CPLD_Read(CPLD_ADDRESS_MASTER_CONTROL) & ~(CPLD_MASTER_CONTROL_PASSTHROUGH);
+	char iValueToSet = 0;
+	MACRO__AVR32_CPLD_Read(iValueToSet, CPLD_ADDRESS_MASTER_CONTROL);
+	iValueToSet &= ~(CPLD_MASTER_CONTROL_PASSTHROUGH);
 	if (bPassthrough == TRUE) iValueToSet |= CPLD_MASTER_CONTROL_PASSTHROUGH;	
-	__AVR32_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);	
+	MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_MASTER_CONTROL, iValueToSet);	
 }
 
 char XLINK_get_chain_status(void)
 {
-	__AVR32_CPLD_SetAccess();	
-	return __AVR32_CPLD_Read(CPLD_ADDRESS_CHAIN_STATUS);
+	__AVR32_CPLD_SetAccess();
+	char retval = 0;	
+	MACRO__AVR32_CPLD_Read(retval,CPLD_ADDRESS_CHAIN_STATUS);
+	return retval;
 }
 
 char XLINK_get_TX_status(void)
 {
 	__AVR32_CPLD_SetAccess();		
-	return __AVR32_CPLD_Read(CPLD_ADDRESS_TX_STATUS);
+	char retval = 0;	
+	MACRO__AVR32_CPLD_Read(retval, CPLD_ADDRESS_TX_STATUS);
+	return retval;
 }
 
 char XLINK_get_RX_status(void)
 {
-	__AVR32_CPLD_SetAccess();	
-	return __AVR32_CPLD_Read(CPLD_ADDRESS_RX_STATUS);		
+	__AVR32_CPLD_SetAccess();
+	char retval = 0;		
+	MACRO__AVR32_CPLD_Read(retval, CPLD_ADDRESS_RX_STATUS);		
+	return retval;
 }
 
 void XLINK_set_target_address(char uAdrs)
 {
 	__AVR32_CPLD_SetAccess();	
-	__AVR32_CPLD_Write(CPLD_ADDRESS_TX_TARGET_ADRS, uAdrs & 0b011111);
+	MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_TX_TARGET_ADRS, uAdrs & 0b011111);
 }
 
 char XLINK_get_target_address(void)
 {
 	__AVR32_CPLD_SetAccess();
-	return __AVR32_CPLD_Read(CPLD_ADDRESS_TX_TARGET_ADRS);
+	char retVal = 0;
+	MACRO__AVR32_CPLD_Read(retVal, CPLD_ADDRESS_TX_TARGET_ADRS);
+	return retVal;
 }
 
 void XLINK_clear_RX(void)
 {
 	__AVR32_CPLD_SetAccess();											
-	__AVR32_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR);
+	MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_RX_CONTROL, CPLD_RX_CONTROL_CLEAR);
 }
 
 int	XLINK_is_cpld_present(void)
 {
 	__AVR32_CPLD_SetAccess();
-	return (__AVR32_CPLD_Read(CPLD_ADDRESS_IDENTIFICATION) == 0x0A4);
+	char retVal = 0;
+	MACRO__AVR32_CPLD_Read(retVal,CPLD_ADDRESS_IDENTIFICATION);
+	return (retVal == 0x0A4);
 }
 
 char XLINK_get_device_status()
@@ -1233,4 +1276,3 @@ void XLINK_set_outbox(char* szData, short iLen)
 	XLINK_Outbox_Length = iLen;
 	for (unsigned int x = 0; x < iLen; x++) XLINK_Outbox[x] = szData[x];
 }
-;
