@@ -251,21 +251,21 @@ void XLINK_wait_packet (char  *data,
 	volatile unsigned char us2 = 0;
 
 	iActualRXStatus = XLINK_get_RX_status();
-	UL32 iTimeoutHolder = GetTickCount();
+	UL32 iTimeoutHolder = MACRO_GetTickCountRet;
 
 	// Wait until actual buffer is sent...
 	if ((iActualRXStatus & CPLD_RX_STATUS_DATA) == 0)
 	{
 		
 		// Wait for 25uS
-		while (GetTickCount() - iTimeoutHolder < time_out)
+		while (MACRO_GetTickCountRet - iTimeoutHolder < time_out)
 		{
 			iActualRXStatus = XLINK_get_RX_status();
 			if ((iActualRXStatus & CPLD_RX_STATUS_DATA) != 0) break;
 		}
 		
 		// Did we timeout?
-		if (GetTickCount() - iTimeoutHolder >= time_out)
+		if (MACRO_GetTickCountRet - iTimeoutHolder >= time_out)
 		{
 			// Ok we've timed out....
 			// TODO: We must do something important

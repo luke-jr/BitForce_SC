@@ -60,7 +60,6 @@ typedef unsigned int UL32;
 // Master Tick Counter (Holds clock in 1uS ticks)
 volatile UL32 MAST_TICK_COUNTER;
 
-UL32 GetTickCount(void);
 void IncrementTickCounter(void);
 
 // Other definitions
@@ -108,7 +107,7 @@ int global_vals[6];
 
 // Assembly NOP operation
 #ifdef __OPERATING_FREQUENCY_64MHz__
-	#define NOP_OPERATION asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t");
+	#define NOP_OPERATION asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t");
 #elif defined(__OPERATING_FREQUENCY_48MHz__)	
 	#define NOP_OPERATION asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t");
 #else
