@@ -65,17 +65,17 @@ void ASIC_Bootup_Chips()
 	// Send initialization clocks
 	__ASIC_WriteEngine(0,0,0,0);
 	
-	volatile unsigned int iHover = 0;
+	unsigned int iHover = 0;
 	
 	// Setup Oscillator on all eight chips
-	volatile unsigned int iOscillatorEnableCmdBase	  = (0b00000000000000000000000000000001); // Must be OR'ed with chip address
-	volatile unsigned int iOscillatorFreqSelectCmdBase = (0b00000000011000001111111111010101); // Must be OR'ed with chip address
+	unsigned int iOscillatorEnableCmdBase	  = (0b00000000000000000000000000000001); // Must be OR'ed with chip address
+	unsigned int iOscillatorFreqSelectCmdBase = (0b00000000011000001111111111010101); // Must be OR'ed with chip address
 	
 	for (iHover = 0; iHover < 8; iHover++)
 	{
 		// Get the correct version by OR'ing them with chip address
-		volatile unsigned int iOscillatorEnableCmd     = iOscillatorEnableCmdBase     | ((iHover & 0x0FF) << 28);
-		volatile unsigned int iOscillatorFreqSelectCmd = iOscillatorFreqSelectCmdBase | ((iHover & 0x0FF) << 28);
+		unsigned int iOscillatorEnableCmd     = iOscillatorEnableCmdBase     | ((iHover & 0x0FF) << 28);
+		unsigned int iOscillatorFreqSelectCmd = iOscillatorFreqSelectCmdBase | ((iHover & 0x0FF) << 28);
 		
 		// We have data to write...
 		__MCU_ASIC_Activate_CS();
@@ -97,9 +97,9 @@ void ASIC_Bootup_Chips()
 	}	
 	
 	// Now we're done here, we need to execute the next command for all the 256 engines in system
-	volatile unsigned int iResetEngineCommand1Base = 0;
-	volatile unsigned int iResetEngineCommand2Base = (1<<12);
-	volatile unsigned int iResetEngineCommand3Base = 0;
+	unsigned int iResetEngineCommand1Base = 0;
+	unsigned int iResetEngineCommand2Base = (1<<12);
+	unsigned int iResetEngineCommand3Base = 0;
 	
 	// Run through all the chips
 	for (iHover = 0; iHover <= 0x07F; iHover++)

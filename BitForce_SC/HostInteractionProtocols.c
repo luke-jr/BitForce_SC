@@ -207,9 +207,9 @@ PROTOCOL_RESULT Protocol_Echo(void)
 	// Send the OK back first
 	// All is good... sent the identifier and get out of here...
 	if (XLINK_ARE_WE_MASTER)
-		USB_send_string("ECHO");  // Send it to USB
+	USB_send_string("ECHO");  // Send it to USB
 	else // We're a slave... send it by XLINK
-		XLINK_send_packet(XLINK_get_cpld_id(), "ECHO", 4, TRUE, FALSE);
+	XLINK_send_packet(XLINK_get_cpld_id(), "ECHO", 4, TRUE, FALSE);
 	
 	// Return our result...
 	return res;
@@ -283,18 +283,6 @@ while(TRUE) \
 
 volatile UL32 OPTO_GetTickCountRet(void);
 volatile UL32 OPTO_GetTickCountRet(void){ return ((UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_TC.channel[0].cv)) >> 1); }
-	
-volatile void CIPHER_X(void);
-volatile void CIPHER_X(void)
-{
-	for (unsigned int uss = 0; uss < 300000; uss++)
-	{
-		volatile char read_tx_status = 0x0FF; 
-		while ((read_tx_status & CPLD_TX_STATUS_TxInProg) != 0) { MACRO_XLINK_get_TX_status(read_tx_status);} 
-		MACRO_XLINK_set_target_address(1);
-		MACRO__AVR32_CPLD_WriteTxControlAndStart(0b00011110);		
-	}
-}
 
 PROTOCOL_RESULT Protocol_Test_Command(void)
 {

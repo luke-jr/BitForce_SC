@@ -705,7 +705,7 @@ inline unsigned int	__AVR32_CPLD_Read (char iAdrs)
 	AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_OE;
 	
 	// Get the result
-	volatile unsigned int iRetVal = (AVR32_GPIO.port[1].pvr & 0x000000FF);
+	volatile int iRetVal = (AVR32_GPIO.port[1].pvr & 0x000000FF);
 	
 	// Disable OE
 	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;

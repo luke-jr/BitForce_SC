@@ -123,9 +123,7 @@
       <Value>m</Value>
     </ListValues>
   </avr32gcc.linker.libraries.Libraries>
-  <avr32gcc.linker.optimization.EnableUnsafeMatchOptimizations>True</avr32gcc.linker.optimization.EnableUnsafeMatchOptimizations>
-  <avr32gcc.linker.optimization.EnableFastMath>True</avr32gcc.linker.optimization.EnableFastMath>
-  <avr32gcc.linker.optimization.GeneratePositionIndependentCode>True</avr32gcc.linker.optimization.GeneratePositionIndependentCode>
+  <avr32gcc.linker.optimization.GarbageCollectUnusedSections>True</avr32gcc.linker.optimization.GarbageCollectUnusedSections>
   <avr32gcc.linker.optimization.PutReadOnlyDataInWritableDataSection>True</avr32gcc.linker.optimization.PutReadOnlyDataInWritableDataSection>
   <avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>True</avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>
   <avr32gcc.assembler.debugging.DebugLevel>Default (-g)</avr32gcc.assembler.debugging.DebugLevel>
