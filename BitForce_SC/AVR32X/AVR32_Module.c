@@ -326,7 +326,10 @@ char __AVR32_USB_WriteData(char* iData, char iCount)
 	for (unsigned int vx = 0; vx < iCount; vx++)
 	{
 		// Is there space available?
-		if ((__AVR32_USB_GetInformation() & 0b010) == FALSE) break;
+		if ((__AVR32_USB_GetInformation() & 0b010) == FALSE) 
+		{
+			break;
+		}			
 		
 		// Write data
 		AVR32_GPIO.port[0].ovr  = (AVR32_GPIO.port[0].ovr & 0x0FFFFFF00) | iData[vx];
@@ -877,10 +880,18 @@ void	__AVR32_LED_Reset(char iLed)
 ISR(__avr32_tmr0_interrupt, 0, 3)
 {
 	// Just increase our counter
-	MAST_TICK_COUNTER += 1;
+	MAST_TICK_COUNTER += 0x10000;
 	
-	// Clear the RTC interrupt.
+	// Clear the interrupt.
 	volatile unsigned int umx = AVR32_TC.channel[0].sr; // Read the SR flag to clear the interrupt
+	
+	
+	//AVR32_RTC.val = 0;
+	//volatile unsigned long uTop = AVR32_RTC.top;
+	/*AVR32_RTC.top = -1;
+	while (AVR32_RTC.CTRL.busy); // Wait...	*/
+	//AVR32_RTC.ICR.topi = 1 ; // Read the ICR to clear the interrupt
+	
 }
 
 void __AVR32_Timer_Initialize()
@@ -888,6 +899,7 @@ void __AVR32_Timer_Initialize()
 	// Reset master tick counter
 	MAST_TICK_COUNTER = 0;
 
+	// Timer0 System
 	AVR32_TC.BCR.sync = 0;
 	
 	AVR32_TC.BMR.tc0xc0s = 0b01;
@@ -907,6 +919,22 @@ void __AVR32_Timer_Initialize()
 	AVR32_TC.channel[0].CCR.clken = 1;
 	AVR32_TC.channel[0].CCR.swtrg = 1;	
 	
+	// Wait for BUSY to clear
+	
+	// Now proceed
+	/*AVR32_RTC.IER.topi = 1;	
+	while (AVR32_RTC.CTRL.busy); // Wait...	
+	AVR32_RTC.top = 0x0FFFFFFFF;
+	while (AVR32_RTC.CTRL.busy); // Wait...	
+	AVR32_RTC.val = 0x0;
+	while (AVR32_RTC.CTRL.busy); // Wait...	
+	AVR32_RTC.ctrl = (1);
+	while (AVR32_RTC.CTRL.busy); // Wait...
+	
+	// Get the value
+	volatile unsigned long umx = 0;
+	umx = AVR32_RTC.top;*/
+		
 	// Disable all interrupts first
 	Disable_global_interrupt();
 	

@@ -94,7 +94,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
 	
 	// What is our information request?
-	char szInfoReq[2024];
+	char szInfoReq[4024];
 	char szTemp[256];
 	
 	strcpy(szInfoReq,"DEVICE: BitFORCE SC\n");
@@ -104,22 +104,15 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"FIRMWARE: %s\n", __FIRMWARE_VERSION);
 	strcat(szInfoReq, szTemp);
 	
-	volatile UL64 uL1;
-	volatile UL64 uL2;
-	volatile UL64 uLRes;
+	volatile UL32 uL1;
+	volatile UL32 uL2;
+	volatile UL32 uLRes;
 
-	// Atomic func latency
-	uL1 = GetTickCount();
-	uL2 = GetTickCount();
-	uLRes = uL2 - uL1;
-	sprintf(szTemp,"ATOMIC GetTickCount LATENCY: %d us\n", (unsigned int)uLRes);
-	strcat(szInfoReq, szTemp);
-	
 	// Atomic Full-Asm Special CPLD Write latency
-	uL1 = GetTickCount();
+	uL1 = MACRO_GetTickCountRet;
 	MACRO_XLINK_send_packet(0,"ABCD",4,1,1);
-	uL2 = GetTickCount();
-	uLRes = (UL64)((UL64)uL2 - (UL64)uL1);
+	uL2 = MACRO_GetTickCountRet;
+	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
 	sprintf(szTemp,"ATOMIC MACRO SEND: %d us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);	
 	
@@ -130,8 +123,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	uLRes = uL2 - uL1;
 	sprintf(szTemp,"ATOMIC ORDINARY CPLD WRITE LATENCY: %d us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);
-		
-		
+	
 	// Add Engine count
 	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_chip_count());
 	strcat(szInfoReq, szTemp);
@@ -156,7 +148,9 @@ PROTOCOL_RESULT Protocol_info_request(void)
 
 	// All is good... sent the identifier and get out of here...
 	if (XLINK_ARE_WE_MASTER)
-	USB_send_string(szInfoReq);  // Send it to USB
+	{
+		USB_send_string(szInfoReq);  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
 	{
 		char bTimeoutDetected = 0;
@@ -253,9 +247,9 @@ while(TRUE) \
 	volatile unsigned char us1 = 0; \
 	volatile unsigned char us2 = 0; \
 	MACRO_XLINK_get_RX_status(iActualRXStatus); \
-	UL64 iTimeoutHolder; \
+	UL32 iTimeoutHolder; \
 	MACRO_GetTickCount(iTimeoutHolder); \
-	UL64 iTickHolder; \
+	UL32 iTickHolder; \
 	if ((iActualRXStatus & CPLD_RX_STATUS_DATA) == 0) \
 	{ \
 		while (TRUE) \
@@ -301,10 +295,10 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	
 	// Success Counter
 	int iSuccessCounter = 0;
-	UL64 iTurnaroundTime = 0;
+	volatile UL32 iTurnaroundTime = 0;
 	
 	// First get our tick counter
-	UL64 iActualTick = GetTickCount();
+	volatile UL32 iActualTick =  MACRO_GetTickCountRet;
 	
 	// Total timeout counters
 	int iTotalTimeoutCounter = 0;
@@ -319,7 +313,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	// CPLD TEST Write different values to CPLD and read back
 	//////////////////////////////////////////////////////////
 	
-	UL64 iActualTickTick = GetTickCount();
+	volatile UL32 iActualTickTick = MACRO_GetTickCountRet;
 	
 	int iTotalWrongReads = 0;
 	unsigned int umi = 0;
@@ -359,32 +353,33 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	return res; 
 	*/
 	// Total time taken
-	UL64 iTotalTimeTaken = 0;
+	volatile UL32 iTotalTimeTaken = 0;
+	volatile UL32 iTempX = 0;
+	
+	// Calculate single turn-around time
+	volatile UL32 iSecondaryTickTemp = 0;
+	volatile UL32 iActualTickTemp = 0;
 	
 	// Now we send message to XLINK_GENERAL_DISPATCH_ADDRESS for an ECHO and count the successful iterations
 	for (unsigned int x = 0; x < 100000; x++)
 	{
 		// Clear input
 		MACRO_XLINK_clear_RX;
-
 		
 		// Now we wait for response
-		char bTimedOut = FALSE;
-		char szResponse[10] = {0,0,0,0,0,0,0,0,0,0};
-		unsigned int iRespLen = 0;
-		char iBC = 0;
-		char iLP = 0;
-		char iSendersAddress = 0;
+		volatile char bTimedOut = FALSE;
+		volatile char szResponse[10] = {0,0,0,0,0,0,0,0,0,0};
+		volatile unsigned int iRespLen = 0;
+		volatile char iBC = 0;
+		volatile char iLP = 0;
+		volatile char iSendersAddress = 0;
 		
 		szResponse[0] = 0; szResponse[1] = 0; szResponse[2] = 0; szResponse[3] = 0;
 		iRespLen = 0;	
 		
 		// Clear RX
 		MACRO_XLINK_clear_RX;
-						
-		// Calculate single turn-around time
-		UL64 iSecondaryTickTemp = 0;
-		UL64 iActualTickTemp = MACRO_GetTickCountRet;
+		iActualTickTemp = MACRO_GetTickCountRet;
 	
 		// Send the command
 		MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
@@ -392,19 +387,22 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	
 		// Update turnaround time
 		iSecondaryTickTemp = MACRO_GetTickCountRet;
-		
+			
 		// Increase total time
-		NOP_OPERATION;
-		iTotalTimeTaken += (iSecondaryTickTemp - iActualTickTemp);
+
+		iTempX = (iSecondaryTickTemp - iActualTickTemp);
+		if ((iTempX > 0x0FFFF))
+		{
+			iSecondaryTickTemp += 1;
+		}
+		iTotalTimeTaken += iTempX;
 		
 		if ((iRespLen == 4) &&
 		(szResponse[0] == 'E') &&
 		(szResponse[1] == 'C') &&
 		(szResponse[2] == 'H') &&
 		(szResponse[3] == 'O'))
-		{
-
-			
+		{	
 			if (x == 0) iTurnaroundTime = (iSecondaryTickTemp - iActualTickTemp);
 			if (iTurnaroundTime > 0) iTurnaroundTime -= 1;
 			
@@ -417,26 +415,22 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 			// Increase our success counter			
 			iSuccessCounter++;
 		}
-
 	}
 
 	// Generate Report
-	char szTempex[128];
-	strcpy(szReportResult,"");
-	
+	volatile char szTempex[128];
+	strcpy(szReportResult,"");	
 	/*for (int x = 0; x < 30; x++)
 	{
 		sprintf(szTempex,"%d,", iTransactionTimes[x]);
 		strcat(szReportResult, szTempex);
 		
-	}*/
-	
-	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %d us\nLeast transact: %d us\n",
+	}*/	
+	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %u us\nLeast transact: %u us\n",
 			iSuccessCounter, 100000, (unsigned int)iTotalTimeTaken, (unsigned int)iTurnaroundTime );
 
 	strcat(szReportResult, szTempex);
 	
-
 	// Send the OK back first
 	// All is good... sent the identifier and get out of here...
 	if (XLINK_ARE_WE_MASTER)
@@ -446,18 +440,16 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	else // We're a slave... send it by XLINK
 	{
 		// We do nothing here...
-	}
-
-	
+	}	
 	
 	/*
 	int iDigestValues[8] = {0,0,0,0,0,0,0,0};
 		
-	UL64 iTickVal = GetTickCount();
+	UL32 iTickVal = GetTickCount();
 		
 	SHA256_Digest(0x0FFEE2E3A, iDigestValues);
 	
-	UL64 iResultTick = GetTickCount() - iTickVal;
+	UL32 iResultTick = GetTickCount() - iTickVal;
 	
 	char szReportResult[128];
 	
@@ -473,11 +465,11 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	}
 	*/
 	
-	/*unsigned UL64 iActualTick = GetTickCount();
+	/*unsigned UL32 iActualTick = GetTickCount();
 	volatile unsigned int iRetVals[8] = {0,0,0,0,0,0,0,0};
 	SHA256_Digest("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiKK", 362, iRetVals);
 	char szResponse[128];
-	unsigned UL64 iPostTick = GetTickCount();
+	unsigned UL32 iPostTick = GetTickCount();
 	unsigned int iDiff = (iPostTick - iActualTick);
 	
 	sprintf(szResponse, "HASH RESULT: %08X-%08X-%08X-%08X-%08X-%08X-%08X-%08X\nOperation took: %d us",

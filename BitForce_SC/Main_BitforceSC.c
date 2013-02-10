@@ -104,6 +104,7 @@ int main(void)
 			XLINK_set_cpld_id(0);
 			XLINK_set_cpld_master(TRUE);
 			XLINK_set_cpld_passthrough(FALSE);
+			
 			if (Management_MASTER_Initialize_XLINK_Chain() == FALSE)
 			{
 				// Ok this can be bad, we failed the chain initialization
@@ -420,9 +421,9 @@ void MCU_Main_Loop()
 
 static int Management_MASTER_Initialize_XLINK_Chain()
 {
-	// What we do here is we keep sending PROTOCOL_PRESENCE_DETECTION until we no UL64er receive
+	// What we do here is we keep sending PROTOCOL_PRESENCE_DETECTION until we no UL32er receive
 	// a response. For each response we receive, we send a SET-ID command. The responding device
-	// we have an ID assigned to it and will no UL64er response to PROTOCOL_PRESENCE_DETECTION command
+	// we have an ID assigned to it and will no UL32er response to PROTOCOL_PRESENCE_DETECTION command
 	// OK We've detected a ChainForward request. First Send 'OK' to the host
 		
 	char szRespData[32];

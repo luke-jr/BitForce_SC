@@ -9,14 +9,15 @@
 #include "Generic_Module.h"
 
 
-UL64	GetTickCount(void)
+/*
+UL32	GetTickCount(void)
 {
 	#if defined(__OPERATING_FREQUENCY_32MHz__)
-		return (UL64)((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF));
+		return (UL32)((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF));
 	#elif defined(__OPERATING_FREQUENCY_48MHz__)
-		return (UL64)((((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF)) * 6) / 10);
+		return (UL32)((((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF)) * 6) / 10);
 	#elif defined(__OPERATING_FREQUENCY_64MHz__)
-		return (UL64)((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF)) >> 1; // Divide by 2 for 64MHz
+		return (UL32)((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF)) >> 1; // Divide by 2 for 64MHz
 	#elif defined(__OPERATING_FREQUENCY_16MHz__)
 		MAST_TICK_COUNTER += 40;
 	#else
@@ -28,4 +29,4 @@ UL64	GetTickCount(void)
 void	IncrementTickCounter(void)
 {
 	MAST_TICK_COUNTER++;
-}
+}*/

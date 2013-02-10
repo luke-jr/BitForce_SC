@@ -34,16 +34,16 @@
 #define __XLINK_WAIT_PACKET_TIMEOUT__        440
 */
 
-#define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   20000   // 10ms
-#define __XLINK_TRANSACTION_TIMEOUT__	     240000
-#define __XLINK_WAIT_PACKET_TIMEOUT__        880
+#define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
+#define __XLINK_TRANSACTION_TIMEOUT__	     120000
+#define __XLINK_WAIT_PACKET_TIMEOUT__        440
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      88
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION	"1.0.0"
+#define __FIRMWARE_VERSION		"1.0.0"
 
 /*************** UNIT ID STRING ********************/
-#define  UNIT_ID_STRING "BitForce SC 1.0"
+#define  UNIT_ID_STRING			"BitForce SC 1.0"
 
 // Unit Identification String
 #define UNIT_FIRMWARE_ID_STRING	">>>>ID: BitFORCE SC SHA256 Version 1.0>>>>\n"
@@ -51,16 +51,16 @@
 #define UNIT_FIRMWARE_TYPE		">>>>JALAPENO>>>>" // OR ">>>>MINIRIG>>>>" OR ">>>>SINGLE>>>>" OR ">>>>LITTLE-SINGLE>>>>"
 #define UNIT_FIRMWARE_SPEED		">>>>32>>>>"
 
-// We define our UL64 and Unsigned Long Long
+// We define our UL32 and Unsigned Long Long
 typedef unsigned long long UL64;
 typedef unsigned int UL32;
 
 
 ///////////////////////////////////////// typedefs
 // Master Tick Counter (Holds clock in 1uS ticks)
-UL32 MAST_TICK_COUNTER;
+volatile UL32 MAST_TICK_COUNTER;
 
-UL64 GetTickCount(void);
+UL32 GetTickCount(void);
 void IncrementTickCounter(void);
 
 // Other definitions
@@ -99,7 +99,6 @@ typedef struct _tag_buf_job_result_packet
 int XLINK_ARE_WE_MASTER;
 int global_vals[6];
 
-
 // Used for ASIC handling
 #define ASIC_SPI_RW_COMMAND						    0b01000000000000000
 
@@ -109,7 +108,7 @@ int global_vals[6];
 
 // Assembly NOP operation
 #ifdef __OPERATING_FREQUENCY_64MHz__
-	#define NOP_OPERATION asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t");
+	#define NOP_OPERATION asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t nop \n\t");
 #elif defined(__OPERATING_FREQUENCY_48MHz__)	
 	#define NOP_OPERATION asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t");
 #else

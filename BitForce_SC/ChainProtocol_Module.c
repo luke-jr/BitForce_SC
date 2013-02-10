@@ -233,7 +233,7 @@ void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, c
 //////////////////////////////////////////////////////////////////////////////
 void XLINK_wait_packet (char  *data,
 						unsigned int *length,
-						UL64  time_out,
+						UL32  time_out,
 						char  *timeout_detected,
 						char  *senders_address,
 						char  *LP,
@@ -251,9 +251,7 @@ void XLINK_wait_packet (char  *data,
 	volatile unsigned char us2 = 0;
 
 	iActualRXStatus = XLINK_get_RX_status();
-		 
-	UL64 iTimeoutHolder;
-	iTimeoutHolder = GetTickCount();
+	UL32 iTimeoutHolder = GetTickCount();
 
 	// Wait until actual buffer is sent...
 	if ((iActualRXStatus & CPLD_RX_STATUS_DATA) == 0)
@@ -297,7 +295,7 @@ void XLINK_MASTER_transact(char   iAdrs,
 						   char*  szResp,
 						   unsigned short* response_length,
 						   unsigned short  iMaxRespLen,
-						   UL64    transaction_timeout, // Master timeout
+						   UL32    transaction_timeout, // Master timeout
 						   char   *bDeviceNotResponded, // Device did not respond, even to the first packet
 						   char   *bTimeoutDetected, // Was a timeout detected?
 					       char   bWeAreMaster)
@@ -311,7 +309,7 @@ void XLINK_MASTER_transact(char   iAdrs,
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	volatile UL64 iActualTickcount = MACRO_GetTickCountRet;
+	volatile UL32 iActualTickcount = MACRO_GetTickCountRet;
 	volatile unsigned short iTotalSent = 0;
 	volatile char  iBytesToSend = 0;
 	volatile char  iLP = 0; // LastPacket
@@ -326,9 +324,9 @@ void XLINK_MASTER_transact(char   iAdrs,
 	volatile char __lp = 0;
 	volatile char __bc = 0;
 	
-	volatile UL64 vTemp1 = 0;
-	volatile UL64 vTemp2 = 0;
-	volatile UL64 vTemp3 = 0;
+	volatile UL32 vTemp1 = 0;
+	volatile UL32 vTemp2 = 0;
+	volatile UL32 vTemp3 = 0;
 	
 	while (iTotalSent < iLen)
 	{
@@ -439,8 +437,8 @@ RETRY_POINT_1:
 	volatile unsigned short iTotalReceived = 0;
 	iTotalRetryCount = 0;
 	
-	volatile UL64 imrActualHolder = 0;
-	volatile UL64 imrActualTime = 0;
+	volatile UL32 imrActualHolder = 0;
+	volatile UL32 imrActualTime = 0;
 	
 	// We have to reset the BitCorrector, as it will start from 0 for the PUSH part
 	iBC = TRUE; // Push must be set to one
@@ -473,7 +471,7 @@ RETRY_POINT_1:
 		// Wait for response		
 		MACRO_XLINK_wait_packet(szDevResponse, 
 							    __iRespLen,
-								((iTotalReceived == 0) ? (__XLINK_WAIT_PACKET_TIMEOUT__ << 3) : (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3)),  // For the first packet (only) we wait UL64 time. For the rest, we'll be fast...
+								((iTotalReceived == 0) ? (__XLINK_WAIT_PACKET_TIMEOUT__ << 3) : (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3)),  // For the first packet (only) we wait UL32 time. For the rest, we'll be fast...
 								iTimeoutDetected,
 								__senders_address,
 								__lp,
@@ -679,7 +677,7 @@ RETRY_POINT_3:
 void XLINK_SLAVE_wait_transact (char  *data,
 							    unsigned int *length,
 							    unsigned int  max_len,
-							    UL64 transaction_timeout,
+							    UL32 transaction_timeout,
 							    char  *bTimeoutDetected,
 							    char  bWeAreMaster)
 {
@@ -691,7 +689,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	volatile UL64  iActualTickcount;
+	volatile UL32  iActualTickcount;
 	iActualTickcount = MACRO_GetTickCountRet;
 	
 	volatile char  iBC = 0; // BitCorrector
@@ -702,9 +700,9 @@ void XLINK_SLAVE_wait_transact (char  *data,
 	// What is our address?
 	volatile char  our_address = __OUR_CPLD_ID;
 	volatile short iLoopCounter = 0;
-	volatile UL64 vTemp1 = 0;
-	volatile UL64 vTemp2 = 0;
-	volatile UL64 vTemp3 = 0;
+	volatile UL32 vTemp1 = 0;
+	volatile UL32 vTemp2 = 0;
+	volatile UL32 vTemp3 = 0;
 	
 	// Now we have to wait for data
 	while (iTotalReceived < max_len)
@@ -859,7 +857,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 
 void XLINK_SLAVE_respond_transact  (char  *data,
 									unsigned int length,
-									UL64 transaction_timeout,
+									UL32 transaction_timeout,
 									char  *bTimeoutDetected,
 									char  bWeAreMaster)
 {
@@ -872,8 +870,8 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	volatile unsigned int iActualTickcount = GetTickCount();
-	volatile unsigned short iTotalSent = 0;
+	volatile unsigned int    iActualTickcount = MACRO_GetTickCountRet;
+	volatile unsigned short  iTotalSent = 0;
 	volatile unsigned short  iBytesToSend = 0;
 	volatile char  iBC = 1; // BitCorrector is ONE, since the previous part has already set it to one!
 	volatile char  iTotalRetryCount = 0;
@@ -883,9 +881,9 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 	volatile char  iPrevLP = 0;
 	volatile char  iPrevBC = 0;
 	
-	volatile UL64  vTemp1;
-	volatile UL64  vTemp2;
-	volatile UL64  vTemp3;
+	volatile UL32  vTemp1;
+	volatile UL32  vTemp2;
+	volatile UL32  vTemp3;
 	
 	// Now we have to wait for data
 	while (1)

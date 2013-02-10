@@ -26,11 +26,15 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 #define CPLD_deactivate_address_increase   AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
 
 #if defined(__OPERATING_FREQUENCY_32MHz__)
-	#define MACRO_GetTickCount(x)  (x = (UL64)((UL64)(MAST_TICK_COUNTER << 16) + (UL64)(AVR32_TC.channel[0].cv)))
-	#define MACRO_GetTickCountRet  ((UL64)((UL64)(MAST_TICK_COUNTER << 16) + (UL64)(AVR32_TC.channel[0].cv)))
+	#define MACRO_GetTickCount(x)  (x = (UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_TC.channel[0].cv)))
+	#define MACRO_GetTickCountRet  ((UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_TC.channel[0].cv)))
+	//#define MACRO_GetTickCount(x)  (x = (UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_RTC.val * 9)))
+	//#define MACRO_GetTickCountRet  ((UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_RTC.val * 9 )))	
 #else
-	#define MACRO_GetTickCount(x)  (x = (((UL64)((UL64)(MAST_TICK_COUNTER << 16) + (UL64)(AVR32_TC.channel[0].cv))) >> 1) )
-	#define MACRO_GetTickCountRet  (((UL64)((UL64)(MAST_TICK_COUNTER << 16) + (UL64)(AVR32_TC.channel[0].cv))) >> 1)
+	#define MACRO_GetTickCount(x)  (x = (((UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_TC.channel[0].cv))) >> 1) )
+	#define MACRO_GetTickCountRet  (((UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_TC.channel[0].cv))) >> 1)
+	//#define MACRO_GetTickCount(x)  (x = (((UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_RTC.val))) >> 1) )
+	//#define MACRO_GetTickCountRet  (((UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_RTC.val))) >> 1)	
 #endif
 
 #define MACRO__AVR32_CPLD_Read(ret_value, address) ({ \
@@ -262,9 +266,9 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 			volatile unsigned char us1 = 0; \
 			volatile unsigned char us2 = 0; \
 			MACRO_XLINK_get_RX_status(iActualRXStatus); \
-			volatile UL64 iTimeoutHolder; \
+			volatile UL32 iTimeoutHolder; \
 			MACRO_GetTickCount(iTimeoutHolder); \
-			volatile UL64 iTickHolder; \
+			volatile UL32 iTickHolder; \
 			if ((iActualRXStatus & CPLD_RX_STATUS_DATA) == 0) \
 			{ \
 				while (TRUE) \ 
@@ -272,7 +276,7 @@ void OPTIMIZED__AVR32_CPLD_BurstRxRead(char* szData, char iAddress);
 					MACRO_XLINK_get_RX_status(iActualRXStatus); \
 					if ((iActualRXStatus & CPLD_RX_STATUS_DATA) != 0) break; \
 					MACRO_GetTickCount(iTickHolder); \
-					if ((iTickHolder - iTimeoutHolder) > time_out) \
+					if ((UL32)(iTickHolder - iTimeoutHolder) > (UL32)time_out) \
 					{ \
 						timeout_detected = TRUE; \
 						length = 0; \
@@ -307,9 +311,9 @@ while(TRUE) \
 	volatile unsigned char us1 = 0; \
 	volatile unsigned char us2 = 0; \
 	MACRO_XLINK_get_RX_status(iActualRXStatus); \
-	UL64 iTimeoutHolder; \
+	UL32 iTimeoutHolder; \
 	MACRO_GetTickCount(iTimeoutHolder); \
-	UL64 iTickHolder; \
+	UL32 iTickHolder; \
 	volatile char imrLen = 0; \
 	imrLen = ((iActualRXStatus & 0b0111000) >> 3); \
 	length = imrLen; \
@@ -359,9 +363,9 @@ while(TRUE) \
 	volatile unsigned char us1 = 0; \
 	volatile unsigned char us2 = 0; \
 	MACRO_XLINK_get_RX_status(iActualRXStatus); \
-	UL64 iTimeoutHolder; \
+	UL32 iTimeoutHolder; \
 	MACRO_GetTickCount(iTimeoutHolder); \
-	UL64 iTickHolder; \
+	UL32 iTickHolder; \
 	if ((iActualRXStatus & CPLD_RX_STATUS_DATA) == 0) \
 	{ \
 		while (TRUE) \
@@ -407,9 +411,9 @@ while(TRUE) \
 			volatile unsigned char us1 = 0; \
 			volatile unsigned char us2 = 0; \
 			MACRO_XLINK_get_RX_status(iActualRXStatus); \
-			UL64 iTimeoutHolder; \
+			UL32 iTimeoutHolder; \
 			MACRO_GetTickCount(iTimeoutHolder); \
-			UL64 iTickHolder; \
+			UL32 iTickHolder; \
 			if ((iActualRXStatus & CPLD_RX_STATUS_DATA) == 0) \
 			{ \
 				while (TRUE) \ 
