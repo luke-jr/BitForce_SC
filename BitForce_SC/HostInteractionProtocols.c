@@ -107,23 +107,22 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	volatile UL32 uL1;
 	volatile UL32 uL2;
 	volatile UL32 uLRes;
+	
+	// Atomic Full-Asm Special CPLD Write latency
+	uL1 = MACRO_GetTickCountRet;
+	uL2 = MACRO_GetTickCountRet;
+	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
+	sprintf(szTemp,"MACRO_GetTickCount roundtime: %u us\n", (unsigned int)uLRes);
+	strcat(szInfoReq, szTemp);
 
 	// Atomic Full-Asm Special CPLD Write latency
 	uL1 = MACRO_GetTickCountRet;
 	MACRO_XLINK_send_packet(0,"ABCD",4,1,1);
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
-	sprintf(szTemp,"ATOMIC MACRO SEND: %d us\n", (unsigned int)uLRes);
+	sprintf(szTemp,"ATOMIC MACRO SEND PACKET: %u us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);	
-	
-	// Atomic ORDINARY CPLD WRITE latency
-	uL1 = MACRO_GetTickCountRet;
-	OPTIMIZED__AVR32_CPLD_Write(199,100);
-	uL2 = MACRO_GetTickCountRet;
-	uLRes = uL2 - uL1;
-	sprintf(szTemp,"ATOMIC ORDINARY CPLD WRITE LATENCY: %d us\n", (unsigned int)uLRes);
-	strcat(szInfoReq, szTemp);
-	
+
 	// Add Engine count
 	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_chip_count());
 	strcat(szInfoReq, szTemp);

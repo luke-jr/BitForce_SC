@@ -61,9 +61,7 @@ unsigned int OPTO_GetTickCountRet(void);
 		NOP_OPERATION \
 		volatile int iRetVal = (AVR32_GPIO.port[1].pvr & 0x000000FF); \
 		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
-		NOP_OPERATION \
 		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \
-		NOP_OPERATION \
 		ret_value = iRetVal; })
 
 #define MACRO__AVR32_CPLD_Write(address, value) ({ \
@@ -168,9 +166,7 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
 		CPLD_deactivate_address_increase; \
-		NOP_OPERATION \		
 		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; }) 
 		
 #define MACRO__AVR32_CPLD_BurstRxRead(iData,iAddress) ({ \
@@ -216,9 +212,7 @@ unsigned int OPTO_GetTickCountRet(void);
 		iData[3] = (AVR32_GPIO.port[1].pvr & 0x000000FF); \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
-		NOP_OPERATION \
 		CPLD_deactivate_address_increase; \
-		NOP_OPERATION \
 		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \
 	 })
 
