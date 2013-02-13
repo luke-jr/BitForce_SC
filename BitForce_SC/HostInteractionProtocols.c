@@ -160,6 +160,45 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	return res;
 }
 
+PROTOCOL_RESULT Protocol_fan_set(char iValue)
+{
+	// Our result
+	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
+		
+	// Requests...		
+	volatile unsigned char iRequestedMod = iValue - 48;
+	volatile unsigned char szResponse[64];
+		
+	strcpy(szResponse,"");
+		
+	// We have linear request, it should be 0 to 5 and '9'
+	if ((iRequestedMod < 0) || ((iRequestedMod > 5) && (iRequestedMod != 9)))
+	{	
+		// We have an error
+		strcpy(szResponse, "ERR:INVALID FAN STATE\n");
+	}	
+	else
+	{	
+		// Set the proper state
+		// Note: iRequestedMod is now corresponds to FAN_STATE_<VALUE> modes, so we can used it directly
+		FAN_SUBSYS_SetFanState(iRequestedMod);
+	}	
+		
+		
+	// All is good... sent the identifier and get out of here...
+	if (XLINK_ARE_WE_MASTER)
+	{	
+		USB_send_string(szResponse);  // Send it to USB
+	}	
+	else // We're a slave... send it by XLINK
+	{	
+		char bTimeoutDetected = 0;
+		XLINK_SLAVE_respond_transact(szResponse, sizeof(szResponse), 
+									 __XLINK_TRANSACTION_TIMEOUT__, 
+									 &bTimeoutDetected, FALSE);
+	}	
+}		
+
 PROTOCOL_RESULT Protocol_Blink(void)
 {
 	// Our result
@@ -279,10 +318,6 @@ while(TRUE) \
 	}) 		
 */
 
-
-volatile UL32 OPTO_GetTickCountRet(void);
-volatile UL32 OPTO_GetTickCountRet(void){ return ((UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_TC.channel[0].cv)) >> 1); }
-
 PROTOCOL_RESULT Protocol_Test_Command(void)
 {
 	// Our result
@@ -322,38 +357,6 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	char burst_write[4] = {0,0,0,0};
 	char burst_read[4]  = {0,0,0,0};
 		
-
-	
-	/*for (unsigned int umm = 0; umm < 1000; umm++)
-	{
-		burst_write[0] = umm & 0x0FF;
-		burst_write[1] = (umm+1) & 0x0FF;
-		burst_write[2] = (umm+2) & 0x0FF;
-		burst_write[3] = (umm+3) & 0x0FF;
-		__AVR32_CPLD_BurstTxWrite(burst_write, CPLD_ADDRESS_TX_BUF_BEGIN);
-		if (MCU_CPLD_Read(31) != iVal) iTotalWrongReads++;	
-		
-		// TO BE COMPLETED, We need to test burst-read and burst-write
-																																		
-	}
-	
-	sprintf(szReportResult, "Total wrong results: %d, operation took %d us\n", iTotalWrongReads, GetTickCount() - iActualTickTick);
-	
-	if (XLINK_ARE_WE_MASTER)
-	{
-		USB_send_string(szReportResult);  // Send it to USB
-	}
-	else // We're a slave... send it by XLINK
-	{
-		// We do nothing here...
-	}
-	
-	
-	//////////////////////
-	/// WE RETURN HERE...
-	//////////////////////
-	return res; 
-	*/
 	// Total time taken
 	volatile UL32 iTotalTimeTaken = 0;
 	volatile UL32 iTempX = 0;
@@ -362,6 +365,8 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	volatile UL32 iSecondaryTickTemp = 0;
 	volatile UL32 iActualTickTemp = 0;
 	volatile UL32 iTotalGoodDelay = 0;
+	
+	iTurnaroundTime = 0x0FFFFFFFF;
 	
 	// Now we send message to XLINK_GENERAL_DISPATCH_ADDRESS for an ECHO and count the successful iterations
 	for (unsigned int x = 0; x < 100000; x++)
@@ -404,9 +409,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 			(szResponse[2] == 'H') &&
 			(szResponse[3] == 'O'))
 		{	
-			if (x == 0) iTurnaroundTime = (iSecondaryTickTemp - iActualTickTemp);
-			if (iTurnaroundTime > 0) iTurnaroundTime -= 1;
-			
+		
 			// Increase good count
 			iTotalGoodDelay += (iTempX - 1);
 			
@@ -482,7 +485,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	sprintf(szResponse, "HASH RESULT: %08X-%08X-%08X-%08X-%08X-%08X-%08X-%08X\nOperation took: %d us",
 			iRetVals[0], iRetVals[1], iRetVals[2], iRetVals[3], iRetVals[4], iRetVals[5], iRetVals[6], iRetVals[7], iDiff);
 	if (XLINK_ARE_WE_MASTER)
-	{
+	{ 
 		USB_send_string(szResponse);  // Send it to USB
 	}
 	else // We're a slave... send it by XLINK
@@ -502,14 +505,16 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 {
 	// Our result
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
-
+	
 	// We've received the ZX command, can we take this job now?
 	if (!__pipe_ok_to_push())
 	{
 		Flush_p2p_buffer_into_engines(); // Function is called before we return
 		
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string("ERR:BUFFER FULL\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
 		{
 			unsigned int bXTimeoutDetected = 0;
@@ -521,6 +526,24 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 		}			
 		
 		return PROTOCOL_FAILED;
+	}
+	
+	// Are we at high-temperature, waiting to cool down?
+	if (GLOBAL_IS_CRITICAL_TEMPERATURE == TRUE)
+	{
+		if (XLINK_ARE_WE_MASTER)
+			USB_send_string("ERR:HIGH TEMPERATURE RECOVERY\n");  // Send it to USB
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:HIGH TEMPERATURE RECOVERY\n",
+										sizeof("ERR:BUFFER FULL\n"),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
+		}
+		
+		return PROTOCOL_FAILED;		
 	}
 
 	// We can take the job (either we start processing or we put it in the buffer)
@@ -800,6 +823,27 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	// Send data to ASIC and wait for response...
 	// BTW, our actual timeout is 16 seconds... (1GH/s)
 	// Also, we do expect a packet which is 64 Bytes data, 16 Bytes Midstate, 16 Bytes difficulty (totaling 96 Bytes)
+	
+	// Are we at high-temperature, waiting to cool down?
+	if (GLOBAL_IS_CRITICAL_TEMPERATURE == TRUE)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:HIGH TEMPERATURE RECOVERY\n");  // Send it to USB	
+		}		
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:HIGH TEMPERATURE RECOVERY\n",
+			sizeof("ERR:BUFFER FULL\n"),
+			__XLINK_TRANSACTION_TIMEOUT__,
+			&bXTimeoutDetected,
+			FALSE);
+		}
+			
+		return PROTOCOL_FAILED;
+	}
+
 
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
@@ -874,6 +918,26 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	// Send data to ASIC and wait for response...
 	// BTW, our actual timeout is 16 seconds... (1GH/s)
 	// Also, we do expect a packet which is 64 Bytes data, 16 Bytes Midstate, 16 Bytes difficulty (totaling 96 Bytes)
+
+	// Are we at high-temperature, waiting to cool down?
+	if (GLOBAL_IS_CRITICAL_TEMPERATURE == TRUE)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:HIGH TEMPERATURE RECOVERY\n");  // Send it to USB
+		}			
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:HIGH TEMPERATURE RECOVERY\n",
+			sizeof("ERR:BUFFER FULL\n"),
+			__XLINK_TRANSACTION_TIMEOUT__,
+			&bXTimeoutDetected,
+			FALSE);
+		}
+		
+		return PROTOCOL_FAILED;
+	}
 
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)

@@ -42,9 +42,9 @@ unsigned int OPTO_GetTickCountRet(void);
 #define MACRO__AVR32_CPLD_Read(ret_value, address) ({ \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS; \
 		NOP_OPERATION \		
 		AVR32_GPIO.port[1].ovr  = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00) | address; \
@@ -67,9 +67,9 @@ unsigned int OPTO_GetTickCountRet(void);
 #define MACRO__AVR32_CPLD_Write(address, value) ({ \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS; \
 		NOP_OPERATION \		
 		AVR32_GPIO.port[1].ovr  = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00) | address; \
@@ -87,46 +87,12 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; })
-		
-#define MACRO__AVR32_CPLD_WriteTxControlAndStart(txControlVal) ({ \
-		NOP_OPERATION \
-		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS; \
-		NOP_OPERATION \
-		volatile unsigned int iInitialOvrValue = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00); \
-		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | CPLD_ADDRESS_TX_CONTROL; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS; \
-		NOP_OPERATION \
-		CPLD_activate_address_increase; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | txControlVal; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | CPLD_ADDRESS_TX_START_SEND; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
-		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \	
-		NOP_OPERATION \
-		CPLD_deactivate_address_increase; \				
-		NOP_OPERATION \
-		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; })		
+	
 
 #define MACRO__AVR32_CPLD_BurstTxWrite(szdata, address_begin) ({ \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc =  __AVR32_CPLD_OE; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS; \
@@ -138,33 +104,31 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS; \
-		NOP_OPERATION \		
 		CPLD_activate_address_increase; \
-		NOP_OPERATION \
 		volatile unsigned int iInitialOvrValue = (AVR32_GPIO.port[1].ovr & 0x0FFFFFF00); \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | szdata[0]; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
+		asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t"); \
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | szdata[1]; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
+		asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t");	\	
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | szdata[2]; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
+		asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t"); \
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovr  = (iInitialOvrValue) | szdata[3]; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
+		asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t"); \
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		CPLD_deactivate_address_increase; \
 		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; }) 
@@ -188,25 +152,23 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \	
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_OE; \
-		NOP_OPERATION \
 		CPLD_activate_address_increase; \
-		NOP_OPERATION \
 		iData[0] = (AVR32_GPIO.port[1].pvr & 0x000000FF); \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
+		asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t"); \
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		iData[1] = (AVR32_GPIO.port[1].pvr & 0x000000FF); \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
+		asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t"); \
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		iData[2] = (AVR32_GPIO.port[1].pvr & 0x000000FF); \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
-		NOP_OPERATION \
+		asm volatile ("nop \n\t nop \n\t nop \n\t nop \n\t"); \
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		iData[3] = (AVR32_GPIO.port[1].pvr & 0x000000FF); \
@@ -444,22 +406,5 @@ while(TRUE) \
 #endif
 
 
-
 /////////////////////////////////////////////////////////////////
-/*
-#define MACRO_XLINK_send_packet(iadrs, szdata, ilen, lp, bc) ({ \
-		char read_tx_status = 0x0FF; \
-		while ((read_tx_status & CPLD_TX_STATUS_TxInProg) != 0) { MACRO_XLINK_get_TX_status(read_tx_status);} \
-		MACRO_XLINK_set_target_address(iadrs); \
-		unsigned char iTotalToSend = (ilen << 1); \
-		char szMMR[4]; \
-		MACRO__AVR32_CPLD_BurstTxWrite(szdata, CPLD_ADDRESS_TX_BUF_BEGIN); \
-		unsigned int iTxControlVal = 0; \
-		iTxControlVal |= iTotalToSend;	\
-		iTxControlVal |= (lp != 0) ? CPLD_TX_CONTROL_LP : 0; \
-		iTxControlVal |= (bc != 0) ? CPLD_TX_CONTROL_BC : 0; \
-		MACRO__AVR32_CPLD_WriteTxControlAndStart(iTxControlVal); \
-		})		
-*/
-
 #endif /* AVR32_OPTIMIZEDTEMPLATES_H_ */

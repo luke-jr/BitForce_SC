@@ -31,6 +31,8 @@
 #include "HighLevel_Operations.h"
 #include "AVR32_OptimizedTemplates.h"
 #include "AVR32X/AVR32_Module.h"
+#include "FAN_Subsystem.h"
+
 // Information about the result we're holding
 extern buf_job_result_packet  __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
 extern char 		   __buf_job_results_count;  // Total of results in our __buf_job_results
@@ -64,7 +66,7 @@ int main(void)
 	// Continue...
 	init_mcu_led();
 	init_pipe_job_system();
-	init_XLINK(); // TEMPORARY!
+	init_XLINK();
 	init_ASIC();
 	init_USB();
 	
@@ -84,6 +86,9 @@ int main(void)
 	// Turn on the front LED
 	MCU_MainLED_Initialize();
 	MCU_MainLED_Set();
+	
+	// Initialize FAN subsystem
+	FAN_SUBSYS_Initialize();
 	
 	// Detect if we're chain master or not [MODIFY]
 	XLINK_ARE_WE_MASTER = XLINK_detect_if_we_are_master(); // For the moment we're the chain master [MODIFY]
@@ -381,13 +386,17 @@ void MCU_Main_Loop()
 				else
 				{
 					// We have a valid command, go call its procedure...
+					
+					// Job-Issuing commands
 					if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB)			Protocol_P2P_BUF_PUSH();
+					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB_P2POOL)	Protocol_handle_job_p2p();
+					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB)			Protocol_handle_job();
+					
+					// The rest of the commands
 					if (sz_cmd[1] == PROTOCOL_REQ_BUF_FLUSH)			Protocol_P2P_BUF_FLUSH();
 					if (sz_cmd[1] == PROTOCOL_REQ_BUF_STATUS)			Protocol_P2P_BUF_STATUS();
 					if (sz_cmd[1] == PROTOCOL_REQ_INFO_REQUEST)			Protocol_info_request();
-					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB)			Protocol_handle_job();
 					if (sz_cmd[1] == PROTOCOL_REQ_ID)					Protocol_id();
-					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB_P2POOL)	Protocol_handle_job_p2p();
 					if (sz_cmd[1] == PROTOCOL_REQ_BLINK)				Protocol_Blink();
 					if (sz_cmd[1] == PROTOCOL_REQ_TEMPERATURE)			Protocol_temperature();
 					if (sz_cmd[1] == PROTOCOL_REQ_GET_STATUS)			Protocol_get_status();

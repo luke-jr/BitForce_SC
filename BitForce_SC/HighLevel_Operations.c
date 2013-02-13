@@ -16,6 +16,7 @@
 
 #include "HostInteractionProtocols.h"
 #include "HighLevel_Operations.h"
+#include "FAN_Subsystem.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -23,12 +24,16 @@
 #include <avr32/io.h>
 
 
+
+
 volatile void HighLevel_Operations_Spin()
 {
 	// Nothing for the moment
 	// Reset Watchdog to prevent system reset. (Timeout for watchdog is 17ms)
-	AVR32_WDT.clr = 0x0FFFFFFFF;
+	WATCHDOG_RESET;
 	
+	// Call our Fan-Spin
+	FAN_SUBSYS_IntelligentFanSystem_Spin();
 	
 }
 

@@ -8,25 +8,5 @@
 #include "std_defs.h"
 #include "Generic_Module.h"
 
-
-/*
-UL32	GetTickCount(void)
-{
-	#if defined(__OPERATING_FREQUENCY_32MHz__)
-		return (UL32)((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF));
-	#elif defined(__OPERATING_FREQUENCY_48MHz__)
-		return (UL32)((((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF)) * 6) / 10);
-	#elif defined(__OPERATING_FREQUENCY_64MHz__)
-		return (UL32)((MAST_TICK_COUNTER << 16) | (MCU_Timer_GetValue() & 0x0FFFF)) >> 1; // Divide by 2 for 64MHz
-	#elif defined(__OPERATING_FREQUENCY_16MHz__)
-		MAST_TICK_COUNTER += 40;
-	#else
-		return 0;
-	#endif
-
-}
-
-void	IncrementTickCounter(void)
-{
-	MAST_TICK_COUNTER++;
-}*/
+// Set our initial value for the critical temperature
+extern volatile char GLOBAL_IS_CRITICAL_TEMPERATURE = FALSE;

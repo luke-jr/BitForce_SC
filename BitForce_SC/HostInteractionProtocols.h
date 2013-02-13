@@ -58,6 +58,13 @@
 #define PROTOCOL_REQ_ECHO					0+65  // A // Echoes back whatever it hears
 #define PROTOCOL_REQ_TEST_COMMAND			1+65  // B // Custom Command
 
+#define PROTOCOL_REQ_FAN_VERY_SLOW			48+0  // 0
+#define PROTOCOL_REQ_FAN_SLOW				48+1  // 1
+#define PROTOCOL_REQ_FAN_MEDIUM				48+2  // 2
+#define PROTOCOL_REQ_FAN_FAST				48+3  // 3
+#define PROTOCOL_REQ_FAN_VERY_FAST			48+4  // 4
+#define PROTOCOL_REQ_FAN_AUTO				48+9  // 9
+
 // ***** Functions
 PROTOCOL_RESULT Protocol_Echo			 (void);
 PROTOCOL_RESULT Protocol_Test_Command	 (void);
@@ -71,6 +78,7 @@ PROTOCOL_RESULT Protocol_id				 (void);
 PROTOCOL_RESULT Protocol_Blink			 (void);
 PROTOCOL_RESULT Protocol_temperature	 (void);
 PROTOCOL_RESULT Protocol_chain_forward   (char iTarget, char* sz_cmd, unsigned short iCmdLen);
+PROTOCOL_RESULT Protocol_fan_set		 (char iValue);
 
 // Initiate process for the next job from the buffer
 // And returns previous popped job result

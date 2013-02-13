@@ -98,8 +98,14 @@ typedef struct _tag_buf_job_result_packet
 int XLINK_ARE_WE_MASTER;
 int global_vals[6];
 
+// Critical Temperature Warning - Abort Jobs!
+volatile static char GLOBAL_IS_CRITICAL_TEMPERATURE;
+
 // Used for ASIC handling
 #define ASIC_SPI_RW_COMMAND						    0b01000000000000000
+
+// Our Wathdog Reset command
+#define WATCHDOG_RESET  AVR32_WDT.clr = 0x0FFFFFFFF
 
 // Basic boolean definition
 #define TRUE	1

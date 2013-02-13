@@ -907,14 +907,12 @@ ISR(__avr32_tmr0_interrupt, 0, 3)
 	
 	// Clear the interrupt.
 	volatile unsigned int umx = AVR32_TC.channel[0].sr; // Read the SR flag to clear the interrupt
-	
-	
+		
 	//AVR32_RTC.val = 0;
 	//volatile unsigned long uTop = AVR32_RTC.top;
 	/*AVR32_RTC.top = -1;
 	while (AVR32_RTC.CTRL.busy); // Wait...	*/
 	//AVR32_RTC.ICR.topi = 1 ; // Read the ICR to clear the interrupt
-	
 }
 
 void __AVR32_Timer_Initialize()
@@ -945,7 +943,8 @@ void __AVR32_Timer_Initialize()
 	// Wait for BUSY to clear
 	
 	// Now proceed
-	/*AVR32_RTC.IER.topi = 1;	
+	/*
+	AVR32_RTC.IER.topi = 1;	
 	while (AVR32_RTC.CTRL.busy); // Wait...	
 	AVR32_RTC.top = 0x0FFFFFFFF;
 	while (AVR32_RTC.CTRL.busy); // Wait...	
@@ -956,7 +955,8 @@ void __AVR32_Timer_Initialize()
 	
 	// Get the value
 	volatile unsigned long umx = 0;
-	umx = AVR32_RTC.top;*/
+	umx = AVR32_RTC.top;
+	*/
 		
 	// Disable all interrupts first
 	Disable_global_interrupt();
