@@ -138,8 +138,14 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	// If we are master, how many devices exist in chain?
 	if ((XLINK_ARE_WE_MASTER == TRUE) && (XLINK_is_cpld_present() == TRUE))
 	{
-		sprintf(szTemp,"DEVICES IN CHAIN: %d\n", XLINK_chain_device_count);
+		// Show total devices
+		sprintf(szTemp,"--DEVICES IN CHAIN: %d\n", XLINK_MASTER_getChainLength());
 		strcat (szInfoReq, szTemp);
+		
+		// Show device bit-mask
+		sprintf(szTemp,"--CHAIN PRESENCE MASK: %08X\n", GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK);
+		strcat (szInfoReq, szTemp);
+		
 	}
 	
 	// Add the terminator
@@ -507,7 +513,7 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
 	
 	// We've received the ZX command, can we take this job now?
-	if (!__pipe_ok_to_push())
+	if (!JobPipe__pipe_ok_to_push())
 	{
 		Flush_p2p_buffer_into_engines(); // Function is called before we return
 		
@@ -612,7 +618,7 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 
 	// All is ok, send data to ASIC for processing, and respond with OK
 	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf); 
-	__pipe_push_P2P_job(p_job);
+	JobPipe__pipe_push_P2P_job(p_job);
 	
 	// SIGNATURE CHECK
 	// Respond with 'ERR:SIGNATURE' if not matched
@@ -646,7 +652,7 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_FLUSH(void)
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
 
 	// Reset the FIFO
-	__pipe_flush_buffer();
+	JobPipe__pipe_flush_buffer();
 
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
@@ -721,7 +727,7 @@ PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void)
 		strcat(sz_rep, "ENGINE STATUS:IDLE\n");
 
 		// Enable an engine start if we have jobs in the queue
-		if (__pipe_ok_to_pop()) // It means we have some job to do...
+		if (JobPipe__pipe_ok_to_pop()) // It means we have some job to do...
 		{
 			// Engine start requested
 			i_engine_start_req = 1;
@@ -731,45 +737,45 @@ PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void)
 	// Ok, return the last result as well
 	if (TRUE)
 	{
-		if (__pipe_get_buf_job_results_count() == 0)
+		if (JobPipe__pipe_get_buf_job_results_count() == 0)
 		{
 			strcat(sz_rep, "RECENT:NONE\n");
 		}
 		else
 		{
 			// Give out the count:
-			sprintf(sz_temp, "RECENT:%d\n", __pipe_get_buf_job_results_count());
+			sprintf(sz_temp, "RECENT:%d\n", JobPipe__pipe_get_buf_job_results_count());
 
 			// Now post them one by one
-			for (i_cnt = 0; i_cnt < __pipe_get_buf_job_results_count(); i_cnt++)
+			for (i_cnt = 0; i_cnt < JobPipe__pipe_get_buf_job_results_count(); i_cnt++)
 			{
 				// Also say which midstate and nonce-range is in process
-				stream_to_hex( ((pbuf_job_result_packet)(__pipe_get_buf_job_result(i_cnt)))->midstate , sz_temp2, 32, &istream_len);
+				stream_to_hex( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->midstate , sz_temp2, 32, &istream_len);
 				sz_temp2[(istream_len * 2)] = 0;
 				sprintf(sz_temp, "MIDSTATE:%s\n", sz_temp2);
 				strcat(sz_rep, sz_temp);
 
 				// Nonce-Begin
-				stream_to_hex( ((pbuf_job_result_packet)(__pipe_get_buf_job_result(i_cnt)))->nonce_begin, sz_temp2, 4, &istream_len);
+				stream_to_hex( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->nonce_begin, sz_temp2, 4, &istream_len);
 				sz_temp2[(istream_len * 2)] = 0;
 				sprintf(sz_temp, "-BEGIN:%s\n", sz_temp2);
 				strcat(sz_rep, sz_temp);
 
 				// Nonce-End
-				stream_to_hex( ((pbuf_job_result_packet)(__pipe_get_buf_job_result(i_cnt)))->nonce_end, sz_temp2, 4, &istream_len);
+				stream_to_hex( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->nonce_end, sz_temp2, 4, &istream_len);
 				sz_temp2[(istream_len * 2)] = 0;
 				sprintf(sz_temp, "-END:%s\n",sz_temp2);
 				strcat(sz_rep, sz_temp);
 
 				// Nonces found...
-				if ( ((pbuf_job_result_packet)(__pipe_get_buf_job_result(i_cnt)))->i_nonce_count > 0)
+				if ( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count > 0)
 				{
 					char ix;
 					sprintf(sz_temp,"-NONCE:");
 
-					for (ix = 0; ix < ((pbuf_job_result_packet)(__pipe_get_buf_job_result(i_cnt)))->i_nonce_count; ix++)
+					for (ix = 0; ix < ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count; ix++)
 					{
-						sprintf(sz_temp2, "%08X", ((pbuf_job_result_packet)(__pipe_get_buf_job_result(i_cnt)))->nonce_list[ix]);
+						sprintf(sz_temp2, "%08X", ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->nonce_list[ix]);
 						strcat(sz_temp, sz_temp2);
 
 						// Add a comma if it's not the last nonce
@@ -796,7 +802,7 @@ PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void)
 	}
 
 	// OK, reset the results count in results-buffer, since we've already read them
-	__pipe_set_buf_job_results_count(0);
+	JobPipe__pipe_set_buf_job_results_count(0);
 	
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
@@ -1394,7 +1400,7 @@ void Flush_p2p_buffer_into_engines()
 	// Special case: if processing is finished, it's not ok to pop and
 	// _prev_job_was_p2p is set to one, then we must take the result
 	// and put it in our result list
-	if ((!__pipe_ok_to_pop()) && (!ASIC_is_processing()) && _prev_job_was_p2p)
+	if ((!JobPipe__pipe_ok_to_pop()) && (!ASIC_is_processing()) && _prev_job_was_p2p)
 	{
 		// Verify the result counter is correct
 		if (__buf_job_results_count == PIPE_MAX_BUFFER_DEPTH)
@@ -1431,7 +1437,7 @@ void Flush_p2p_buffer_into_engines()
 	}
 
 	// Do we have anything to pop? Are we processing?
-	if ((!__pipe_ok_to_pop()) || (ASIC_is_processing())) 	return;
+	if ((!JobPipe__pipe_ok_to_pop()) || (ASIC_is_processing())) 	return;
 
 	// Ok, at this stage, we take the result of the previous operation
 	// and put it in our result buffer
@@ -1466,7 +1472,7 @@ void Flush_p2p_buffer_into_engines()
 	// -------------
 	// We have something to pop, get it...
 	job_packet_p2p job_p2p;
-	if (__pipe_pop_P2P_job(&job_p2p) == PIPE_JOB_BUFFER_EMPTY)
+	if (JobPipe__pipe_pop_P2P_job(&job_p2p) == PIPE_JOB_BUFFER_EMPTY)
 	{
 		// This is odd!!! Don't do anything...
 		_prev_job_was_p2p = 0; // Obviously, this must be cleared...

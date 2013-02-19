@@ -35,7 +35,7 @@
 */
 
 #define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
-#define __XLINK_TRANSACTION_TIMEOUT__	     120000
+#define __XLINK_TRANSACTION_TIMEOUT__	     12000
 #define __XLINK_WAIT_PACKET_TIMEOUT__        440
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      88
 
@@ -100,6 +100,9 @@ int global_vals[6];
 
 // Critical Temperature Warning - Abort Jobs!
 volatile static char GLOBAL_IS_CRITICAL_TEMPERATURE;
+
+// This is the main bit mask
+volatile unsigned int GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK;
 
 // Used for ASIC handling
 #define ASIC_SPI_RW_COMMAND						    0b01000000000000000

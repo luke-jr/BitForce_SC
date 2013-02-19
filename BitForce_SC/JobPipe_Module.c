@@ -34,27 +34,27 @@ void init_pipe_job_system()
 	__buf_job_results_count = 0;
 }
 
-void __pipe_flush_buffer()
+void JobPipe__pipe_flush_buffer()
 {
 	// simply reset its counter;
 	__buf_job_results_count = 0;
 	__total_jobs_in_buffer = 0;	
 }
 
-char __pipe_ok_to_pop()
+char JobPipe__pipe_ok_to_pop()
 {
 	return ((__total_jobs_in_buffer > 0) ? 1 : 0);
 }
 
-char __pipe_ok_to_push()
+char JobPipe__pipe_ok_to_push()
 {
 	return ((__total_jobs_in_buffer < PIPE_MAX_BUFFER_DEPTH) ? 1 : 0);
 }
 
-char __pipe_push_P2P_job(void* __input_p2p_job_info)
+char JobPipe__pipe_push_P2P_job(void* __input_p2p_job_info)
 {
 	// Is it ok to push a job into stack?
-	if (!__pipe_ok_to_push()) return PIPE_JOB_BUFFER_FULL;
+	if (!JobPipe__pipe_ok_to_push()) return PIPE_JOB_BUFFER_FULL;
 
 	// Copy memory block
 	memcpy((void*)((char*)(PIPE_PROC_BUF) + (__total_jobs_in_buffer * sizeof(job_packet_p2p))),
@@ -68,10 +68,10 @@ char __pipe_push_P2P_job(void* __input_p2p_job_info)
 	return PIPE_JOB_BUFFER_OK;
 }
 
-char __pipe_pop_P2P_job(void* __output_p2p_job_info)
+char JobPipe__pipe_pop_P2P_job(void* __output_p2p_job_info)
 {
 	// Is it ok to pop a job from the stack?
-	if (!__pipe_ok_to_pop()) return PIPE_JOB_BUFFER_EMPTY;
+	if (!JobPipe__pipe_ok_to_pop()) return PIPE_JOB_BUFFER_EMPTY;
 
 	// Copy memory block (from element 0)
 	memcpy(__output_p2p_job_info,
@@ -96,17 +96,17 @@ char __pipe_pop_P2P_job(void* __output_p2p_job_info)
 }
 
 
-void* __pipe_get_buf_job_result(unsigned int iIndex)
+void* JobPipe__pipe_get_buf_job_result(unsigned int iIndex)
 {
 	return (void*)&__buf_job_results[iIndex];
 }
 
-unsigned int  __pipe_get_buf_job_results_count(void)
+unsigned int  JobPipe__pipe_get_buf_job_results_count(void)
 {
 	return __buf_job_results_count;
 }
 
-void  __pipe_set_buf_job_results_count(unsigned int iCount)
+void  JobPipe__pipe_set_buf_job_results_count(unsigned int iCount)
 {
 	__buf_job_results_count = iCount;
 }

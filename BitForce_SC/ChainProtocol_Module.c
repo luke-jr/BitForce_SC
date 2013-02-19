@@ -13,6 +13,7 @@
 #include "AVR32X\AVR32_Module.h"
 #include <avr32/io.h>
 #include "AVR32_OptimizedTemplates.h"
+#include "HostInteractionProtocols.h" // We use some constant here...
 
 // *** IREG - RX Status (8 Bit)
 //
@@ -105,6 +106,9 @@ void init_XLINK()
 	XLINK_chain_device_count = 0;
 	XLINK_set_device_status(XLINK_DEVICE_STATUS_NO_TRANS);
 	XLINK_set_outbox("",0);
+	
+	// Reset xlink address map
+	GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK = 0; // All devices are off-line
 }
 
 
@@ -168,9 +172,372 @@ int XLINK_MASTER_chainDevicesExists()
 // How many devices exist in chain?
 int XLINK_MASTER_getChainLength()
 {
+	int iTotalDevicesInChain = 0;
+	for (unsigned char x = 0; x < 31; x++) 
+	{
+		if ( (GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK & ((1<<x) & 0x0FFFFFFFF)) != 0) 
+		{
+			iTotalDevicesInChain++;
+		}			
+	}		
 	
+	return iTotalDevicesInChain;
 }
 
+// XLINK Is Device Present
+char XLINK_MASTER_Is_Device_Present(char aID)
+{
+	// Our device detection counter...
+	volatile int iDevDetectionCount = 0;
+	
+	// Is the device present?
+	// set the proper command
+	volatile char sz_cmd[3];
+	sz_cmd[0] = 'Z';
+	sz_cmd[2] = 'X';
+	sz_cmd[1] = PROTOCOL_REQ_ECHO;
+	
+	// Send a message to general dispatch
+	volatile char bTimedOut = FALSE;
+	volatile char szResponse[10];
+	volatile unsigned int iRespLen = 0;
+	volatile char iBC = 0;
+	volatile char iLP = 0;
+	volatile char iSendersAddress = 0;
+
+REPEAT_DEVICE_DETECTION:
+
+	szResponse[0] = 0; szResponse[1] = 0; szResponse[2] = 0; szResponse[3] = 0;
+	iRespLen = 0;
+		
+	// Send the command
+	MACRO_XLINK_send_packet(1, sz_cmd, 3, TRUE, FALSE);
+	MACRO_XLINK_wait_packet(szResponse, iRespLen, 90, bTimedOut, iSendersAddress, iLP, iBC );
+		
+	// Check response errors
+	if (bTimedOut)
+	{
+		// We will try for 2 times here
+		if (iDevDetectionCount > 10)
+		{
+			// Then this device doesn't exist...
+			return FALSE;
+		}
+		else 
+		{ 
+			iDevDetectionCount++;
+			goto REPEAT_DEVICE_DETECTION;
+		}			
+	}	
+	
+	// Device did respond, now was it correct?
+	if ((szResponse[0] == 'E') && (szResponse[1] == 'C') && (szResponse[2] == 'H') && (szResponse[3] == 'O') && (iRespLen == 4))
+	{
+		// We're ok, Blink for a while....
+		return TRUE;
+	}
+	else
+	{
+		// We will try for 3 times here
+		if (iDevDetectionCount > 10)
+		{
+			// Then we have no more devices, exit the loop
+			return FALSE;
+		}
+		else
+		{
+			iDevDetectionCount++;
+			goto REPEAT_DEVICE_DETECTION; // Otherwise we try again
+		}			 
+	}	
+	
+	// We should never reach here!
+	return TRUE;
+}
+
+// XLINK Refresh chain
+void XLINK_MASTER_Refresh_Chain()
+{
+	// What we do here is we check each device in the flag.
+	// If they don't respond then we issue a chain-scan.
+	// Should the device respond to chain-scan then we set the address
+	// and register the device. If not, we reduce device count...
+	// This operation could take a while to execute, so Watchdog Reset is important
+	volatile char bNoResponseToEnumeration = FALSE;
+	
+	// Main counter
+	for (char aIDToAssign = 1; aIDToAssign < 31; aIDToAssign++)
+	{
+		// Reset Watchdog
+		WATCHDOG_RESET;
+		
+		// It means the device should be present... Now is it?
+		if (((GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK & (1 << aIDToAssign)) != 0) && (XLINK_MASTER_Is_Device_Present(aIDToAssign)))
+		{
+			// If present the we do nothing... All is ok!
+			continue;
+		}
+		else
+		{
+			// Then see if we can find a new device in chain
+			volatile char bSucceeded = FALSE;
+			
+			if (bNoResponseToEnumeration == FALSE)
+			{
+				// In this case we do try...		
+				XLINK_MASTER_Scan_And_Register_Device(aIDToAssign, 5, 6, &bSucceeded);
+			
+				// Did we succeed? Update the flag accordingly
+				if (bSucceeded)
+				{
+					GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK |= (unsigned int)((1 << aIDToAssign) & 0x0FFFFFFFF);
+				}					
+				else // Clear
+				{
+					GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK &= (unsigned int)((~(1 << aIDToAssign)) & 0x0FFFFFFFF);				
+					bNoResponseToEnumeration = TRUE; // Meaning we shouldn't enumerate anymore, since no device responded 
+				}									
+			}
+			else
+			{
+				// Since in the past an enumeration has failed, there is no reason for us to re-enumerate now...
+				GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK &= (unsigned int)((~(1 << aIDToAssign)) & 0x0FFFFFFFF);			
+			}
+		}
+	}	
+}
+
+// XLINK Scan and Register Device
+void XLINK_MASTER_Scan_And_Register_Device(unsigned char  aIDToAssign,
+										   unsigned char  aPassthroughRetryCounts,
+										   unsigned char  aConnectRetryCounts,
+										   unsigned char* aSucceeded)
+{
+	// Variables
+	volatile char szRespData[32];
+	volatile char sz_cmd[16];
+	volatile unsigned short iRespLen = 0;
+	volatile char bDeviceNotResponded = 0;
+	volatile char bTimeoutDetected = 0;
+	volatile unsigned int iTotalRetryCount = 0;
+			
+	// Our device detection counter...
+	volatile int iDevDetectionCount = 0;
+			
+	// Did we succeed?
+	*aSucceeded = FALSE;
+	
+	while (TRUE)
+	{		
+		// set the proper command
+		sz_cmd[0] = 'Z';
+		sz_cmd[2] = 'X';
+		sz_cmd[1] = PROTOCOL_REQ_PRESENCE_DETECTION;
+
+		// Clear the response message
+		szRespData[0] = 0; szRespData[1] = 0; szRespData[2] = 0; szRespData[3] = 0; szRespData[4] = 0;
+		szRespData[5] = 0; szRespData[6] = 0; szRespData[7] = 0; szRespData[8] = 0; szRespData[9] = 0;
+
+		// Send a message to general dispatch
+		XLINK_MASTER_transact(XLINK_GENERAL_DISPATCH_ADDRESS,
+							  sz_cmd,
+							  3,
+							  szRespData,
+							  &iRespLen,
+							  128,					// Maximum response length
+							  __XLINK_TRANSACTION_TIMEOUT__,			// 400us timeout
+							  &bDeviceNotResponded,
+							  &bTimeoutDetected,
+							  TRUE);				// We're master
+
+		// Check response errors
+		if (bDeviceNotResponded || bTimeoutDetected)
+		{
+			// We will try for aConnectRetryCounts times here
+			if (iDevDetectionCount++ > aConnectRetryCounts)
+			{
+				// Then we have no more devices, exit the loop
+				*aSucceeded = FALSE;
+				return;
+			}
+			else continue;
+		}
+			
+		// reset iDevDetectionCount since we've succeeded in getting a response
+		iDevDetectionCount = 0;
+
+		// Check response, is it 'Present'?
+		if ((szRespData[0] == 'P') && (szRespData[1] == 'R') && (szRespData[2] == 'S') && (szRespData[3] == 'N') && (iRespLen == 4))
+		{
+			// We're ok, Blink for a while....
+		}
+		else
+		{
+			// We will try for 5 times here
+			if (iDevDetectionCount++ > aConnectRetryCounts)
+			{
+				// Then we have no more devices, exit the loop
+				break;
+			}
+			else continue; // Otherwise we try again
+				
+		}
+			
+		// OK, We have 'Present', set the device ID
+		// set the proper command (This is valid in XLINK: AA BB C4 <ID>, device will then activate pass-through
+		sz_cmd[0] = 0xAA;
+		sz_cmd[1] = 0xBB;
+		sz_cmd[2] = 0xC4;
+		sz_cmd[3] = aIDToAssign;
+			
+		// Clear the response message
+		szRespData[0] = 0; szRespData[1] = 0; szRespData[2] = 0; szRespData[3] = 0; szRespData[4] = 0;
+		szRespData[5] = 0; szRespData[6] = 0; szRespData[7] = 0; szRespData[8] = 0; szRespData[9] = 0;
+
+			
+		// Send a message to general dispatch
+		XLINK_MASTER_transact(XLINK_GENERAL_DISPATCH_ADDRESS,//
+							  sz_cmd,						 //
+							  4,							 //
+							  szRespData,					 //
+							  &iRespLen,					 //
+							  128,							 // Maximum response length
+							  __XLINK_TRANSACTION_TIMEOUT__, // 400us timeout
+							  &bDeviceNotResponded,			 //
+							  &bTimeoutDetected,			 //
+							  TRUE);						 // We're master
+			
+
+		// Check response errors
+		if ( (bDeviceNotResponded) || (bTimeoutDetected) || (!((szRespData[0] == 'A') && (szRespData[1] == 'C') && (szRespData[2] == 'K') && (iRespLen == 3))) )
+		{
+			if (iTotalRetryCount++ >= aPassthroughRetryCounts)
+			{
+				// Device did not respond to our message for 200 attempts.
+				// Either it doesn't exist or has already  taken the ID but we failed to received the
+				// confirmation from it. Should this be the case, we can discover it by trying to execute
+				// presence detection on it's new address. If it responded, then we're ok.
+					
+				int iPresenceDetectionRetryCount = 0;
+				int iDeviceIsPresent = FALSE;
+					
+				// Note that we will execute this command for 40 times maximum
+				// set the proper command
+				while (iPresenceDetectionRetryCount++ < 40)
+				{
+					sz_cmd[0] = 'Z';
+					sz_cmd[2] = 'X';
+					sz_cmd[1] = PROTOCOL_REQ_PRESENCE_DETECTION;
+						
+					// Clear the response message
+					szRespData[0] = 0; szRespData[1] = 0; szRespData[2] = 0; szRespData[3] = 0; szRespData[4] = 0;
+					szRespData[5] = 0; szRespData[6] = 0; szRespData[7] = 0; szRespData[8] = 0; szRespData[9] = 0;
+						
+					// Send a message to general dispatch
+					XLINK_MASTER_transact(aIDToAssign,
+										  sz_cmd,
+										  3,
+										  szRespData,
+										  &iRespLen,
+										  128,					// Maximum response length
+										  __XLINK_TRANSACTION_TIMEOUT__,			// 400us timeout
+										  &bDeviceNotResponded,
+										  &bTimeoutDetected,
+										  TRUE);				// We're master
+
+					// Check response errors
+					if (bDeviceNotResponded || bTimeoutDetected)
+					{
+						// We have no more devices...
+						continue;
+					}
+						
+					// Check response
+					if ((szRespData[0] == 'P') && (szRespData[1] == 'R') && (szRespData[2] == 'S') && (szRespData[3] == 'N') && (iRespLen == 4))
+					{
+						// We're ok
+						iDeviceIsPresent = TRUE;
+						break;
+					}
+				}
+					
+				// Did we fail?
+				if (iDeviceIsPresent == FALSE)
+				{
+					// Chain Device INIT has failed! This is bad..
+					aSucceeded = FALSE;				
+					return;
+				}
+
+			}  else continue; // Otherwise we repeat
+		}
+
+		// Since we've reached here, it means the ACK was received and we're OK to allow 'PassThrough'
+		// Update flag bit in our device bitmask
+		GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK |= (unsigned int)((1 << aIDToAssign) & 0x0FFFFFFFF);
+
+		// Now ask the device to enable pass-through
+		sz_cmd[0] = 'Z';
+		sz_cmd[1] = PROTOCOL_REQ_XLINK_ALLOW_PASS;
+		sz_cmd[2] = 'X';
+				
+		volatile unsigned int iPassthroughRetryCount = 0;
+				
+		while (iPassthroughRetryCount < aPassthroughRetryCounts)
+		{
+			// First clear the response buffer
+			szRespData[0] = 0;
+			szRespData[1] = 0;
+			szRespData[2] = 0;
+			szRespData[3] = 0;
+			iRespLen = 0;
+					
+			// Get response
+			XLINK_MASTER_transact(aIDToAssign, // We'll use the actual ID of the device
+								  sz_cmd,
+								  3,
+								  szRespData,
+								  &iRespLen,
+								  128,
+								  __XLINK_TRANSACTION_TIMEOUT__,
+								  &bDeviceNotResponded,
+								  &bTimeoutDetected,
+								  TRUE);
+					
+			// Check for response
+			if (bDeviceNotResponded || bTimeoutDetected)
+			{
+				// We continue...
+				iPassthroughRetryCount++;
+				continue;
+			}
+					
+			// If Response was not 'OK' we try again as well
+			if (szRespData[0] != 'O' || szRespData[1] != 'K')
+			{
+				// We continue...
+				iPassthroughRetryCount++;
+				continue;
+			}
+					
+			// All ok, we break
+			break;
+		}
+		
+		// Check if we have succeeded or not by checking the retry count
+		if (iPassthroughRetryCount >= aPassthroughRetryCounts)
+		{
+			// We have failed!
+			*aSucceeded = FALSE;
+			return;
+		}				
+	} // end of while(TRUE)
+	
+
+	// We're OK
+	*aSucceeded = TRUE;
+	return;
+}
 
 // iAdrs = Target
 // szData and iLen is the data stack
@@ -382,7 +749,7 @@ RETRY_POINT_1:
 		if (iTimeoutDetected)
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount ==  (__XLINK_WAIT_PACKET_TIMEOUT__ << 3))
+			if (iTotalRetryCount ==  (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
 			{
 				// We've failed
 				*bTimeoutDetected = 1;
@@ -406,7 +773,7 @@ RETRY_POINT_1:
 			(__senders_address != iAdrs)) // Check both for address-match and 'OK' response
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount ==  (__XLINK_WAIT_PACKET_TIMEOUT__ << 3))
+			if (iTotalRetryCount ==  (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
 			{
 				// We've failed
 				*bTimeoutDetected = 2;

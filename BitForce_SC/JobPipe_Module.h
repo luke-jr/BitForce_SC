@@ -26,13 +26,13 @@ char  __inprocess_nonce_begin[4]; // This is the midstate of which we are showin
 char  __inprocess_nonce_end[4]; // This is the midstate of which we are showing the result in status
 
 void init_pipe_job_system(void);
-char __pipe_ok_to_push(void);
-char __pipe_ok_to_pop(void);
-char __pipe_push_P2P_job(void* __input_p2p_job_info);
-char __pipe_pop_P2P_job(void* __output_p2p_job_info);
-void*				 __pipe_get_buf_job_result(unsigned int iIndex);
-unsigned int		 __pipe_get_buf_job_results_count(void);
-void				 __pipe_set_buf_job_results_count(unsigned int iCount);
-void				 __pipe_flush_buffer(void);
+char JobPipe__pipe_ok_to_push(void);
+char JobPipe__pipe_ok_to_pop(void);
+char JobPipe__pipe_push_P2P_job(void* __input_p2p_job_info);
+char JobPipe__pipe_pop_P2P_job(void* __output_p2p_job_info);
+void*				 JobPipe__pipe_get_buf_job_result(unsigned int iIndex);
+unsigned int		 JobPipe__pipe_get_buf_job_results_count(void);
+void				 JobPipe__pipe_set_buf_job_results_count(unsigned int iCount);
+void				 JobPipe__pipe_flush_buffer(void);
 
 #endif /* MCU_INITIALIZATION_H_ */

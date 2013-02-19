@@ -176,6 +176,18 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 									char  *bTimeoutDetected,
 									char  bWeAreMaster); // If zero, we'll use CPLDs address
 
+// XLINK Scan and Register Device
+void XLINK_MASTER_Scan_And_Register_Device(unsigned char  aIDToAssign,
+										   unsigned char  aPassthroughRetryCounts,
+										   unsigned char  aConnectRetryCounts,
+										   unsigned char* aSucceeded);
+										   
+// XLINK Refresh XLINK chain
+void XLINK_MASTER_Refresh_Chain(void);	
+
+// XLINK Is Device Present
+char XLINK_MASTER_Is_Device_Present(char aID);
+								 
 // This function receives data
 void XLINK_wait_packet (char  *data,
 						unsigned int   *length,
