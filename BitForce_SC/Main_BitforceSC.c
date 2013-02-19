@@ -110,7 +110,7 @@ int main(void)
 			XLINK_set_cpld_master(TRUE);
 			XLINK_set_cpld_passthrough(FALSE);
 			
-			if (Management_MASTER_Initialize_XLINK_Chain() == FALSE)
+			if (XLINK_MASTER_Start_Chain() == FALSE)
 			{
 				// Ok this can be bad, we failed the chain initialization
 			}
@@ -293,7 +293,7 @@ void MCU_Main_Loop()
 			XLINK_SLAVE_wait_transact(sz_cmd, 
 									  &i_count, 
 									  256, 
-									  500,  // 500us, half a ms
+									  1000,  // 1000us, or 1ms
 									  &bTimeoutDetectedOnXLINK, FALSE);
 			
 			// Check for sz_cmd, if it's PUSH then we have an invalid command
@@ -422,66 +422,4 @@ void MCU_Main_Loop()
 		}		
 	}
 }
-
-
-//////////////////////////////////
-//// Management functions
-//////////////////////////////////
-static int Management_MASTER_Initialize_XLINK_Chain()
-{
-	
-	// What we do here is we keep sending PROTOCOL_PRESENCE_DETECTION until we no UL32er receive
-	// a response. For each response we receive, we send a SET-ID command. The responding device
-	// we have an ID assigned to it and will no UL32er response to PROTOCOL_PRESENCE_DETECTION command
-	// OK We've detected a ChainForward request. First Send 'OK' to the host
-
-	XLINK_MASTER_Refresh_Chain();
-	return;
-	
-	
-	// Check CPLD, is CHAIN_OUT connected?
-	char iChainOutConnectValue = 0;
-	MACRO__AVR32_CPLD_Read(iChainOutConnectValue, CPLD_ADDRESS_CHAIN_STATUS);
-	
-	if ((iChainOutConnectValue & CHAIN_OUT_BIT) == 0)
-	{
-		// Meaning there is not chain-out connection
-		MAST_TICK_COUNTER += 5;
-		return TRUE;	
-	}		
-	
-	// Device Availability Bit
-	// GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK 
-	// Each bit represents one device. Bit 1 means Device address 1...
-	char  iActualID = 1; // The ID we have to assign
-				
-	// Main loop
-	while (iActualID < 0x01F) // Maximum 30 devices supported. ID Starts from 1
-	{
-		// Reset Watchdog
-		WATCHDOG_RESET;
-		
-		// Perform
-		char bSucceeded = FALSE;
-		XLINK_MASTER_Scan_And_Register_Device(iActualID, 10, 10, &bSucceeded);
-		
-		if (bSucceeded == FALSE)	
-		{
-			// Abort, we're done
-			break;
-		}
-		else
-		{
-			// ID successfully assigned
-			iActualID++;			
-		}
-	}	
-	
-	// At this point, the iActualID shows the number of devices in chain
-	XLINK_chain_device_count = iActualID - 1;
-	
-	// We've been successful
-	return TRUE;	
-}
-
 

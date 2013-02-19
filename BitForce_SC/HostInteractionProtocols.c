@@ -395,7 +395,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	
 		// Send the command
 		MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
-		MACRO_XLINK_wait_packet(szResponse, iRespLen, 90, bTimedOut, iSendersAddress, iLP, iBC );
+		MACRO_XLINK_wait_packet(szResponse, iRespLen, 880, bTimedOut, iSendersAddress, iLP, iBC );
 	
 		// Update turnaround time
 		iSecondaryTickTemp = MACRO_GetTickCountRet;
@@ -1314,19 +1314,15 @@ PROTOCOL_RESULT Protocol_xlink_presence_detection()
 	// Get our ID
 	volatile unsigned char iCPLDId = XLINK_get_cpld_id();
 	
-	// Check if it's not 0x1F
-	if (iCPLDId == XLINK_GENERAL_DISPATCH_ADDRESS)
+	// Send OK first
+	if (XLINK_ARE_WE_MASTER)
+		USB_send_string("PRSN");  // Send it to USB
+	else // We're a slave... send it by XLINK
 	{
-		// Send OK first
-		if (XLINK_ARE_WE_MASTER)
-			USB_send_string("PRSN");  // Send it to USB
-		else // We're a slave... send it by XLINK
-		{
-			// XLINK_SLAVE_respond_string("OK\n");
-			char bTimeoutDetected = FALSE;
-			XLINK_SLAVE_respond_transact("PRSN", 4, __XLINK_TRANSACTION_TIMEOUT__, &bTimeoutDetected, FALSE);
-		}			
-	}
+		// XLINK_SLAVE_respond_string("OK\n");
+		char bTimeoutDetected = FALSE;
+		XLINK_SLAVE_respond_transact("PRSN", 4, __XLINK_TRANSACTION_TIMEOUT__, &bTimeoutDetected, FALSE);
+	}			
 
 	// We're ok
 	return PROTOCOL_SUCCESS;

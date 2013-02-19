@@ -32,8 +32,7 @@ volatile void HighLevel_Operations_Spin()
 {
 	// Nothing for the moment
 	// Reset Watchdog to prevent system reset. (Timeout for watchdog is 17ms)
-	WATCHDOG_RESET;
-	
+	WATCHDOG_RESET;	
 	
 	// Job-Pipe Scheduling
 	Flush_p2p_buffer_into_engines();

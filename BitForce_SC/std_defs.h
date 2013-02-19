@@ -35,7 +35,7 @@
 */
 
 #define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
-#define __XLINK_TRANSACTION_TIMEOUT__	     12000
+#define __XLINK_TRANSACTION_TIMEOUT__	     8000    // 8ms. No transaction should take longer. 
 #define __XLINK_WAIT_PACKET_TIMEOUT__        440
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      88
 

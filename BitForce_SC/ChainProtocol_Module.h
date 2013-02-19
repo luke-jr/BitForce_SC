@@ -181,7 +181,10 @@ void XLINK_MASTER_Scan_And_Register_Device(unsigned char  aIDToAssign,
 										   unsigned char  aPassthroughRetryCounts,
 										   unsigned char  aConnectRetryCounts,
 										   unsigned char* aSucceeded);
-										   
+		
+// XLINK Start chain
+int XLINK_MASTER_Start_Chain(void);
+
 // XLINK Refresh XLINK chain
 void XLINK_MASTER_Refresh_Chain(void);	
 

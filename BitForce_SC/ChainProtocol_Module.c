@@ -195,65 +195,107 @@ char XLINK_MASTER_Is_Device_Present(char aID)
 	volatile char sz_cmd[3];
 	sz_cmd[0] = 'Z';
 	sz_cmd[2] = 'X';
-	sz_cmd[1] = PROTOCOL_REQ_ECHO;
+	sz_cmd[1] = PROTOCOL_REQ_PRESENCE_DETECTION;
 	
 	// Send a message to general dispatch
 	volatile char bTimedOut = FALSE;
+	volatile char bDevNotResponded = FALSE;
 	volatile char szResponse[10];
-	volatile unsigned int iRespLen = 0;
+	volatile unsigned short iRespLen = 0;
 	volatile char iBC = 0;
 	volatile char iLP = 0;
 	volatile char iSendersAddress = 0;
-
-REPEAT_DEVICE_DETECTION:
-
-	szResponse[0] = 0; szResponse[1] = 0; szResponse[2] = 0; szResponse[3] = 0;
+	
 	iRespLen = 0;
-		
-	// Send the command
-	MACRO_XLINK_send_packet(1, sz_cmd, 3, TRUE, FALSE);
-	MACRO_XLINK_wait_packet(szResponse, iRespLen, 90, bTimedOut, iSendersAddress, iLP, iBC );
-		
+	szResponse[0] = 0; 
+	szResponse[1] = 0; 
+	szResponse[2] = 0; 
+	szResponse[3] = 0;
+			
+	XLINK_MASTER_transact(aID, sz_cmd, 3, szResponse, &iRespLen, 128, __XLINK_TRANSACTION_TIMEOUT__, &bDevNotResponded, &bTimedOut, TRUE);
+	
 	// Check response errors
-	if (bTimedOut)
+	if (bTimedOut || bDevNotResponded)
 	{
-		// We will try for 2 times here
-		if (iDevDetectionCount > 10)
-		{
-			// Then this device doesn't exist...
-			return FALSE;
-		}
-		else 
-		{ 
-			iDevDetectionCount++;
-			goto REPEAT_DEVICE_DETECTION;
-		}			
+		return FALSE;
 	}	
 	
 	// Device did respond, now was it correct?
-	if ((szResponse[0] == 'E') && (szResponse[1] == 'C') && (szResponse[2] == 'H') && (szResponse[3] == 'O') && (iRespLen == 4))
+	if ((szResponse[0] == 'P') && (szResponse[1] == 'R') && (szResponse[2] == 'S') && (szResponse[3] == 'N') && (iRespLen == 4))
 	{
 		// We're ok, Blink for a while....
 		return TRUE;
 	}
 	else
 	{
-		// We will try for 3 times here
-		if (iDevDetectionCount > 10)
+		// Then we have no more devices, exit the loop
+		return FALSE;
+	}	
+
+}
+
+// The Chain-Startup function
+volatile int XLINK_MASTER_Start_Chain()
+{
+	
+	// What we do here is we keep sending PROTOCOL_PRESENCE_DETECTION until we no UL32er receive
+	// a response. For each response we receive, we send a SET-ID command. The responding device
+	// we have an ID assigned to it and will no UL32er response to PROTOCOL_PRESENCE_DETECTION command
+	// OK We've detected a ChainForward request. First Send 'OK' to the host
+	
+	// Check CPLD, is CHAIN_OUT connected?
+	char iChainOutConnectValue = 0;
+	MACRO__AVR32_CPLD_Read(iChainOutConnectValue, CPLD_ADDRESS_CHAIN_STATUS);
+	
+	if ((iChainOutConnectValue & CHAIN_OUT_BIT) == 0)
+	{
+		// Meaning there is not chain-out connection
+		MAST_TICK_COUNTER += 5;
+		return TRUE;
+	}
+	
+	// Device Availability Bit
+	// GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK
+	// Each bit represents one device. Bit 1 means Device address 1...
+	char  iActualID = 1; // The ID we have to assign
+	
+	// Main loop
+	while (iActualID < 0x01F) // Maximum 30 devices supported. ID Starts from 1
+	{
+		// Reset Watchdog
+		WATCHDOG_RESET;
+		
+		// Check if this thing already exists
+		if (XLINK_MASTER_Is_Device_Present(iActualID) == TRUE)
 		{
-			// Then we have no more devices, exit the loop
-			return FALSE;
+			GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK |= (1 << iActualID);
+			iActualID++;
+			continue;
+		}
+		
+		// Perform
+		char bSucceeded = FALSE;
+		XLINK_MASTER_Scan_And_Register_Device(iActualID, 10, 10, &bSucceeded);
+		
+		if (bSucceeded == FALSE)
+		{
+			// Abort, we're done
+			break;
 		}
 		else
 		{
-			iDevDetectionCount++;
-			goto REPEAT_DEVICE_DETECTION; // Otherwise we try again
-		}			 
-	}	
+			// ID successfully assigned
+			iActualID++;
+		}
+	}
 	
-	// We should never reach here!
+	// At this point, the iActualID shows the number of devices in chain
+	XLINK_chain_device_count = iActualID - 1;
+	
+	// We've been successful
 	return TRUE;
 }
+
 
 // XLINK Refresh chain
 void XLINK_MASTER_Refresh_Chain()
@@ -290,7 +332,8 @@ void XLINK_MASTER_Refresh_Chain()
 				// Did we succeed? Update the flag accordingly
 				if (bSucceeded)
 				{
-					GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK |= (unsigned int)((1 << aIDToAssign) & 0x0FFFFFFFF);
+					volatile unsigned int iValueToSet = (1 << aIDToAssign);
+					GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK |= iValueToSet;
 				}					
 				else // Clear
 				{
@@ -471,10 +514,6 @@ void XLINK_MASTER_Scan_And_Register_Device(unsigned char  aIDToAssign,
 
 			}  else continue; // Otherwise we repeat
 		}
-
-		// Since we've reached here, it means the ACK was received and we're OK to allow 'PassThrough'
-		// Update flag bit in our device bitmask
-		GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK |= (unsigned int)((1 << aIDToAssign) & 0x0FFFFFFFF);
 
 		// Now ask the device to enable pass-through
 		sz_cmd[0] = 'Z';
