@@ -535,7 +535,7 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 	}
 	
 	// Are we at high-temperature, waiting to cool down?
-	if (GLOBAL_IS_CRITICAL_TEMPERATURE == TRUE)
+	if (GLOBAL_CRITICAL_TEMPERATURE == TRUE)
 	{
 		if (XLINK_ARE_WE_MASTER)
 			USB_send_string("ERR:HIGH TEMPERATURE RECOVERY\n");  // Send it to USB
@@ -831,7 +831,7 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	// Also, we do expect a packet which is 64 Bytes data, 16 Bytes Midstate, 16 Bytes difficulty (totaling 96 Bytes)
 	
 	// Are we at high-temperature, waiting to cool down?
-	if (GLOBAL_IS_CRITICAL_TEMPERATURE == TRUE)
+	if (GLOBAL_CRITICAL_TEMPERATURE == TRUE)
 	{
 		if (XLINK_ARE_WE_MASTER)
 		{
@@ -926,7 +926,7 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	// Also, we do expect a packet which is 64 Bytes data, 16 Bytes Midstate, 16 Bytes difficulty (totaling 96 Bytes)
 
 	// Are we at high-temperature, waiting to cool down?
-	if (GLOBAL_IS_CRITICAL_TEMPERATURE == TRUE)
+	if (GLOBAL_CRITICAL_TEMPERATURE == TRUE)
 	{
 		if (XLINK_ARE_WE_MASTER)
 		{
@@ -1477,6 +1477,7 @@ void Flush_p2p_buffer_into_engines()
 
 	// Before we issue the job, we must put the correct information
 	memcpy((void*)__inprocess_midstate, 	(void*)job_p2p.midstate, 		32);
+	memcpy((void*)__inprocess_blockdata, 	(void*)job_p2p.block_data, 		32);
 	memcpy((void*)__inprocess_nonce_begin,  (void*)job_p2p.nonce_begin, 	4);
 	memcpy((void*)__inprocess_nonce_end, 	(void*)job_p2p.nonce_end, 		4);
 

@@ -99,7 +99,7 @@ int XLINK_ARE_WE_MASTER;
 int global_vals[6];
 
 // Critical Temperature Warning - Abort Jobs!
-volatile static char GLOBAL_IS_CRITICAL_TEMPERATURE;
+volatile static char GLOBAL_CRITICAL_TEMPERATURE;
 
 // This is the main bit mask
 volatile unsigned int GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK;

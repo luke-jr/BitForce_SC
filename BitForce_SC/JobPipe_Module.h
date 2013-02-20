@@ -21,18 +21,19 @@ unsigned int    __total_jobs_in_buffer;
 unsigned int	__total_buf_p2p_jobs_ever_received;
 
 // In process information
-char  __inprocess_midstate[32]; // This is the midstate of which we are processing at this moment
-char  __inprocess_nonce_begin[4]; // This is the midstate of which we are showing the result in status
-char  __inprocess_nonce_end[4]; // This is the midstate of which we are showing the result in status
+volatile char   __inprocess_midstate[32]; // This is the midstate of which we are processing at this moment
+volatile char   __inprocess_blockdata[12]; // This is the midstate of which we are processing at this moment
+volatile char   __inprocess_nonce_begin[4]; // This is the midstate of which we are showing the result in status
+volatile char	__inprocess_nonce_end[4]; // This is the midstate of which we are showing the result in status
 
-void init_pipe_job_system(void);
-char JobPipe__pipe_ok_to_push(void);
-char JobPipe__pipe_ok_to_pop(void);
-char JobPipe__pipe_push_P2P_job(void* __input_p2p_job_info);
-char JobPipe__pipe_pop_P2P_job(void* __output_p2p_job_info);
-void*				 JobPipe__pipe_get_buf_job_result(unsigned int iIndex);
-unsigned int		 JobPipe__pipe_get_buf_job_results_count(void);
-void				 JobPipe__pipe_set_buf_job_results_count(unsigned int iCount);
-void				 JobPipe__pipe_flush_buffer(void);
+void			init_pipe_job_system(void);
+char			JobPipe__pipe_ok_to_push(void);
+char			JobPipe__pipe_ok_to_pop(void);
+char			JobPipe__pipe_push_P2P_job(void* __input_p2p_job_info);
+char			JobPipe__pipe_pop_P2P_job(void* __output_p2p_job_info);
+void*			JobPipe__pipe_get_buf_job_result(unsigned int iIndex);
+unsigned int	JobPipe__pipe_get_buf_job_results_count(void);
+void			JobPipe__pipe_set_buf_job_results_count(unsigned int iCount);
+void			JobPipe__pipe_flush_buffer(void);
 
 #endif /* MCU_INITIALIZATION_H_ */

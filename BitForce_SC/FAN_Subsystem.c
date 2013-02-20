@@ -48,7 +48,7 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 	if (iTempAveraged > 95)
 	{
 		// Holy jesus! We're in a critical situation...
-		GLOBAL_IS_CRITICAL_TEMPERATURE = TRUE;
+		GLOBAL_CRITICAL_TEMPERATURE = TRUE;
 		
 		// Override fan, set it to maximum
 		__AVR32_FAN_SetSpeed(FAN_CONTROL_BYTE_VERY_FAST);
@@ -58,7 +58,7 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 	}
 	
 	// If we're here, it means we're not critical anymore
-	GLOBAL_IS_CRITICAL_TEMPERATURE = FALSE;
+	GLOBAL_CRITICAL_TEMPERATURE = FALSE;
 	
 	// Ok, now set the FAN speed according to our setting
 	if (FAN_ActualState == FAN_STATE_VERY_SLOW)

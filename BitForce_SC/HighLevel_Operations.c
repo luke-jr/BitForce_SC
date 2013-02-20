@@ -26,8 +26,6 @@
 #include <avr32/io.h>
 
 
-
-
 volatile void HighLevel_Operations_Spin()
 {
 	// Nothing for the moment
@@ -37,7 +35,7 @@ volatile void HighLevel_Operations_Spin()
 	// Job-Pipe Scheduling
 	Flush_p2p_buffer_into_engines();
 	
-	// Scan XLINK Chain
+	// Scan XLINK Chain, to be executed every 1.2 seconds
 	if (XLINK_ARE_WE_MASTER == TRUE)
 	{
 		// We refresh the chain every 1.2 seconds
@@ -51,8 +49,21 @@ volatile void HighLevel_Operations_Spin()
 		}		
 	}
 	
-	// Call our Fan-Spin
-	FAN_SUBSYS_IntelligentFanSystem_Spin();
+	// Fan-Spin must be executed every 0.5 seconds
+	{
+		static volatile UL32 iInitialTimeHolder = 0;
+		volatile UL32 iActualTickHolder = MACRO_GetTickCountRet;
+		
+		if (iActualTickHolder - iInitialTimeHolder > 500000) // 500,000 us = 0.5sec
+		{
+			iInitialTimeHolder = iActualTickHolder;
+			
+			// Call our Fan-Spin
+			FAN_SUBSYS_IntelligentFanSystem_Spin();
+		}
+	}
+	
+
 	
 }
 

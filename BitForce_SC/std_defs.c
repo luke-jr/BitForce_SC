@@ -9,4 +9,4 @@
 #include "Generic_Module.h"
 
 // Set our initial value for the critical temperature
-extern volatile char GLOBAL_IS_CRITICAL_TEMPERATURE = FALSE;
+extern volatile char GLOBAL_CRITICAL_TEMPERATURE = FALSE;
