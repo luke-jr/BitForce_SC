@@ -35,9 +35,9 @@
 */
 
 #define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
-#define __XLINK_TRANSACTION_TIMEOUT__	     8000    // 8ms. No transaction should take longer. 
+#define __XLINK_TRANSACTION_TIMEOUT__	     20000    // 20ms. No transaction should take longer. 
 #define __XLINK_WAIT_PACKET_TIMEOUT__        440
-#define __XLINK_ATTEMPT_RETRY_MAXIMUM__      88
+#define __XLINK_ATTEMPT_RETRY_MAXIMUM__      44
 
 /*************** Firmware Version ******************/
 #define __FIRMWARE_VERSION		"1.0.0"
@@ -69,6 +69,7 @@ void IncrementTickCounter(void);
 #define MAKE_DWORD(u,v,x,y) ((u << 24) + (v << 16) + (x << 8) + (y))
 #define GET_MSB_BYTE(u, v)  ((((unsigned int)(u)) >> ((3 - v) * 8)) & 0x0FF)
 
+volatile char GLOBAL_InterProcChars[128];
 
 // Some global definitions
 typedef struct _tag_job_packet

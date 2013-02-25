@@ -77,7 +77,7 @@ PROTOCOL_RESULT Protocol_get_firmware_version(void);
 PROTOCOL_RESULT Protocol_id				 (void);
 PROTOCOL_RESULT Protocol_Blink			 (void);
 PROTOCOL_RESULT Protocol_temperature	 (void);
-PROTOCOL_RESULT Protocol_chain_forward   (char iTarget, char* sz_cmd, unsigned short iCmdLen);
+PROTOCOL_RESULT Protocol_chain_forward   (char iTarget, char* sz_cmd, unsigned int iCmdLen);
 PROTOCOL_RESULT Protocol_fan_set		 (char iValue);
 
 // Initiate process for the next job from the buffer

@@ -169,7 +169,7 @@ void MCU_Main_Loop()
 	// OK, now the memory on FTDI is empty,
 	// wait for standard packet size
 	char sz_cmd[1024];
-	unsigned short umx;
+	unsigned int umx;
 	unsigned int  i_count = 0;
 	
 	char bTimeoutDetectedOnXLINK = 0;
@@ -294,7 +294,8 @@ void MCU_Main_Loop()
 									  &i_count, 
 									  256, 
 									  1000,  // 1000us, or 1ms
-									  &bTimeoutDetectedOnXLINK, FALSE);
+									  &bTimeoutDetectedOnXLINK, 
+									  FALSE, TRUE); // Note: WE ARE WAITING FOR COMMAND
 			
 			// Check for sz_cmd, if it's PUSH then we have an invalid command
 			if ((sz_cmd[0] == 'P') && (sz_cmd[1] == 'U') && (sz_cmd[2] == 'S') && (sz_cmd[3] == 'H'))

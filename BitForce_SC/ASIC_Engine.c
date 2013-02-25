@@ -141,14 +141,14 @@ void ASIC_SetFrequencyFactor(int iFreqFactor)
 	
 }
 
-int ASIC_are_all_engines_done(unsigned short iChip)
+int ASIC_are_all_engines_done(unsigned int iChip)
 {
 	if (MCU_SC_GetDone(iChip) == FALSE) return FALSE; // 0 = FALSE
 		
 	__MCU_ASIC_Activate_CS();
 	
 	// Check all engines
-	for (unsigned short imx = 0; imx < 16; imx++)
+	for (unsigned int imx = 0; imx < 16; imx++)
 	{
 		if ((__ASIC_ReadEngine(iChip, imx, ASIC_SPI_READ_STATUS_REGISTER) & ASIC_SPI_READ_STATUS_DONE_BIT) == 0)
 		{
@@ -218,7 +218,7 @@ int ASIC_get_job_status(unsigned int *iNonceList, char *iNonceCount)
 			unsigned int i_status_reg = __ASIC_ReadEngine(x_chip, y_engine, ASIC_SPI_READ_STATUS_REGISTER);
 			
 			// Check FIFO depths
-			unsigned short iLocNonceCount = 0;
+			unsigned int iLocNonceCount = 0;
 			unsigned int   iLocNonceFlag[8] = {0,0,0,0,0,0,0,0};
 			
 			// Check nonce existence

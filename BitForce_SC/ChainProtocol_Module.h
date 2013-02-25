@@ -124,7 +124,7 @@
 ///////////////////////////////////////////////////////////////////
 
 // Variables
-unsigned short XLINK_chain_device_count;
+unsigned int XLINK_chain_device_count;
 
 // Our general dispatch address
 #define XLINK_GENERAL_DISPATCH_ADDRESS 0x01F
@@ -134,7 +134,7 @@ void init_XLINK();
 
 void XLINK_send_packet( char iAdrs, 
 						char* szData, 
-						unsigned short iLen, 
+						unsigned int iLen, 
 						char LP, 
 						char BC);
 					   
@@ -145,10 +145,10 @@ void XLINK_SLAVE_respond_string(char* szStringToSend);
 // This is used by master
 void XLINK_MASTER_transact (char   iAdrs,
 							char*  szData,
-							unsigned short  iLen,
+							unsigned int  iLen,
 							char*  szResp,
-							unsigned short* response_length,
-							unsigned short  iMaxRespLen,
+							unsigned int* response_length,
+							unsigned int  iMaxRespLen,
 							UL32    transaction_timeout, // Master timeout
 							char   *bDeviceNotResponded, // Device did not respond, even to the first packet
 							char   *bTimeoutDetected, // Was a timeout detected?
@@ -167,7 +167,8 @@ void XLINK_SLAVE_wait_transact (char  *data,
 								unsigned int  max_len,
 								UL32 transaction_timeout,
 								char  *bTimeoutDetected,
-								char  bWeAreMaster);
+								char  bWeAreMaster,
+								char  bWaitingForCommand);
 								
 // This is used by slave as well								
 void XLINK_SLAVE_respond_transact  (char  *data,

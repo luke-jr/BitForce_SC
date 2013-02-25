@@ -17,7 +17,10 @@
 #define XLINK_activate_address_increase     AVR32_GPIO.port[1].ovrs  = __AVR32_CPLD_INCREASE_ADDRESS;
 #define XLINK_deactivate_address_increase   AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
 
-#define AVR32_FLASHC_MAIN  (*((volatile unsigned int*)0xFFFE1400))
+#define AVR32_FLASHC_MAIN    (*((volatile unsigned int*)0xFFFE1400))
+#define AVR32_FLASHC_CONTROL (*((volatile unsigned int*)0xFFFE1400))
+#define AVR32_FLASHC_COMMAND (*((volatile unsigned int*)0xFFFE1404))
+#define AVR32_FLASHC_STATUS  (*((volatile unsigned int*)0xFFFE1408))
 
 
 // General MCU Functions
@@ -720,7 +723,7 @@ inline unsigned int	__AVR32_CPLD_Read (char iAdrs)
 //////////////////////////////////////////////
 // SC Chips
 //////////////////////////////////////////////
-volatile void	__AVR32_SC_Initialize()
+volatile void __AVR32_SC_Initialize()
 {
 	////////////////// Set SPI1 GPIO settings (Function-A)
 	AVR32_GPIO.port[0].gperc = (AVR32_SPI0_PIN1)  |  (AVR32_SPI0_PIN2)  |  (AVR32_SPI0_PIN3);// SPI0_PIN_MISO;
@@ -744,17 +747,17 @@ volatile void	__AVR32_SC_Initialize()
 							   (AVR32_SC_CHIP_DONE4)  |  (AVR32_SC_CHIP_DONE5)  |  (AVR32_SC_CHIP_DONE6) | (AVR32_SC_CHIP_DONE7) ;
 }
 
-volatile void __AVR32_ASIC_Activate_CS()
+volatile inline void __AVR32_ASIC_Activate_CS()
 {
 	AVR32_GPIO.port[0].ovrc   = AVR32_SPI0_PIN_NPCS;
 }
 
-volatile void __AVR32_ASIC_Deactivate_CS()
+volatile inline void __AVR32_ASIC_Deactivate_CS()
 {
 	AVR32_GPIO.port[0].ovrs   = AVR32_SPI0_PIN_NPCS;
 }
 
-volatile void __AVR32_SPI0_SendWord(unsigned short data)
+volatile inline void __AVR32_SPI0_SendWord(unsigned short data)
 {
 	// Put data in register and wait until its sent
 	AVR32_SPI0_TDR = (data & 0x0FFFF);
@@ -772,7 +775,7 @@ volatile void	__AVR32_SC_SetAccess()
 	// Nothing, this is not multiplexed
 }
 
-volatile unsigned int __AVR32_SC_GetDone  (char iChip)
+volatile inline unsigned int __AVR32_SC_GetDone  (char iChip)
 {
 	if (iChip == 0) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE0) != 0);
 	if (iChip == 1) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE1) != 0);
@@ -1028,4 +1031,24 @@ int __AVR32_Timer_GetValue()
 	iFinalVal |= iMXVal;
 	
 	AVR32_GPIO.port[1].ovr = iFinalVal;
+}
+
+
+
+/////////////////////////////////////////////////
+// Flash programming
+/////////////////////////////////////////////////
+void	__AVR32_Flash_Initialize(void)
+{
+	
+}
+
+void	__AVR32_Flash_WritePage(char* szData, unsigned int iAddress, unsigned int iSize)
+{
+	
+}
+
+void	__AVR32_Flash_ReadPage (char* szData, unsigned int iAddress, unsigned int iSize)
+{
+	
 }

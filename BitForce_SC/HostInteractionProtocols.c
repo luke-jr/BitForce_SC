@@ -24,11 +24,11 @@
 extern buf_job_result_packet  __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
 extern char 		   __buf_job_results_count;  // Total of results in our __buf_job_results
 
-PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned short iCmdLen)
+PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned int iCmdLen)
 {
 	// OK We've detected a ChainForward request. First Send 'OK' to the host
 	char szRespData[2048];
-	unsigned short iRespLen = 0;
+	unsigned int iRespLen = 0;
 	char  bDeviceNotResponded = 0;
 	char  bTimeoutDetected = 0;
 	
@@ -73,15 +73,15 @@ PROTOCOL_RESULT Protocol_id(void)
 
 	// All is good... sent the identifier and get out of here...
 	if (XLINK_ARE_WE_MASTER)
-	USB_send_string(UNIT_ID_STRING);  // Send it to USB
+		USB_send_string(UNIT_ID_STRING);  // Send it to USB
 	else // We're a slave... send it by XLINK
 	{
 		char bTimeoutDetected = FALSE;
 		XLINK_SLAVE_respond_transact(UNIT_ID_STRING,
-		strlen(UNIT_ID_STRING),
-		__XLINK_TRANSACTION_TIMEOUT__,
-		&bTimeoutDetected,
-		FALSE);
+									 strlen(UNIT_ID_STRING),
+									 __XLINK_TRANSACTION_TIMEOUT__,
+									 &bTimeoutDetected,
+									 FALSE);
 	}
 	// Return our result...
 	return res;
@@ -114,6 +114,14 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
 	sprintf(szTemp,"MACRO_GetTickCount roundtime: %u us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);
+	
+	// FAN Process latency
+	uL1 = MACRO_GetTickCountRet;
+	FAN_SUBSYS_IntelligentFanSystem_Spin();
+	uL2 = MACRO_GetTickCountRet;
+	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
+	sprintf(szTemp,"FAN_SUBSYS_Intelligent Spin roundtime: %u us\n", (unsigned int)uLRes);
+	strcat(szInfoReq, szTemp);	
 
 	// Atomic Full-Asm Special CPLD Write latency
 	uL1 = MACRO_GetTickCountRet;
@@ -374,6 +382,23 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	
 	iTurnaroundTime = 0x0FFFFFFFF;
 	
+	volatile char szFailures[12000];
+	volatile char szFailTemp[128];
+	strcpy(szFailTemp,"");
+	strcpy(szFailures,"");
+	
+	
+	volatile char iTotal3Error = 0;
+	volatile char iTotal5Error = 0;
+	volatile char iTotal50Error = 0;
+	volatile char iTotal7Error = 0;
+	volatile char iTotal4Error = 0;
+	volatile char iTotal51Error = 0;
+	volatile char iTotalUTError = 0;
+	volatile char iTotalXError = 0;
+	
+	volatile char szKeep[4] = {0,0,0,0};
+	
 	// Now we send message to XLINK_GENERAL_DISPATCH_ADDRESS for an ECHO and count the successful iterations
 	for (unsigned int x = 0; x < 100000; x++)
 	{
@@ -394,39 +419,60 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		iActualTickTemp = MACRO_GetTickCountRet;
 	
 		// Send the command
-		MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
-		MACRO_XLINK_wait_packet(szResponse, iRespLen, 880, bTimedOut, iSendersAddress, iLP, iBC );
+		//MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
+		//MACRO_XLINK_wait_packet(szResponse, iRespLen, 90, bTimedOut, iSendersAddress, iLP, iBC );
+		XLINK_MASTER_transact(3,"ZRX", 3, szResponse, &iRespLen, 128, __XLINK_TRANSACTION_TIMEOUT__, &bDevNotResponded, &bTimedOut, TRUE);
 	
 		// Update turnaround time
 		iSecondaryTickTemp = MACRO_GetTickCountRet;
 			
 		// Increase total time
-
 		iTempX = (iSecondaryTickTemp - iActualTickTemp);
-		if ((iTempX > 0x0FFFF))
-		{
-			iSecondaryTickTemp += 1;
-		}
 		iTotalTimeTaken += iTempX;
 		
 		if ((iRespLen == 4) &&
-			(szResponse[0] == 'E') &&
-			(szResponse[1] == 'C') &&
-			(szResponse[2] == 'H') &&
-			(szResponse[3] == 'O'))
+			(szResponse[0] == 'P') &&
+			(szResponse[1] == 'R') &&
+			(szResponse[2] == 'S') &&
+			(szResponse[3] == 'N'))
 		{	
 		
 			// Increase good count
-			iTotalGoodDelay += (iTempX - 1);
+			iTotalGoodDelay += (iTempX);
 			
 			//  Update turnaround time
 			if (iSecondaryTickTemp - iActualTickTemp < iTurnaroundTime) 
 			{
-				if (iSecondaryTickTemp - iActualTickTemp > 0) iTurnaroundTime = iSecondaryTickTemp - iActualTickTemp;
+				if (iSecondaryTickTemp - iActualTickTemp > 1) iTurnaroundTime = iSecondaryTickTemp - iActualTickTemp;
 			}				
 						
 			// Increase our success counter			
 			iSuccessCounter++;
+		}
+		else
+		{
+			// Report
+			if ((bTimedOut == 3) || (bTimedOut == 77))
+				iTotal3Error++;
+			else if ((bTimedOut == 5))
+				iTotal5Error++;
+			else if ((bTimedOut == 50))		
+			{		
+				iTotal50Error++;
+				szKeep[0] = GLOBAL_InterProcChars[0];
+				szKeep[1] = GLOBAL_InterProcChars[1];
+				szKeep[2] = GLOBAL_InterProcChars[2];
+				szKeep[3] = GLOBAL_InterProcChars[3];
+			}				
+			else if ((bTimedOut == 51))
+				iTotal50Error++;				
+			else if (bTimedOut == 7)
+				iTotal7Error++;
+			else if (bTimedOut > 0)
+				iTotalUTError++;
+			else
+				iTotalXError++;
+			
 		}
 	}
 
@@ -439,13 +485,18 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		strcat(szReportResult, szTempex);
 		
 	}*/	
-	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %u us\nLeast transact: %u us, Total good delay: %u us\n",
-			iSuccessCounter, 100000, (unsigned int)iTotalTimeTaken, (unsigned int)iTurnaroundTime,(unsigned int)iTotalGoodDelay);
+	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %u us\nLeast transact: %u us, Total good delay: %u us\n"
+			"3Err: %d, 4Err: %d, 5Err: %d, 50Err: %d, 51Err: %d, 7Err: %d, UTErr: %d, XErr: %d, KEEP: %02X%02X%02X%02X\n",
+			iSuccessCounter, 100000, (unsigned int)iTotalTimeTaken, (unsigned int)iTurnaroundTime,(unsigned int)iTotalGoodDelay,
+			iTotal3Error, iTotal4Error, iTotal5Error, iTotal50Error, iTotal51Error, iTotal7Error, iTotalUTError, iTotalXError,
+			szKeep[0], szKeep[1], szKeep[2], szKeep[3]);
+
 
 	/*sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %u us\nLeast transact: %u us\n",
 			iSuccessCounter, 100000, (unsigned int)iTotalTimeTaken, (unsigned int)iTurnaroundTime);
 	*/
 	strcat(szReportResult, szTempex);
+	//strcat(szReportResult, szFailures);
 	
 	// Send the OK back first
 	// All is good... sent the identifier and get out of here...
@@ -574,7 +625,7 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 	else
 	{
 		char bTimeoutDetectedX = FALSE;
-		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 1024, 300, &bTimeoutDetectedX, FALSE);
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 1024, 300, &bTimeoutDetectedX, FALSE, FALSE);
 		if (bTimeoutDetectedX == TRUE) return PROTOCOL_FAILED;
 	}
 
@@ -868,7 +919,7 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	{
 		// Wait for incoming transactions
 		char bTimeoutDetectedOnXLINK = 0;
-		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 100, &bTimeoutDetectedOnXLINK, FALSE);
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 100, &bTimeoutDetectedOnXLINK, FALSE, FALSE);
 					
 		// Check
 		if (bTimeoutDetectedOnXLINK) return PROTOCOL_FAILED;	
@@ -962,7 +1013,7 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	else
 	{
 		char bTimeoutDetected = FALSE;
-		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 200, &bTimeoutDetected, FALSE);
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 200, &bTimeoutDetected, FALSE, FALSE);
 		if (bTimeoutDetected) return PROTOCOL_FAILED;
 	}		
 
@@ -1184,7 +1235,7 @@ PROTOCOL_RESULT  Protocol_set_freq_factor()
 	else
 	{
 		char bTimeoutDetected = FALSE;
-		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 200, &bTimeoutDetected, FALSE);
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 200, &bTimeoutDetected, FALSE, FALSE);
 		if (bTimeoutDetected) return PROTOCOL_FAILED;
 	}
 
@@ -1259,7 +1310,7 @@ PROTOCOL_RESULT  Protocol_set_xlink_address()
 	else
 	{
 		char bTimeoutDetected = FALSE;
-		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 200, &bTimeoutDetected, FALSE);
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 200, &bTimeoutDetected, FALSE, FALSE);
 		if (bTimeoutDetected) return PROTOCOL_FAILED;
 	}
 

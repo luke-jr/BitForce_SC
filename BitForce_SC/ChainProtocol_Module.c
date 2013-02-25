@@ -95,6 +95,10 @@ char XLINK_Outbox[4096];
 char XLINK_Device_Status;
 char XLINK_Outbox_Length;
 
+// Our device map
+volatile char XLINK_Internal_DeviceMap[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+#define XLINK_Internal_DeviceMap_RetryCount 2
+
 // Initialize
 void init_XLINK()
 {
@@ -201,7 +205,7 @@ char XLINK_MASTER_Is_Device_Present(char aID)
 	volatile char bTimedOut = FALSE;
 	volatile char bDevNotResponded = FALSE;
 	volatile char szResponse[10];
-	volatile unsigned short iRespLen = 0;
+	volatile unsigned int iRespLen = 0;
 	volatile char iBC = 0;
 	volatile char iLP = 0;
 	volatile char iSendersAddress = 0;
@@ -269,6 +273,7 @@ volatile int XLINK_MASTER_Start_Chain()
 		if (XLINK_MASTER_Is_Device_Present(iActualID) == TRUE)
 		{
 			GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK |= (1 << iActualID);
+			XLINK_Internal_DeviceMap[iActualID] = XLINK_Internal_DeviceMap_RetryCount; // 2 Retries set...
 			iActualID++;
 			continue;
 		}
@@ -314,13 +319,61 @@ void XLINK_MASTER_Refresh_Chain()
 		WATCHDOG_RESET;
 		
 		// It means the device should be present... Now is it?
-		if (((GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK & (1 << aIDToAssign)) != 0) && (XLINK_MASTER_Is_Device_Present(aIDToAssign)))
+		if (((GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK & (1 << aIDToAssign)) != 0))
 		{
-			// If present the we do nothing... All is ok!
-			continue;
+			if (XLINK_MASTER_Is_Device_Present(aIDToAssign))
+			{
+				// If present the we do nothing... All is ok!
+				XLINK_Internal_DeviceMap[aIDToAssign] = XLINK_Internal_DeviceMap_RetryCount;				
+				continue;	
+			}
+			else
+			{
+				if (XLINK_MASTER_Is_Device_Present(aIDToAssign))
+				{
+					// If present the we do nothing... All is ok!
+					continue;
+				}
+				else
+				{
+
+					volatile char bSuccess = FALSE;
+							
+					// We've tried all we could, no luck unfortunately
+					GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK &= (unsigned int)((~(1 << aIDToAssign)) & 0x0FFFFFFFF);	
+							
+					// In this case we do try...
+					XLINK_MASTER_Scan_And_Register_Device(aIDToAssign, 5, 6, &bSuccess);
+							
+					// Did we succeed? Update the flag accordingly
+					if (bSuccess)
+					{
+						volatile unsigned int iValueToSet = (1 << aIDToAssign);
+						GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK |= iValueToSet;
+						XLINK_Internal_DeviceMap[aIDToAssign] = XLINK_Internal_DeviceMap_RetryCount; // 
+					}
+					else // Clear
+					{
+						// No response to enumeration was detected
+						bNoResponseToEnumeration = TRUE; // Meaning we shouldn't enumerate anymore, since no device responded	
+						
+						// Continue...
+						if (XLINK_Internal_DeviceMap[aIDToAssign] == 0)
+						{
+							GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK &= (unsigned int)((~(1 << aIDToAssign)) & 0x0FFFFFFFF);
+						}						
+						else
+						{
+							XLINK_Internal_DeviceMap[aIDToAssign] -= 1;
+						}
+					}
+				}
+			}
+			
 		}
 		else
 		{
+			
 			// Then see if we can find a new device in chain
 			volatile char bSucceeded = FALSE;
 			
@@ -334,17 +387,38 @@ void XLINK_MASTER_Refresh_Chain()
 				{
 					volatile unsigned int iValueToSet = (1 << aIDToAssign);
 					GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK |= iValueToSet;
+					XLINK_Internal_DeviceMap[aIDToAssign] = XLINK_Internal_DeviceMap_RetryCount;
 				}					
 				else // Clear
 				{
-					GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK &= (unsigned int)((~(1 << aIDToAssign)) & 0x0FFFFFFFF);				
-					bNoResponseToEnumeration = TRUE; // Meaning we shouldn't enumerate anymore, since no device responded 
+					// Enumeration response null
+					bNoResponseToEnumeration = TRUE;
+					
+					// Continue...
+					if (XLINK_Internal_DeviceMap[aIDToAssign] == 0)
+					{
+						GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK &= (unsigned int)((~(1 << aIDToAssign)) & 0x0FFFFFFFF);
+						bNoResponseToEnumeration = TRUE; // Meaning we shouldn't enumerate anymore, since no device responded
+						XLINK_Internal_DeviceMap[aIDToAssign] = XLINK_Internal_DeviceMap_RetryCount;	
+					}
+					else
+					{
+						XLINK_Internal_DeviceMap[aIDToAssign] -= 1;
+					}
+					
 				}									
 			}
 			else
 			{
-				// Since in the past an enumeration has failed, there is no reason for us to re-enumerate now...
-				GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK &= (unsigned int)((~(1 << aIDToAssign)) & 0x0FFFFFFFF);			
+				if (XLINK_Internal_DeviceMap[aIDToAssign] == 0)
+				{
+					// Since in the past an enumeration has failed, there is no reason for us to re-enumerate now...
+					GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK &= (unsigned int)((~(1 << aIDToAssign)) & 0x0FFFFFFFF);			
+				}
+				else
+				{
+					XLINK_Internal_DeviceMap[aIDToAssign] -= 1;					
+				}					
 			}
 		}
 	}	
@@ -359,7 +433,7 @@ void XLINK_MASTER_Scan_And_Register_Device(unsigned char  aIDToAssign,
 	// Variables
 	volatile char szRespData[32];
 	volatile char sz_cmd[16];
-	volatile unsigned short iRespLen = 0;
+	volatile unsigned int iRespLen = 0;
 	volatile char bDeviceNotResponded = 0;
 	volatile char bTimeoutDetected = 0;
 	volatile unsigned int iTotalRetryCount = 0;
@@ -559,8 +633,9 @@ void XLINK_MASTER_Scan_And_Register_Device(unsigned char  aIDToAssign,
 				continue;
 			}
 					
-			// All ok, we break
-			break;
+			// All ok, we exit the function
+			*aSucceeded = TRUE;
+			return;
 		}
 		
 		// Check if we have succeeded or not by checking the retry count
@@ -580,7 +655,7 @@ void XLINK_MASTER_Scan_And_Register_Device(unsigned char  aIDToAssign,
 
 // iAdrs = Target
 // szData and iLen is the data stack
-void XLINK_send_packet(char iAdrs, char* szData, unsigned short iLen, char LP, char BC)
+void XLINK_send_packet(char iAdrs, char* szData, unsigned int iLen, char LP, char BC)
 {
 	// Set CPLD Access
 	__AVR32_CPLD_SetAccess();
@@ -697,10 +772,10 @@ void XLINK_wait_packet (char  *data,
 // This is used by master only...
 void XLINK_MASTER_transact(char   iAdrs, 
 					       char*  szData, 
-					       unsigned short  iLen,
+					       unsigned int  iLen,
 						   char*  szResp,
-						   unsigned short* response_length,
-						   unsigned short  iMaxRespLen,
+						   unsigned int* response_length,
+						   unsigned int  iMaxRespLen,
 						   UL32    transaction_timeout, // Master timeout
 						   char   *bDeviceNotResponded, // Device did not respond, even to the first packet
 						   char   *bTimeoutDetected, // Was a timeout detected?
@@ -715,11 +790,11 @@ void XLINK_MASTER_transact(char   iAdrs,
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	volatile UL32 iActualTickcount = MACRO_GetTickCountRet;
-	volatile unsigned short iTotalSent = 0;
+	volatile UL32 iTransactionStartTickcount = MACRO_GetTickCountRet;
+	volatile unsigned int iTotalSent = 0;
 	volatile char  iBytesToSend = 0;
 	volatile char  iLP = 0; // LastPacket
-	volatile char  iBC = 0; // BitCorrector
+	volatile char  iBC = 0; // BitCorrector ((Note: BitCorrector starts with 0))
 	volatile char  iTotalRetryCount = 0; 
 		
 	// Wait for OK packet for 20us
@@ -734,6 +809,8 @@ void XLINK_MASTER_transact(char   iAdrs,
 	volatile UL32 vTemp2 = 0;
 	volatile UL32 vTemp3 = 0;
 	
+	volatile unsigned int iExpectedChecksum = 0;
+		
 	while (iTotalSent < iLen)
 	{
 		// Preliminary calculations
@@ -748,6 +825,14 @@ RETRY_POINT_1:
 		// Send these bytes
 		char* szDest = (char*)(szData + iTotalSent);
 		MACRO_XLINK_send_packet(iAdrs, szDest, iBytesToSend, iLP, iBC);
+		
+		
+		// Calculate iExpectedChecksum
+		iExpectedChecksum = 0;
+		iExpectedChecksum += ((iBytesToSend >= 1) ? szDest[0] : 0);
+		iExpectedChecksum += ((iBytesToSend >= 2) ? szDest[1] : 0);
+		iExpectedChecksum += ((iBytesToSend >= 3) ? szDest[2] : 0);
+		iExpectedChecksum += ((iBytesToSend == 4) ? szDest[3] : 0);
 	
 		// Reset variables
 		iTimeoutDetected = 0;
@@ -772,7 +857,7 @@ RETRY_POINT_1:
 						  
 		// Check master timeout
 		vTemp1 = MACRO_GetTickCountRet;
-		vTemp3 = vTemp1 - iActualTickcount;
+		vTemp3 = vTemp1 - iTransactionStartTickcount;
 		
 		if (vTemp3 > transaction_timeout) 
 		{
@@ -808,6 +893,8 @@ RETRY_POINT_1:
 		// No timeout was detected, check resp. If it was not ok, try again
 		if ((szDevResponse[0] != 'A') || 
 			(szDevResponse[1] != 'R') ||
+			(szDevResponse[2] != ((iExpectedChecksum & 0x0FF00) >> 8) & 0x0FF) ||
+			(szDevResponse[3] !=  (iExpectedChecksum & 0x0FF)) ||
 			(__iRespLen != 4) ||
 			(__senders_address != iAdrs)) // Check both for address-match and 'OK' response
 		{
@@ -840,7 +927,7 @@ RETRY_POINT_1:
 		
 				
 	// At this stage, the data has been sent, now we must ask Device for results...
-	volatile unsigned short iTotalReceived = 0;
+	volatile unsigned int iTotalReceived = 0;
 	iTotalRetryCount = 0;
 	
 	volatile UL32 imrActualHolder = 0;
@@ -877,7 +964,7 @@ RETRY_POINT_1:
 		// Wait for response		
 		MACRO_XLINK_wait_packet(szDevResponse, 
 							    __iRespLen,
-								((iTotalReceived == 0) ? (__XLINK_WAIT_PACKET_TIMEOUT__ << 3) : (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3)),  // For the first packet (only) we wait UL32 time. For the rest, we'll be fast...
+								(__XLINK_WAIT_PACKET_TIMEOUT__ >> 2),  // For the first packet (only) we wait UL32 time. For the rest, we'll be fast...
 								iTimeoutDetected,
 								__senders_address,
 								__lp,
@@ -885,7 +972,8 @@ RETRY_POINT_1:
 		
 		// Check master timeout
 		vTemp1 = MACRO_GetTickCountRet;
-		vTemp3 = vTemp1 - iActualTickcount;
+		vTemp3 = vTemp1 - iTransactionStartTickcount;
+		
 		if (vTemp3 > transaction_timeout)
 		{
 			*bTimeoutDetected = (iTotalReceived == 0) ? 3 : 77;
@@ -897,10 +985,10 @@ RETRY_POINT_1:
 		}
 		
 		// Check for issues
-		if (iTimeoutDetected || (__iRespLen == 0))
+		if (iTimeoutDetected)
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
+			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 2))
 			{
 				// We've failed
 				*bTimeoutDetected = 4;
@@ -921,10 +1009,21 @@ RETRY_POINT_1:
 		if (__senders_address != iAdrs || __iRespLen == 0 || iExpectedBC != __bc) // Check both for address-match, response-length and bit-corrector
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
+			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 2))
 			{
 				// We've failed
-				*bTimeoutDetected = 5;
+				if (__senders_address != iAdrs)
+						*bTimeoutDetected = 5;
+				else if (iExpectedBC != __bc)
+				{
+						*bTimeoutDetected = 50;
+						GLOBAL_InterProcChars[0] = szDevResponse[0];
+						GLOBAL_InterProcChars[1] = szDevResponse[1];
+						GLOBAL_InterProcChars[2] = szDevResponse[2];
+						GLOBAL_InterProcChars[3] = szDevResponse[3];
+				}						
+				else *bTimeoutDetected = 51;
+						
 				*bDeviceNotResponded = (iTotalSent == 0) ? 1 : 0;
 				
 				// Before doing anything, clear the CPLD
@@ -998,7 +1097,7 @@ RETRY_POINT_3:
 		// Wait for response
 		MACRO_XLINK_wait_packet(szDevResponse,
 								__iRespLen,
-								(__XLINK_WAIT_PACKET_TIMEOUT__ >> 3),  // We wait an 8th of the maximum allowed, since we're master
+								(__XLINK_WAIT_PACKET_TIMEOUT__ >> 3),  // We wait an 4th of the maximum allowed, since we're master
 								iTimeoutDetected,
 								__senders_address,
 								__lp,
@@ -1006,7 +1105,7 @@ RETRY_POINT_3:
 						  
 		// Check master timeout
 		vTemp1 = MACRO_GetTickCountRet;
-		vTemp3 = vTemp1 - iActualTickcount;
+		vTemp3 = vTemp1 - iTransactionStartTickcount;
 		
 		if (vTemp3 > transaction_timeout)
 		{
@@ -1085,13 +1184,14 @@ void XLINK_SLAVE_wait_transact (char  *data,
 							    unsigned int  max_len,
 							    UL32 transaction_timeout,
 							    char  *bTimeoutDetected,
-							    char  bWeAreMaster)
+							    char  bWeAreMaster,
+								char  bWaitingForCommand)
 {
 	// This is used by slave only, make sure we are slave..
 	if (bWeAreMaster == 1) return;	
 	
 	// At this stage, the data has been sent, now we must ask Device for results...
-	volatile unsigned short iTotalReceived = 0;
+	volatile unsigned int iTotalReceived = 0;
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
@@ -1109,6 +1209,10 @@ void XLINK_SLAVE_wait_transact (char  *data,
 	volatile UL32 vTemp1 = 0;
 	volatile UL32 vTemp2 = 0;
 	volatile UL32 vTemp3 = 0;
+	
+	// Respond with checksum
+	volatile unsigned int iGeneratedChecksum = 0;
+	
 	
 	// Now we have to wait for data
 	while (iTotalReceived < max_len)
@@ -1182,7 +1286,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 		}
 		
 		// SPECIAL CASE: Is it a 'TERM' signal? If so, simply reply with TERM and ignore the whole story and continue the loop
-		if (iTotalReceived == 0) // Meaning that this is the first packet received...
+		if ((iTotalReceived == 0) && (bWaitingForCommand == TRUE)) // Meaning that this is the first packet received...
 		{
 			if ((__iRespLen == 4) &&
 				(szResp[0] == 'T') &&
@@ -1211,29 +1315,43 @@ void XLINK_SLAVE_wait_transact (char  *data,
 				continue;
 			}
 		}
+		
+		// Check the BitCorrector:
+		// If it's not what we expected it to be, then we need to go back and rewrite the bytes. We won't ignore it however
+		/*if (__bc != iBC) // Bit corrector not matched. If we can, we need to roll-back the address
+		{
+			if (iTotalReceived > 3) iTotalReceived -= 4;
+		}*/	
+		
+		// Reset the Checksum
+		iGeneratedChecksum = 0;		
 			
 		// Resp was OK... Take the data
 		if ((__iRespLen >= 1) && (iTotalReceived + 1 <= max_len))
 		{
 			 data[iTotalReceived] = szResp[0];
+			 iGeneratedChecksum += szResp[0];			 
 			 iTotalReceived += 1;
 		}			 
 		
 		if ((__iRespLen >= 2) && (iTotalReceived + 1 <= max_len)) 
 		{
 			data[iTotalReceived] = szResp[1];
+			iGeneratedChecksum  += szResp[1];			
 			iTotalReceived += 1;
 		}
 					
 		if ((__iRespLen >= 3) && (iTotalReceived + 1 <= max_len)) 
 		{
 			data[iTotalReceived] = szResp[2];
+			iGeneratedChecksum  += szResp[2];			
 			iTotalReceived += 1;
 		}			
 		
 		if ((__iRespLen >= 4) && (iTotalReceived + 1 <= max_len)) 
 		{
 			data[iTotalReceived] = szResp[3];
+			iGeneratedChecksum  += szResp[3];			
 			iTotalReceived += 1;
 		}			
 		// We've sent 4 more bytes
@@ -1245,8 +1363,10 @@ void XLINK_SLAVE_wait_transact (char  *data,
 		// At this point, sent an OK back to sender
 		sziMX[0] = 'A';
 		sziMX[1] = 'R';
-		sziMX[2] = 'T';
-		sziMX[3] = 'X';
+		sziMX[2] = (((iGeneratedChecksum & 0x0FF00) >> 8) & 0x0FF);
+		sziMX[3] = (iGeneratedChecksum & 0x0FF);
+		//sziMX[2] = 'T';
+		//sziMX[3] = 'X';
 		
 		MACRO_XLINK_send_packet(__OUR_CPLD_ID,sziMX, 4, 1, 0);
 		
@@ -1277,8 +1397,8 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
 	volatile unsigned int   iActualTickcount = MACRO_GetTickCountRet;
-	volatile unsigned short iTotalSent = 0;
-	volatile unsigned short iBytesToSend = 0;
+	volatile unsigned int iTotalSent = 0;
+	volatile unsigned int iBytesToSend = 0;
 	volatile char iBC = 1;	 // BitCorrector is ONE, since the previous part has already set it to one!
 	volatile char iTotalRetryCount = 0;
 	
@@ -1297,7 +1417,7 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 		// Wait for OK packet for 20us
 		volatile char iTimeoutDetected = 0;
 		volatile char szResp[4];
-		volatile unsigned int  __iRespLen = 0;
+		volatile unsigned int __iRespLen = 0;
 		volatile char __senders_address = 0;
 		volatile char __lp = 0;
 		volatile char __bc = 0;
@@ -1364,7 +1484,6 @@ RETRY_POINT_1:
 				iTotalRetryCount++;
 				goto RETRY_POINT_1;
 			}
-
 		}
 		
 		// Check for Host Response Data
@@ -1501,7 +1620,6 @@ RETRY_POINT_2:
 				// We will try again
 				iTotalRetryCount++;
 			}
-
 		}
 		
 		// Check for Host Response Data

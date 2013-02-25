@@ -241,4 +241,13 @@ void	__AVR32_FAN_Initialize(void);
 void	__AVR32_FAN_SetAccess(void);
 void	__AVR32_FAN_SetSpeed(char iSpeed);
 
+
+/////////////////////////////////////////////////
+// Flash programming
+/////////////////////////////////////////////////
+void	__AVR32_Flash_Initialize(void);
+void	__AVR32_Flash_WritePage(char* szData, unsigned int iAddress, unsigned int iSize);
+void	__AVR32_Flash_ReadPage (char* szData, unsigned int iAddress, unsigned int iSize);
+
+
 #endif /* AVR32_MODULE_H_ */
