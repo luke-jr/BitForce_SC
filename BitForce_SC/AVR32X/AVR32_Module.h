@@ -31,6 +31,18 @@
 #define AVR32_SPI1_RDR								(*((volatile unsigned int*)0xFFFF2808))
 #define AVR32_SPI1_SR								(*((volatile unsigned int*)0xFFFF2810))
 
+#define AVR32_FLASHC_MAIN							(*((volatile unsigned int*)0xFFFE1400))
+#define AVR32_FLASHC_CONTROL						(*((volatile unsigned int*)0xFFFE1400))
+#define AVR32_FLASHC_COMMAND						(*((volatile unsigned int*)0xFFFE1404))
+#define AVR32_FLASHC_STATUS							(*((volatile unsigned int*)0xFFFE1408))
+#define AVR32_FLASHC_COMMAND_WRITE_PAGE				1
+#define AVR32_FLASHC_COMMAND_ERASE_PAGE				2
+#define AVR32_FLASHC_COMMAND_READ_PAGE				12
+#define AVR32_FLASHC_COMMAND_CLEAR_PAGE_BUFFER		3
+#define AVR32_FLASHC_COMMAND_WRITE_USER_PAGE		13
+#define AVR32_FLASHC_COMMAND_ERASE_USER_PAGE		14
+#define AVR32_FLASHC_COMMAND_READ_USER_PAGE			15
+
 #define	AVR32_SPI_STATUS_RDRF						(0b00000000001)
 #define AVR32_SPI_STATUS_TDRE						(0b00000000010)
 #define	AVR32_SPI_STATUS_OVRS						(0b00000001000)
@@ -60,6 +72,7 @@
 #define AVR32_A2D_CHANNEL_ENABLE_REGISTER			(*((volatile unsigned int*)AVR32_A2D_CHANNEL_ENABLE_REGISTER_ADRS))
 #define AVR32_A2D_CHANNEL_STATUS_REGISTER			(*((volatile unsigned int*)AVR32_A2D_CHANNEL_STATUS_REGISTER_ADRS))
 #define AVR32_A2D_STATUS_REGISTER					(*((volatile unsigned int*)AVR32_A2D_STATUS_REGISTER_ADRS))
+
 
 #define AVR32_A2D_CDR0								(*((volatile unsigned int*)AVR32_A2D_CDR0_ADRS))
 #define AVR32_A2D_CDR1								(*((volatile unsigned int*)AVR32_A2D_CDR1_ADRS))
@@ -156,6 +169,8 @@
 #define __AVR32_ENGINE_LED7  (1<<30)   // PORT B
 #define __AVR32_ENGINE_LED8  (1<<31)   // PORT B
 
+
+
 //////////////////////////////////////////////
 // FUNCTIONS
 /////////////////////////////////////////////
@@ -246,8 +261,8 @@ void	__AVR32_FAN_SetSpeed(char iSpeed);
 // Flash programming
 /////////////////////////////////////////////////
 void	__AVR32_Flash_Initialize(void);
-void	__AVR32_Flash_WritePage(char* szData, unsigned int iAddress, unsigned int iSize);
-void	__AVR32_Flash_ReadPage (char* szData, unsigned int iAddress, unsigned int iSize);
+void	__AVR32_Flash_WriteUserPage(char* szData);
+void	__AVR32_Flash_ReadUserPage (char* szData);
 
 
 #endif /* AVR32_MODULE_H_ */

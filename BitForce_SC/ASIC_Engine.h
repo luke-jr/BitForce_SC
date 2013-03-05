@@ -115,7 +115,6 @@ void    init_ASIC(void);
 // Maximum 32 nonces supported
 int     ASIC_get_job_status(unsigned int *iNonceList, char *iNonceCount);
 void    ASIC_job_issue(void* pJobPacket, unsigned int _LowRange,unsigned int _HighRange);
-void	ASIC_job_issue_p2p(void* pJobPacketP2P);
 int  	ASIC_get_chip_count(void);
 int		ASIC_are_all_engines_done(unsigned int iChip);
 int		ASIC_does_chip_exist(unsigned int iChipIndex);

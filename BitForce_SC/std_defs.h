@@ -27,15 +27,8 @@
 
 
 /*************** XLINK Operations Timeout ***********/
-
-/* OLD VALUES
 #define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
-#define __XLINK_TRANSACTION_TIMEOUT__	     120000
-#define __XLINK_WAIT_PACKET_TIMEOUT__        440
-*/
-
-#define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
-#define __XLINK_TRANSACTION_TIMEOUT__	     20000    // 20ms. No transaction should take longer. 
+#define __XLINK_TRANSACTION_TIMEOUT__	     20000   // 20ms. No transaction should take longer. 
 #define __XLINK_WAIT_PACKET_TIMEOUT__        440
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      44
 
@@ -66,8 +59,8 @@ void IncrementTickCounter(void);
 #define TRUE		1
 #define FALSE		0
 
-#define MAKE_DWORD(u,v,x,y) ((u << 24) + (v << 16) + (x << 8) + (y))
-#define GET_MSB_BYTE(u, v)  ((((unsigned int)(u)) >> ((3 - v) * 8)) & 0x0FF)
+#define MAKE_DWORD(b3,b2,b1,b0) ((b3 << 24) | (b2 << 16) | (b1 << 8) | (b0))
+#define GET_BYTE_FROM_DWORD(dword, byte) ((dword >> (byte * 8)) & 0x0FF)
 
 volatile char GLOBAL_InterProcChars[128];
 
@@ -90,14 +83,25 @@ typedef struct _tag_buf_job_result_packet
 {
 	char midstate[32];   // 256Bits of midstate
 	char block_data[12]; // 12 Bytes of data
-	char nonce_begin[4]; // 4 Bytes of NoncDynaclock_GetFrequencyFactore-Begin (Little-Endian)
-	char nonce_end[4];   // 4 Bytes of Nonce-End (Little-Endian)
 	char i_nonce_count;  // Number of nonces in result
-	unsigned int  nonce_list[16];
+	unsigned int  nonce_list[8];
 } buf_job_result_packet, *pbuf_job_result_packet;
 
+
+// String Identification Memory
+typedef struct _tag_string_storage
+{
+	char signature[3];   // 0x0AA, 0x0BB, 0x055
+	char string_len;	 // Length of the string (including null termination)
+	char string_to_store[256]; // The string to store
+} string_storage, *pstring_storage;
+
+// Other variables
 int XLINK_ARE_WE_MASTER;
 int global_vals[6];
+
+// This should be by default zero
+int GLOBAL_BLINK_REQUEST;
 
 // Critical Temperature Warning - Abort Jobs!
 volatile static char GLOBAL_CRITICAL_TEMPERATURE;

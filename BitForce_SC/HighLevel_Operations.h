@@ -13,6 +13,4 @@
 void HighLevel_Operations_Spin(void);
 
 
-
-
 #endif /* HIGHLEVEL_OPERATIONS_H_ */

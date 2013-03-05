@@ -20,6 +20,7 @@ void init_USB()
 	MCU_USB_Initialize();	
 }
 
+
 void USB_wait_stream (char* data,
 					  unsigned int *length,    // output
 					  unsigned int  max_len,   // input
@@ -91,6 +92,8 @@ void USB_wait_stream (char* data,
 		USB_send_string("ERR:UNKNOWN!!!\n");
 	}	
 }
+
+
 
 void USB_wait_packet(char* data,
 					 unsigned int *length,    // output

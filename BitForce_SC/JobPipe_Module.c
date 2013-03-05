@@ -12,24 +12,22 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 // Information about the result we're holding
-buf_job_result_packet  __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
-char 		   __buf_job_results_count;  // Total of results in our __buf_job_results
-
-job_packet_p2p PIPE_PROC_BUF[PIPE_MAX_BUFFER_DEPTH];
+buf_job_result_packet __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
+char __buf_job_results_count;  // Total of results in our __buf_job_results
+	
+job_packet PIPE_PROC_BUF[PIPE_MAX_BUFFER_DEPTH];
 
 void init_pipe_job_system()
 {
 	// Initialize our buffer
 	__total_jobs_in_buffer = 0;
-	__total_buf_p2p_jobs_ever_received = 0;
+	__total_buf_pipe_jobs_ever_received = 0;
 
 	// Put zeros everywhere
 	unsigned int tx = 0;
-
 	for (tx = 0; tx < sizeof(__inprocess_midstate); tx++) 	 __inprocess_midstate[tx] = 0;
-	for (tx = 0; tx < sizeof(__inprocess_nonce_begin); tx++) __inprocess_nonce_begin[tx] = 0;
-	for (tx = 0; tx < sizeof(__inprocess_nonce_end); tx++) 	 __inprocess_nonce_end[tx] = 0;
-
+	for (tx = 0; tx < sizeof(__inprocess_midstate); tx++) 	 __inprocess_blockdata[tx] = 0;
+	
 	// Reset results...
 	__buf_job_results_count = 0;
 }
@@ -39,6 +37,12 @@ void JobPipe__pipe_flush_buffer()
 	// simply reset its counter;
 	__buf_job_results_count = 0;
 	__total_jobs_in_buffer = 0;	
+}
+
+char JobPipe__available_space()
+{
+	// simply reset its counter;
+	return PIPE_MAX_BUFFER_DEPTH - __total_jobs_in_buffer;
 }
 
 char JobPipe__pipe_ok_to_pop()
@@ -51,15 +55,14 @@ char JobPipe__pipe_ok_to_push()
 	return ((__total_jobs_in_buffer < PIPE_MAX_BUFFER_DEPTH) ? 1 : 0);
 }
 
-char JobPipe__pipe_push_P2P_job(void* __input_p2p_job_info)
+char JobPipe__pipe_push_job(void* __input_pipe_job_info)
 {
 	// Is it ok to push a job into stack?
 	if (!JobPipe__pipe_ok_to_push()) return PIPE_JOB_BUFFER_FULL;
 
 	// Copy memory block
-	memcpy((void*)((char*)(PIPE_PROC_BUF) + (__total_jobs_in_buffer * sizeof(job_packet_p2p))),
-	__input_p2p_job_info,
-	sizeof(job_packet_p2p));
+	memcpy((void*)((char*)(PIPE_PROC_BUF) + (__total_jobs_in_buffer * sizeof(job_packet))),
+		   __input_pipe_job_info, sizeof(job_packet));
 
 	// Increase the total jobs available in the stack
 	__total_jobs_in_buffer++;
@@ -68,24 +71,24 @@ char JobPipe__pipe_push_P2P_job(void* __input_p2p_job_info)
 	return PIPE_JOB_BUFFER_OK;
 }
 
-char JobPipe__pipe_pop_P2P_job(void* __output_p2p_job_info)
+char JobPipe__pipe_pop_job(void* __output_pipe_job_info)
 {
 	// Is it ok to pop a job from the stack?
 	if (!JobPipe__pipe_ok_to_pop()) return PIPE_JOB_BUFFER_EMPTY;
 
 	// Copy memory block (from element 0)
-	memcpy(__output_p2p_job_info,
-	(void*)((char*)(PIPE_PROC_BUF) + (0 * sizeof(job_packet_p2p))),
-	sizeof(job_packet_p2p));
+	memcpy(__output_pipe_job_info,
+		  (void*)((char*)(PIPE_PROC_BUF) + (0 * sizeof(job_packet))),
+		  sizeof(job_packet));
 
 	// Shift all elements back
 	char tx = 0;
 
 	for (tx = 1; tx < __total_jobs_in_buffer; tx++)
 	{
-		memcpy((void*)((char*)(PIPE_PROC_BUF) + ((tx - 1) * sizeof(job_packet_p2p))),
-		(void*)((char*)(PIPE_PROC_BUF) + (tx * sizeof(job_packet_p2p))),
-		sizeof(job_packet_p2p));
+		memcpy((void*)((char*)(PIPE_PROC_BUF) + ((tx - 1) * sizeof(job_packet))),
+			   (void*)((char*)(PIPE_PROC_BUF) + (tx * sizeof(job_packet))),
+			   sizeof(job_packet));
 	}
 
 	// Reduce total of jobs available in the stack

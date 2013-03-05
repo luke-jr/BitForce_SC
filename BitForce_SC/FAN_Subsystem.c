@@ -44,21 +44,26 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 	volatile int iTemp2 = __AVR32_A2D_GetTemp2();
 	volatile int iTempAveraged = (iTemp2 + iTemp1) / 2;
 	
-	// Are we in critical situation? Override FAN if necessary
-	if (iTempAveraged > 95)
+	if (iTempAveraged > 100)
 	{
 		// Holy jesus! We're in a critical situation...
 		GLOBAL_CRITICAL_TEMPERATURE = TRUE;
-		
+	}
+	else
+	{
+		// If we're here, it means we're not critical anymore
+		GLOBAL_CRITICAL_TEMPERATURE = FALSE;
+	}	
+	
+	// Are we in critical situation? Override FAN if necessary
+	if (iTempAveraged > 90)
+	{
 		// Override fan, set it to maximum
 		__AVR32_FAN_SetSpeed(FAN_CONTROL_BYTE_VERY_FAST);
 		
 		// We're done. The device will no longer process nonces
 		return;
 	}
-	
-	// If we're here, it means we're not critical anymore
-	GLOBAL_CRITICAL_TEMPERATURE = FALSE;
 	
 	// Ok, now set the FAN speed according to our setting
 	if (FAN_ActualState == FAN_STATE_VERY_SLOW)

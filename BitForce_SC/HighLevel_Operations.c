@@ -33,7 +33,7 @@ volatile void HighLevel_Operations_Spin()
 	WATCHDOG_RESET;	
 	
 	// Job-Pipe Scheduling
-	Flush_p2p_buffer_into_engines();
+	Flush_buffer_into_engines();
 	
 	// Scan XLINK Chain, to be executed every 1.2 seconds
 	if (XLINK_ARE_WE_MASTER == TRUE)
@@ -61,6 +61,42 @@ volatile void HighLevel_Operations_Spin()
 			// Call our Fan-Spin
 			FAN_SUBSYS_IntelligentFanSystem_Spin();
 		}
+	}
+	
+	// Global Blink-Request subsystem
+	{
+		// Blink time holder
+		static volatile UL32 iInitialTimeHolder = 0;
+		
+		if (GLOBAL_BLINK_REQUEST > 0)
+		{
+			static char actualBlinkValue = FALSE;
+			volatile UL32 iActualTickHolder = MACRO_GetTickCountRet;
+			
+			if (iActualTickHolder - iInitialTimeHolder > 30000) // 30,000 us =  30 msec
+			{
+				iInitialTimeHolder = iActualTickHolder;
+				
+				// Reverse blink value, but set it to 1 if GLOBAL_BLINK_REQUEST is 1
+				if (GLOBAL_BLINK_REQUEST == 1) 
+					actualBlinkValue = TRUE;
+				else
+					actualBlinkValue = (actualBlinkValue == FALSE) ? TRUE : FALSE;
+					
+				// Now set the LED
+				if (actualBlinkValue == TRUE)
+					MCU_MainLED_Set();
+				else
+					MCU_MainLED_Reset();
+					
+				// BTW, Reduct he GLOBAL_BLINK_REQUEST
+				GLOBAL_BLINK_REQUEST--;
+			}
+		}
+		else
+		{
+			iInitialTimeHolder = MACRO_GetTickCountRet;
+		}			
 	}
 	
 

@@ -400,15 +400,6 @@ void ASIC_job_issue(void* pJobPacket,
 }
 
 
-void ASIC_job_issue_p2p(void* pJobPacketP2P)
-{
-	// Break job between chips... (Why would we do this anyway???)
-	// Send the jobs to the chips..
-	ASIC_job_issue(pJobPacketP2P, 
-				  ((pjob_packet_p2p)pJobPacketP2P)->nonce_begin,
-				  ((pjob_packet_p2p)pJobPacketP2P)->nonce_end);
-}
-
 
 ///////////////////////////////////////////////////////////////
 // A very useful macro, used to tailor code to some extent

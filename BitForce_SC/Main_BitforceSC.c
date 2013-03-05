@@ -47,8 +47,6 @@ void MCU_Main_Loop(void);
 // ============ END META ===============
 // -------------------------------------
 
-// This function initializes the XLINK Chain
-static int	Management_MASTER_Initialize_XLINK_Chain(void);
 
 /////////////////////////////////////////////////////////
 /// PROTOCOL
@@ -96,11 +94,17 @@ int main(void)
 	{ 
 		// Wait for a small time
 		blink_medium(); 
+		WATCHDOG_RESET;
 		blink_medium(); 
-		blink_medium(); 
-		blink_medium(); 
-		blink_medium(); 
-		blink_medium(); 
+		WATCHDOG_RESET;
+		blink_medium();
+		WATCHDOG_RESET; 
+		blink_medium();
+		WATCHDOG_RESET; 
+		blink_medium();
+		WATCHDOG_RESET; 
+		blink_medium();
+		WATCHDOG_RESET; 
 		
 		// Initialize the XLINK. Interrogate all devices in the chain and assign then addresses
 		if (XLINK_is_cpld_present() == TRUE)
@@ -136,6 +140,8 @@ int main(void)
 	global_vals[4] = 0;
 	global_vals[5] = 0;
 
+	GLOBAL_BLINK_REQUEST = 0;
+	
 	// Go to our protocol main loop
 	MCU_Main_Loop();
 	return(0);
@@ -341,7 +347,6 @@ void MCU_Main_Loop()
 				if (sz_cmd[0] != '@' &&
 					sz_cmd[1] != PROTOCOL_REQ_INFO_REQUEST &&
 					sz_cmd[1] != PROTOCOL_REQ_HANDLE_JOB &&
-					sz_cmd[1] != PROTOCOL_REQ_HANDLE_JOB_P2POOL &&
 					sz_cmd[1] != PROTOCOL_REQ_ID &&
 					sz_cmd[1] != PROTOCOL_REQ_GET_FIRMWARE_VERSION &&
 					sz_cmd[1] != PROTOCOL_REQ_BLINK &&
@@ -359,6 +364,8 @@ void MCU_Main_Loop()
 					sz_cmd[1] != PROTOCOL_REQ_PRESENCE_DETECTION &&
 					sz_cmd[1] != PROTOCOL_REQ_ECHO &&
 					sz_cmd[1] != PROTOCOL_REQ_TEST_COMMAND &&
+					sz_cmd[1] != PROTOCOL_REQ_SAVE_STRING &&
+					sz_cmd[1] != PROTOCOL_REQ_LOAD_STRING &&
 					sz_cmd[1] != PROTOCOL_REQ_GET_STATUS)
 				{					
 					if (XLINK_ARE_WE_MASTER)
@@ -389,13 +396,16 @@ void MCU_Main_Loop()
 					// We have a valid command, go call its procedure...
 					
 					// Job-Issuing commands
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB)			Protocol_P2P_BUF_PUSH();
-					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB_P2POOL)	Protocol_handle_job_p2p();
+					if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB)			Protocol_PIPE_BUF_PUSH();
 					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB)			Protocol_handle_job();
 					
+					// Load String / Save String
+					if (sz_cmd[1] == PROTOCOL_REQ_SAVE_STRING)			Protocol_save_string();
+					if (sz_cmd[1] == PROTOCOL_REQ_LOAD_STRING)			Protocol_load_string();
+					
 					// The rest of the commands
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_FLUSH)			Protocol_P2P_BUF_FLUSH();
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_STATUS)			Protocol_P2P_BUF_STATUS();
+					if (sz_cmd[1] == PROTOCOL_REQ_BUF_FLUSH)			Protocol_PIPE_BUF_FLUSH();
+					if (sz_cmd[1] == PROTOCOL_REQ_BUF_STATUS)			Protocol_PIPE_BUF_STATUS();
 					if (sz_cmd[1] == PROTOCOL_REQ_INFO_REQUEST)			Protocol_info_request();
 					if (sz_cmd[1] == PROTOCOL_REQ_ID)					Protocol_id();
 					if (sz_cmd[1] == PROTOCOL_REQ_BLINK)				Protocol_Blink();

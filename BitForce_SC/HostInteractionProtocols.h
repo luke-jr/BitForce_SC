@@ -45,6 +45,7 @@
 #define PROTOCOL_REQ_TEMPERATURE  			11+65 // L  (ZLX)
 #define PROTOCOL_REQ_BLINK					12+65 // M
 #define	PROTOCOL_REQ_BUF_PUSH_JOB			13+65 // N
+#define	PROTOCOL_REQ_BUF_PUSH_JOB_PACK		22+65 // W  (ZWX Pushes a Pack of jobs -- 5 to be exact)
 #define	PROTOCOL_REQ_BUF_STATUS			  	14+65 // O
 #define PROTOCOL_REQ_BUF_FLUSH				16+65 // Q ZQX
 #define PROTOCOL_REQ_GET_VOLTAGES			19+65 // T
@@ -57,6 +58,10 @@
 #define PROTOCOL_REQ_XLINK_DENY_PASS		8+65  // I
 #define PROTOCOL_REQ_ECHO					0+65  // A // Echoes back whatever it hears
 #define PROTOCOL_REQ_TEST_COMMAND			1+65  // B // Custom Command
+
+#define PROTOCOL_REQ_SAVE_STRING			18+65 // ZSX - Save String
+#define PROTOCOL_REQ_LOAD_STRING			20+65 // ZUX - Load String
+
 
 #define PROTOCOL_REQ_FAN_VERY_SLOW			48+0  // 0
 #define PROTOCOL_REQ_FAN_SLOW				48+1  // 1
@@ -80,29 +85,34 @@ PROTOCOL_RESULT Protocol_temperature	 (void);
 PROTOCOL_RESULT Protocol_chain_forward   (char iTarget, char* sz_cmd, unsigned int iCmdLen);
 PROTOCOL_RESULT Protocol_fan_set		 (char iValue);
 
+// Load string / Save string
+PROTOCOL_RESULT Protocol_save_string(void);
+PROTOCOL_RESULT Protocol_load_string(void);
+
 // Initiate process for the next job from the buffer
 // And returns previous popped job result
-PROTOCOL_RESULT  Protocol_P2P_BUF_PUSH(void);
+PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH(void);
+PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK(void);
 
 // Returns only the status of the last processed job
 // from the buffer, and will not initiate the next job process
-PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS (void);
+PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void);
 
 // This function flushes the P2P FIFO
-PROTOCOL_RESULT  Protocol_P2P_BUF_FLUSH(void);
+PROTOCOL_RESULT Protocol_PIPE_BUF_FLUSH(void);
 
 // This sets/gets our ASICs frequency
-PROTOCOL_RESULT  Protocol_get_freq_factor(void);
-PROTOCOL_RESULT  Protocol_set_freq_factor(void);
+PROTOCOL_RESULT Protocol_get_freq_factor(void);
+PROTOCOL_RESULT Protocol_set_freq_factor(void);
 
 // Our XLINK Support...
-PROTOCOL_RESULT  Protocol_set_xlink_address(void);
-PROTOCOL_RESULT  Protocol_xlink_allow_pass(void);
-PROTOCOL_RESULT  Protocol_xlink_deny_pass(void);
-PROTOCOL_RESULT  Protocol_xlink_presence_detection(void);
+PROTOCOL_RESULT Protocol_set_xlink_address(void);
+PROTOCOL_RESULT Protocol_xlink_allow_pass(void);
+PROTOCOL_RESULT Protocol_xlink_deny_pass(void);
+PROTOCOL_RESULT Protocol_xlink_presence_detection(void);
 
 // Flush the P2P job into engine
-void Flush_p2p_buffer_into_engines(void);
+void Flush_buffer_into_engines(void);
 
 
 // Some AUX functions

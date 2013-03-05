@@ -213,6 +213,16 @@ PROTOCOL_RESULT Protocol_fan_set(char iValue)
 	}	
 }		
 
+PROTOCOL_RESULT Protocol_save_string(void)
+{
+	
+}
+
+PROTOCOL_RESULT Protocol_load_string(void)
+{
+	
+}
+
 PROTOCOL_RESULT Protocol_Blink(void)
 {
 	// Our result
@@ -226,25 +236,7 @@ PROTOCOL_RESULT Protocol_Blink(void)
 		XLINK_SLAVE_respond_string("OK\n");
 	
 	// All is good... sent the identifier and get out of here...
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	blink_medium();
-	
-	// Set the LED
-	MCU_MainLED_Set();
+	GLOBAL_BLINK_REQUEST = 30;
 
 	// Return our result...
 	return res;
@@ -259,9 +251,9 @@ PROTOCOL_RESULT Protocol_Echo(void)
 	// Send the OK back first
 	// All is good... sent the identifier and get out of here...
 	if (XLINK_ARE_WE_MASTER)
-	USB_send_string("ECHO");  // Send it to USB
+		USB_send_string("ECHO");  // Send it to USB
 	else // We're a slave... send it by XLINK
-	XLINK_send_packet(XLINK_get_cpld_id(), "ECHO", 4, TRUE, FALSE);
+		XLINK_send_packet(XLINK_get_cpld_id(), "ECHO", 4, TRUE, FALSE);
 	
 	// Return our result...
 	return res;
@@ -558,7 +550,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 
 // Initiate process for the next job from the buffer
 // And returns previous popped job result
-PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
+PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 {
 	// Our result
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
@@ -566,17 +558,17 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 	// We've received the ZX command, can we take this job now?
 	if (!JobPipe__pipe_ok_to_push())
 	{
-		Flush_p2p_buffer_into_engines(); // Function is called before we return
+		Flush_buffer_into_engines(); // Function is called before we return
 		
 		if (XLINK_ARE_WE_MASTER)
 		{
-			USB_send_string("ERR:BUFFER FULL\n");  // Send it to USB
+			USB_send_string("ERR:QUEUE FULL\n");  // Send it to USB
 		}			
 		else // We're a slave... send it by XLINK
 		{
 			unsigned int bXTimeoutDetected = 0;
-			XLINK_SLAVE_respond_transact("ERR:BUFFER FULL\n",
-									sizeof("ERR:BUFFER FULL\n"),
+			XLINK_SLAVE_respond_transact("ERR:QUEUE FULL\n",
+									sizeof("ERR:QUEUE FULL\n"),
 									__XLINK_TRANSACTION_TIMEOUT__,
 									&bXTimeoutDetected,
 									FALSE);
@@ -594,7 +586,7 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 		{
 			unsigned int bXTimeoutDetected = 0;
 			XLINK_SLAVE_respond_transact("ERR:HIGH TEMPERATURE RECOVERY\n",
-										sizeof("ERR:BUFFER FULL\n"),
+										sizeof("ERR:HIGH TEMPERATURE RECOVERY\n"),
 										__XLINK_TRANSACTION_TIMEOUT__,
 										&bXTimeoutDetected,
 										FALSE);
@@ -621,11 +613,13 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+	}		
 	else
 	{
 		char bTimeoutDetectedX = FALSE;
-		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 1024, 300, &bTimeoutDetectedX, FALSE, FALSE);
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 1024, __XLINK_TRANSACTION_TIMEOUT__, &bTimeoutDetectedX, FALSE, FALSE);
 		if (bTimeoutDetectedX == TRUE) return PROTOCOL_FAILED;
 	}
 
@@ -653,7 +647,9 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
 		
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string(sz_buf);  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
 		{
 			unsigned int bXTimeoutDetected = 0;
@@ -668,14 +664,14 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 	}
 
 	// All is ok, send data to ASIC for processing, and respond with OK
-	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf); 
-	JobPipe__pipe_push_P2P_job(p_job);
+	pjob_packet p_job = (pjob_packet)(sz_buf); 
+	JobPipe__pipe_push_job(p_job);
 	
 	// SIGNATURE CHECK
 	// Respond with 'ERR:SIGNATURE' if not matched
 
 	// Before we return, we must call this function to get buffer loop going...
-	Flush_p2p_buffer_into_engines();
+	Flush_buffer_into_engines();
 
 	// Job was pushed into buffer, let the host know
 	if (XLINK_ARE_WE_MASTER)
@@ -684,20 +680,224 @@ PROTOCOL_RESULT Protocol_P2P_BUF_PUSH()
 	{
 		unsigned int bXTimeoutDetected = 0;
 		XLINK_SLAVE_respond_transact("OK:QUEUED\n",
-									sizeof("OK:BUFFERED\n"),
+									sizeof("OK:QUEUED"),
 									__XLINK_TRANSACTION_TIMEOUT__,
 									&bXTimeoutDetected,
 									FALSE);
 	}
 
 	// Increase the number of BUF-P2P jobs ever received
-	__total_buf_p2p_jobs_ever_received++;
+	__total_buf_pipe_jobs_ever_received++;
 
 	// Return our result
 	return res;
 }
 
-PROTOCOL_RESULT  Protocol_P2P_BUF_FLUSH(void)
+
+// Push a package of jobs, 5 to be exact
+PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
+{
+	// Our result
+	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
+	
+	// Our small buffer
+	volatile char szBuffer64[64];
+	volatile char iTotalAccepted = 0;
+	
+	// We've received the ZX command, can we take this job now?
+	if (!JobPipe__pipe_ok_to_push())
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:QUEUE FULL\n");  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:QUEUE FULL\n",
+										sizeof("ERR:QUEUE FULL\n"),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
+		}
+		
+		return PROTOCOL_FAILED;
+	}
+	
+	// Are we at high-temperature, waiting to cool down?
+	if (GLOBAL_CRITICAL_TEMPERATURE == TRUE)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:HIGH TEMPERATURE RECOVERY\n");  // Send it to USB	
+		}		
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:HIGH TEMPERATURE RECOVERY\n",
+										sizeof("ERR:HIGH TEMPERATURE RECOVERY\n"),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
+		}
+		
+		return PROTOCOL_FAILED;
+	}
+
+	// We can take the job (either we start processing or we put it in the buffer)
+	// Send data to ASIC and wait for response...
+	// Send OK first
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string("OK\n");
+	}		
+	else
+	{
+		unsigned int bYTimeoutDetected = 0;
+		XLINK_SLAVE_respond_transact("OK\n", sizeof("OK\n"), __XLINK_TRANSACTION_TIMEOUT__, &bYTimeoutDetected, FALSE);
+	}
+	
+	// Wait for job data (96 Bytes)
+	char sz_buf[512];
+	unsigned int i_read;
+	unsigned int i_timeout = 1000000000;
+
+	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+	}		
+	else
+	{
+		char bTimeoutDetectedX = FALSE;
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 512, __XLINK_TRANSACTION_TIMEOUT__, &bTimeoutDetectedX, FALSE, FALSE);
+		
+		if (bTimeoutDetectedX == TRUE)
+		{
+			 return PROTOCOL_FAILED;
+		}			 
+	}
+
+	// Timeout?
+	if (i_timeout < 2)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:TIMEOUT\n");  // Send it to USB	
+		}		
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:TIMEOUT\n",
+										sizeof("ERR:TIMEOUT\n"),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
+		}
+		
+		return PROTOCOL_TIMEOUT;
+	}
+	
+	// THIS IS THE STRUCTURE OF THE JOB PACK
+	// --------------------------------------
+	// unsigned __int8 payloadSize;
+	// unsigned __int8 signature;   == 0x0C1
+	// unsigned __int8 jobsInArray;
+	// job_packets[<jobsInArray>];
+	// unsigned __int8 endOfWrapper == 0x0FE
+	// --------------------------------------	
+
+	// Check integrity
+	if (i_read < sizeof(job_packet) + 1 + 1 + 1 + 1) // sizeof(job_packet) + payloadSize + signature + jobsInArray + endOfWrapper
+	{
+		sprintf(sz_buf, "ERR:INVALID DATA\n");
+		
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string(sz_buf);  // Send it to USB	
+		}		
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact(sz_buf,
+										strlen(sz_buf),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
+		}
+		
+		return PROTOCOL_INVALID_USB_DATA;
+	}
+
+	// All is OK, send data to ASIC for processing, and respond with OK
+	volatile unsigned char stream__payloadSize = sz_buf[0];
+	volatile unsigned char stream__signature   = sz_buf[1];
+	volatile unsigned char stream__jobsInArray = sz_buf[2];
+	volatile unsigned char stream__endOfWrapper= sz_buf[i_read - 1];
+		
+	// SIGNATURE CHECK
+	// Respond with 'ERR:SIGNATURE' if not matched
+	if ((stream__payloadSize  > 255+3)  ||
+		(stream__signature    != 0x0C1) ||
+		(stream__jobsInArray  > 5)		||
+		(stream__jobsInArray  == 0)		||
+		(stream__endOfWrapper != 0x0FE))
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:SIGNATURE\n");  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:SIGNATURE\n",
+										 sizeof("ERR:SIGNATURE\n"),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bXTimeoutDetected,
+										 FALSE);
+		}
+	}
+	
+	// Now our famous JobPackets
+	volatile pjob_packet pointer_to_jobs = (pjob_packet)(sz_buf + 3);
+	
+	// Now check how many jobs we can take...
+	volatile char total_space_available = JobPipe__available_space();
+	volatile char total_jobs_to_take    = (total_space_available > stream__jobsInArray) ? stream__jobsInArray : total_space_available;
+		
+	// Push the job...
+	if (total_jobs_to_take == 1) JobPipe__pipe_push_job((void*)(pointer_to_jobs+0));
+	if (total_jobs_to_take == 2) JobPipe__pipe_push_job((void*)(pointer_to_jobs+1));
+	if (total_jobs_to_take == 3) JobPipe__pipe_push_job((void*)(pointer_to_jobs+2));
+	if (total_jobs_to_take == 4) JobPipe__pipe_push_job((void*)(pointer_to_jobs+3));
+	if (total_jobs_to_take == 5) JobPipe__pipe_push_job((void*)(pointer_to_jobs+4));
+	
+	// Job was pushed into buffer, let the host know
+	// Generate the message
+	sprintf(szBuffer64,"OK:QUEUED %d\n", total_jobs_to_take);
+	
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string(szBuffer64);  // Send it to USB	
+	}	
+	else // We're a slave... send it by XLINK
+	{
+		unsigned int bXTimeoutDetected = 0;
+		XLINK_SLAVE_respond_transact(szBuffer64,
+									strlen(szBuffer64),
+									__XLINK_TRANSACTION_TIMEOUT__,
+									&bXTimeoutDetected,
+									FALSE);
+	}
+
+	// Increase the number of BUF-P2P jobs ever received
+	__total_buf_pipe_jobs_ever_received++;
+
+	// Return our result
+	return res;
+}
+
+PROTOCOL_RESULT  Protocol_PIPE_BUF_FLUSH(void)
 {
 	// Our result
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
@@ -707,15 +907,16 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_FLUSH(void)
 
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
 	{
 		unsigned int bXTimeoutDetected = 0;
-		XLINK_SLAVE_respond_transact("OK\n",
-				sizeof("OK\n"),
-				__XLINK_TRANSACTION_TIMEOUT__,
-				&bXTimeoutDetected,
-				FALSE);
+		XLINK_SLAVE_respond_transact("OK\n", sizeof("OK\n"),
+									__XLINK_TRANSACTION_TIMEOUT__,
+									&bXTimeoutDetected,
+									FALSE);
 	}		
 
 	// Return our result
@@ -724,15 +925,16 @@ PROTOCOL_RESULT  Protocol_P2P_BUF_FLUSH(void)
 
 // Returns only the status of the last processed job
 // from the buffer, and will not initiate the next job process
-PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void)
+PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 {
 	// Our result
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
 
 	// We can take the job (either we start processing or we put it in the buffer)
-	char sz_rep[2048];
-	char sz_temp[128];
-	char sz_temp2[128];
+	char sz_rep[3500];
+	char sz_temp[256];
+	char sz_temp2[256];
+	char sz_temp3[32];
 	unsigned int istream_len;
 	char i_cnt;
 
@@ -746,126 +948,78 @@ PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void)
 
 	// What is the actual
 	// Are we processing something?
-	unsigned int  found_nonce_list[16];
+	unsigned int  found_nonce_list[8];
 	char found_nonce_count;
 
-	if (ASIC_get_job_status(found_nonce_list, &found_nonce_count) == ASIC_JOB_NONCE_PROCESSING)
+	// How many results?
+	sprintf(sz_temp,"COUNT:%d\n", JobPipe__pipe_get_buf_job_results_count());
+	strcat(sz_rep, sz_temp);
+	
+	// Ok, return the last result as well
+	if (JobPipe__pipe_get_buf_job_results_count() == 0)
 	{
-		// We are processing something...
-		strcat(sz_rep, "ENGINE STATUS:PROCESSING\n");
-
-		// Also say which midstate and nonce-range is in process
-		stream_to_hex(__inprocess_midstate, sz_temp2, 32, &istream_len);
-		sz_temp2[(istream_len * 2)] = 0;
-		sprintf(sz_temp, "-MIDSTATE:%s\n", sz_temp2);
-		strcat(sz_rep, sz_temp);
-
-		// Nonce-Begin
-		stream_to_hex(__inprocess_nonce_begin, sz_temp2, 4, &istream_len);
-		sz_temp2[(istream_len * 2)] = 0;
-		sprintf(sz_temp, "-BEGIN:%s\n", sz_temp2);
-		strcat(sz_rep, sz_temp);
-
-		// Nonce-End
-		stream_to_hex(__inprocess_nonce_end, sz_temp2, 4, &istream_len);
-		sz_temp2[(istream_len * 2)] = 0;
-		sprintf(sz_temp, "-END:%s\n",sz_temp2);
-		strcat(sz_rep, sz_temp);
+		// We simply do nothing... Just add the <LF> to the end of the line
+		strcat(sz_rep,"\n");
 	}
 	else
 	{
-		// Engine is not active (i.e. not processing)
-		strcat(sz_rep, "ENGINE STATUS:IDLE\n");
-
-		// Enable an engine start if we have jobs in the queue
-		if (JobPipe__pipe_ok_to_pop()) // It means we have some job to do...
+		// Now post them one by one
+		for (i_cnt = 0; i_cnt < JobPipe__pipe_get_buf_job_results_count(); i_cnt++)
 		{
-			// Engine start requested
-			i_engine_start_req = 1;
-		}
-	}
-
-	// Ok, return the last result as well
-	if (TRUE)
-	{
-		if (JobPipe__pipe_get_buf_job_results_count() == 0)
-		{
-			strcat(sz_rep, "RECENT:NONE\n");
-		}
-		else
-		{
-			// Give out the count:
-			sprintf(sz_temp, "RECENT:%d\n", JobPipe__pipe_get_buf_job_results_count());
-
-			// Now post them one by one
-			for (i_cnt = 0; i_cnt < JobPipe__pipe_get_buf_job_results_count(); i_cnt++)
+			// Also say which midstate and nonce-range is in process
+			stream_to_hex(((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->midstate , sz_temp2, 64, &istream_len);
+			sz_temp2[(istream_len * 2)] = 0;
+			stream_to_hex(((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->midstate , sz_temp3, 24, &istream_len);
+			sz_temp3[(istream_len * 2)] = 0;			
+			
+			// Add nonce-count...
+			volatile unsigned char iNonceCount = ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count;
+			sprintf(sz_temp,"%s,%s,%d", sz_temp2, sz_temp3, iNonceCount); // Add midstate, block-data, count and nonces...
+			strcat(sz_rep, sz_temp);
+			
+			// If there are nonces, add a comma here
+			if (iNonceCount > 0) strcat(sz_rep,",");
+					
+			// Nonces found...
+			if ( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count > 0)
 			{
-				// Also say which midstate and nonce-range is in process
-				stream_to_hex( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->midstate , sz_temp2, 32, &istream_len);
-				sz_temp2[(istream_len * 2)] = 0;
-				sprintf(sz_temp, "MIDSTATE:%s\n", sz_temp2);
-				strcat(sz_rep, sz_temp);
-
-				// Nonce-Begin
-				stream_to_hex( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->nonce_begin, sz_temp2, 4, &istream_len);
-				sz_temp2[(istream_len * 2)] = 0;
-				sprintf(sz_temp, "-BEGIN:%s\n", sz_temp2);
-				strcat(sz_rep, sz_temp);
-
-				// Nonce-End
-				stream_to_hex( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->nonce_end, sz_temp2, 4, &istream_len);
-				sz_temp2[(istream_len * 2)] = 0;
-				sprintf(sz_temp, "-END:%s\n",sz_temp2);
-				strcat(sz_rep, sz_temp);
-
-				// Nonces found...
-				if ( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count > 0)
+				// Our loop counter
+				unsigned char ix = 0;
+				
+				for (ix = 0; ix < ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count; ix++)
 				{
-					char ix;
-					sprintf(sz_temp,"-NONCE:");
+					sprintf(sz_temp2, "%08X", ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->nonce_list[ix]);
+					strcat(sz_rep, sz_temp2);
 
-					for (ix = 0; ix < ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count; ix++)
-					{
-						sprintf(sz_temp2, "%08X", ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->nonce_list[ix]);
-						strcat(sz_temp, sz_temp2);
-
-						// Add a comma if it's not the last nonce
-						if (ix != found_nonce_count - 1)
-						strcat(sz_temp,",");
-					}
-
-					// Add the 'Enter' character
-					strcat(sz_temp, "\n");
-
-					// Ok, we have the nonce
-					strcat(sz_rep, sz_temp);
+					// Add a comma if it's not the last nonce
+					if (ix != found_nonce_count - 1) strcat(sz_rep,",");
 				}
-				else
-				{
-					// No nonce was available
-					strcat(sz_rep,"-NONCE:NONE\n");
-				}
+
+				// Add the 'Enter' character
+				strcat(sz_temp, "\n");
 			}
-		}
 
-		// Add the OK to our response (finilizer)
-		strcat(sz_rep, "OK\n");
+			// In the end, add the <LF>
+			strcat(sz_rep,"\n");
+		}
 	}
 
-	// OK, reset the results count in results-buffer, since we've already read them
-	JobPipe__pipe_set_buf_job_results_count(0);
-	
+	// Add the OK to our response (finilizer)
+	strcat(sz_rep, "OK\n");
+
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string(sz_rep);  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
 	{
 		unsigned int bXTimeoutDetected = 0;
 		XLINK_SLAVE_respond_transact(sz_rep,
-				strlen(sz_rep),
-				__XLINK_TRANSACTION_TIMEOUT__,
-				&bXTimeoutDetected,
-				FALSE);
+									 strlen(sz_rep),
+									 __XLINK_TRANSACTION_TIMEOUT__,
+									 &bXTimeoutDetected,
+									 FALSE);
 	}		
 
 	// Return the result...
@@ -892,10 +1046,10 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 		{
 			unsigned int bXTimeoutDetected = 0;
 			XLINK_SLAVE_respond_transact("ERR:HIGH TEMPERATURE RECOVERY\n",
-			sizeof("ERR:BUFFER FULL\n"),
-			__XLINK_TRANSACTION_TIMEOUT__,
-			&bXTimeoutDetected,
-			FALSE);
+										 sizeof("ERR:HIGH TEMPERATURE RECOVERY\n"),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bXTimeoutDetected,
+										 FALSE);
 		}
 			
 		return PROTOCOL_FAILED;
@@ -904,9 +1058,13 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string("OK\n");	
+	}		
 
 	// Wait for job data (96 Bytes)
 	char sz_buf[1024];
@@ -914,7 +1072,9 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	unsigned int i_timeout = 1000000000;
 
 	if (XLINK_ARE_WE_MASTER)
+	{
 	    USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+	}		
 	else
 	{
 		// Wait for incoming transactions
@@ -929,7 +1089,9 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	if (i_timeout < 2)
 	{
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string("ERR:TIMEOUT\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
 		{
 			XLINK_SLAVE_respond_string("ERR:TIMEOUT\n");	
@@ -944,10 +1106,14 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
 		
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string(sz_buf);  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{
 			XLINK_SLAVE_respond_string(sz_buf);
-						
+		}
+								
 		return PROTOCOL_INVALID_USB_DATA;
 	}
 
@@ -959,10 +1125,14 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 
 	// Send our OK
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string("OK\n");	
-
+	}
+	
 	// Return our result...
 	return res;
 }
@@ -987,10 +1157,10 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 		{
 			unsigned int bXTimeoutDetected = 0;
 			XLINK_SLAVE_respond_transact("ERR:HIGH TEMPERATURE RECOVERY\n",
-			sizeof("ERR:BUFFER FULL\n"),
-			__XLINK_TRANSACTION_TIMEOUT__,
-			&bXTimeoutDetected,
-			FALSE);
+										sizeof("ERR:HIGH TEMPERATURE RECOVERY\n"),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
 		}
 		
 		return PROTOCOL_FAILED;
@@ -1019,25 +1189,31 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 
 	// Timeout?
 	if (i_timeout < 2)
-	{
-		
+	{		
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string("ERR:TIMEOUT\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{
 			XLINK_SLAVE_respond_string("ERR:TIMEOUT\n");
-		
+		}				
 		return PROTOCOL_TIMEOUT;
 	}
 
 	// Check integrity
 	if (i_read < sizeof(job_packet_p2p)) // Extra 16 bytes are preamble / postamble
 	{
-		sprintf(sz_buf, "ERR:INVALID DATA, i_read = %d\n", i_read);
+		strcpy(sz_buf, "ERR:INVALID DATA\n");
 		
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string(sz_buf);  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{
 			XLINK_SLAVE_respond_string(sz_buf);
+		}			
 		
 		return PROTOCOL_INVALID_USB_DATA;
 	}
@@ -1046,13 +1222,19 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf); // 4 Bytes are for the initial '>>>>'
 
 	// We have all what we need, send it to ASIC-COMM interface
-	ASIC_job_issue_p2p(p_job);
+	ASIC_job_issue(p_job, 
+				   p_job->nonce_begin, 
+				   p_job->nonce_end);
 
 	// Send our OK	
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string("OK\n");
+	}		
 
 	// Return our result...
 	return res;
@@ -1078,9 +1260,13 @@ PROTOCOL_RESULT Protocol_get_status()
 	if (stat == ASIC_JOB_IDLE)
 	{
 		if (XLINK_ARE_WE_MASTER)
+		{
 			 USB_send_string("IDLE\n");  // Send it to USB
+		}			 
 		else // We're a slave... send it by XLINK
+		{
 			 XLINK_SLAVE_respond_string("IDLE\n");
+		}
 	}		
 	else if (stat == ASIC_JOB_NONCE_FOUND)
 	{
@@ -1099,33 +1285,49 @@ PROTOCOL_RESULT Protocol_get_status()
 
 		// Send it to host
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string(sz_report);  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{		
 			XLINK_SLAVE_respond_string(sz_report);
+		}
 	}
 	else if (stat == ASIC_JOB_NONCE_NO_NONCE)
 	{
 		// Send it to host
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string("NO-NONCE\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{		
 			XLINK_SLAVE_respond_string("NO-NONCE\n");
+		}			
 	}		
 	else if (stat == ASIC_JOB_NONCE_PROCESSING)
 	{
 		// Send it to host
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string("BUSY\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{
 			XLINK_SLAVE_respond_string("BUSY\n");
+		}			
 	}		
 	else
 	{
 		// Send it to host
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string("ERR:UKNOWN\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{
 			XLINK_SLAVE_respond_string("ERR:UKNOWN\n");
+		}			
 	}
 
 	// Return our result...
@@ -1435,11 +1637,11 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 	return result;	
 }
 
-void Flush_p2p_buffer_into_engines()
+void Flush_buffer_into_engines()
 {
 	// Our flag which tells us where the previous job
 	// was a P2P job processed or not :)
-	static char _prev_job_was_p2p = 0;
+	static char _prev_job_was_from_pipe = 0;
 
 	// Take the job from buffer and put it here...
 	// (We take element 0, and push all the arrays back...)
@@ -1447,7 +1649,7 @@ void Flush_p2p_buffer_into_engines()
 	// Special case: if processing is finished, it's not ok to pop and
 	// _prev_job_was_p2p is set to one, then we must take the result
 	// and put it in our result list
-	if ((!JobPipe__pipe_ok_to_pop()) && (!ASIC_is_processing()) && _prev_job_was_p2p)
+	if ((!JobPipe__pipe_ok_to_pop()) && (!ASIC_is_processing()) && _prev_job_was_from_pipe)
 	{
 		// Verify the result counter is correct
 		if (__buf_job_results_count == PIPE_MAX_BUFFER_DEPTH)
@@ -1466,8 +1668,7 @@ void Flush_p2p_buffer_into_engines()
 
 		// Copy data...
 		memcpy((void*)__buf_job_results[i_result_index_to_put].midstate, 	(void*)__inprocess_midstate, 		32);
-		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_begin, (void*)__inprocess_nonce_begin, 	4);
-		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_end,	(void*)__inprocess_nonce_end, 		4);
+		memcpy((void*)__buf_job_results[i_result_index_to_put].block_data, 	(void*)__inprocess_blockdata, 		32);
 		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_list,	(void*)	 i_found_nonce_list, 		16*sizeof(int));
 		__buf_job_results[i_result_index_to_put].i_nonce_count = i_found_nonce_count;
 
@@ -1477,7 +1678,7 @@ void Flush_p2p_buffer_into_engines()
 		// Also clear the _prev_job_was_p2p flag,
 		// this prevents the loop from adding additional results
 		// to the results list when they really don't exist...
-		_prev_job_was_p2p = 0;
+		_prev_job_was_from_pipe = 0;
 
 		// We return, since there is nothing left to do
 		return;
@@ -1506,10 +1707,8 @@ void Flush_p2p_buffer_into_engines()
 		i_result_index_to_put = (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH) ?  (__buf_job_results_count) : (PIPE_MAX_BUFFER_DEPTH - 1);
 
 		// Copy data...
-		memcpy((void*)__buf_job_results[i_result_index_to_put].midstate, 	(void*)__inprocess_midstate, 		32);
-		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_begin, (void*)__inprocess_nonce_begin, 	4);
-		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_end,	(void*)__inprocess_nonce_end, 		4);
-		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_list,	(void*)	 i_found_nonce_list, 		16*sizeof(int));
+		memcpy((void*)__buf_job_results[i_result_index_to_put].midstate, 	(void*)__inprocess_midstate, 	32);
+		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_list,	(void*)i_found_nonce_list, 		8*sizeof(UL32)); // 8 nonces maxium
 		__buf_job_results[i_result_index_to_put].i_nonce_count = i_found_nonce_count;
 
 		// Increase the result count (if possible)
@@ -1518,25 +1717,23 @@ void Flush_p2p_buffer_into_engines()
 
 	// -------------
 	// We have something to pop, get it...
-	job_packet_p2p job_p2p;
-	if (JobPipe__pipe_pop_P2P_job(&job_p2p) == PIPE_JOB_BUFFER_EMPTY)
+	job_packet job_from_pipe;
+	if (JobPipe__pipe_pop_job(&job_from_pipe) == PIPE_JOB_BUFFER_EMPTY)
 	{
 		// This is odd!!! Don't do anything...
-		_prev_job_was_p2p = 0; // Obviously, this must be cleared...
+		_prev_job_was_from_pipe = 0; // Obviously, this must be cleared...
 		return;
 	}
 
 	// Before we issue the job, we must put the correct information
-	memcpy((void*)__inprocess_midstate, 	(void*)job_p2p.midstate, 		32);
-	memcpy((void*)__inprocess_blockdata, 	(void*)job_p2p.block_data, 		32);
-	memcpy((void*)__inprocess_nonce_begin,  (void*)job_p2p.nonce_begin, 	4);
-	memcpy((void*)__inprocess_nonce_end, 	(void*)job_p2p.nonce_end, 		4);
+	memcpy((void*)__inprocess_midstate, 	(void*)job_from_pipe.midstate, 	 32);
+	memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 32);
 
 	// Send it to processing...
-	ASIC_job_issue_p2p(&job_p2p);
+	ASIC_job_issue(&job_from_pipe, 0x0, 0x0FFFFFFFF);
 
 	// Our job is p2p now...
-	_prev_job_was_p2p = 1;
+	_prev_job_was_from_pipe = 1;
 }
 
 

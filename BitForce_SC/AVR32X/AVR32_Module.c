@@ -17,11 +17,6 @@
 #define XLINK_activate_address_increase     AVR32_GPIO.port[1].ovrs  = __AVR32_CPLD_INCREASE_ADDRESS;
 #define XLINK_deactivate_address_increase   AVR32_GPIO.port[1].ovrc  = __AVR32_CPLD_INCREASE_ADDRESS;
 
-#define AVR32_FLASHC_MAIN    (*((volatile unsigned int*)0xFFFE1400))
-#define AVR32_FLASHC_CONTROL (*((volatile unsigned int*)0xFFFE1400))
-#define AVR32_FLASHC_COMMAND (*((volatile unsigned int*)0xFFFE1404))
-#define AVR32_FLASHC_STATUS  (*((volatile unsigned int*)0xFFFE1408))
-
 
 // General MCU Functions
 void __AVR32_LowLevelInitialize()
@@ -30,6 +25,13 @@ void __AVR32_LowLevelInitialize()
 	AVR32_MCCTRL  |= 0b100; // OSC0EN = 1
 	AVR32_CKSEL   = 0; // All Clocks equal main-clock
 	AVR32_OSCCTRL0 = 0b00000000000000000000000100000111;
+	
+	// Enable watchdog to reset the system if PLL fails
+	AVR32_WDT.ctrl = (0x055000000) | (0b0111100000000) | 0b01; // Timeout is set to 142ms
+	NOP_OPERATION;
+	AVR32_WDT.ctrl = (0x0AA000000) | (0b0111100000000) | 0b01;
+	NOP_OPERATION;
+	AVR32_WDT.clr = 0x0FFFFFFFF;
 
 	// Wait until it's active (1 << 7 is OSC0 Status bit)
 	while ((AVR32_POSCSR & (1 << 7)) == 0);
@@ -60,12 +62,6 @@ void __AVR32_LowLevelInitialize()
 		AVR32_PLL0 = 0b00011111000001110000010000000101; // PLL0 at 32MHz (same as the first mode here, as the PLL will not be used)
 	#endif
 
-	// Enable watchdog to reset the system if PLL fails
-	AVR32_WDT.ctrl = (0x055000000) | (0b1011000000000) | 0b01; // Timeout is set to 142ms
-	NOP_OPERATION;
-	AVR32_WDT.ctrl = (0x0AA000000) | (0b1011000000000) | 0b01;
-	NOP_OPERATION;
-	AVR32_WDT.clr = 0x0FFFFFFFF;
 
 	// Wait until PLL0 is stable (1 is PLL0 LOCK status bit)
 	while ((AVR32_POSCSR & (1)) == 0);
@@ -1038,17 +1034,106 @@ int __AVR32_Timer_GetValue()
 /////////////////////////////////////////////////
 // Flash programming
 /////////////////////////////////////////////////
+
+void	__avr32_flash_writeRegister(uint16_t offset, int32_t value);
+int32_t __avr32_flash_readRegister(uint16_t offset);
+void	__avr32_flash_writeUserData(char* szStream);
+void	__avr32_flash_readUserData(char* szStream);
+void    __avr32_flash_eraseUserData(void);
+void	__avr32_flash_waitForFlashReady(void);
+
+//
+// Write to Flash Controller register with an offset and value provided
+//
+volatile void __avr32_flash_writeRegister(uint16_t offset, int32_t value) {
+	volatile int32_t *p = (int32_t *)(AVR32_FLASHC_ADDRESS + offset);
+	*p = value;
+}
+
+//
+// Read from Flash Controller register with an offset
+//
+volatile int32_t __avr32_flash_readRegister(uint16_t offset) {
+	volatile int32_t *p = (int32_t *)(AVR32_FLASHC_ADDRESS + offset);
+	return *p;
+}
+
+//
+// Write words into Flash user page
+//
+volatile void __avr32_flash_writeUserData(char* szStream) {
+	// Send Clear Buffer Page command to the Flash controller
+	__avr32_flash_writeRegister(AVR32_FLASHC_FCMD, (AVR32_FLASHC_FCMD_KEY_KEY << AVR32_FLASHC_FCMD_KEY_OFFSET) | AVR32_FLASHC_FCMD_CMD_CPB);
+	__avr32_flash_waitForFlashReady();
+	// Copy data to buffer page
+	volatile uint32_t *dst = (uint32_t *)AVR32_FLASHC_USER_PAGE_ADDRESS;
+	volatile uint32_t bytes = 512;
+	volatile uint32_t word_to_write = 0;
+	
+	// Now write page-buffer
+	for (int x = 0; x < 512; x += 4)
+	{
+		word_to_write = MAKE_DWORD(szStream[x], szStream[x+1], szStream[x+2],szStream[x+3]);
+		*dst++ = word_to_write;
+	}
+	// Send Write User Page command to the Flash controller
+	__avr32_flash_writeRegister(AVR32_FLASHC_FCMD, (AVR32_FLASHC_FCMD_KEY_KEY << AVR32_FLASHC_FCMD_KEY_OFFSET) | AVR32_FLASHC_FCMD_CMD_WUP);
+	__avr32_flash_waitForFlashReady();
+}
+
+//
+// Read words from Flash user page
+//
+volatile void __avr32_flash_readUserData(char* szStream) {
+	// Copy data from buffer page
+	volatile uint32_t *src = (uint32_t *)AVR32_FLASHC_USER_PAGE_ADDRESS;
+	volatile uint32_t read_word = 0;
+	// Now read page-buffer
+	for (int x = 0; x < 512; x += 4)
+	{
+		read_word = *src++;
+		szStream[x]   = GET_BYTE_FROM_DWORD(read_word, 3) ;
+		szStream[x+1] = GET_BYTE_FROM_DWORD(read_word, 2) ;
+		szStream[x+2] = GET_BYTE_FROM_DWORD(read_word, 1) ;
+		szStream[x+3] = GET_BYTE_FROM_DWORD(read_word, 0) ;
+	}
+}
+
+//
+// We erase the user-page here
+//
+volatile void __avr32_flash_eraseUserData(void)
+{
+	// Send erase-user-page command to the Flash controller
+	__avr32_flash_writeRegister(AVR32_FLASHC_FCMD, (AVR32_FLASHC_FCMD_KEY_KEY << AVR32_FLASHC_FCMD_KEY_OFFSET) | AVR32_FLASHC_CMD_EUP);
+	__avr32_flash_waitForFlashReady();	
+}
+
+//
+// Wait for Flash Controller Ready status
+//
+volatile void __avr32_flash_waitForFlashReady() {
+	while (!__avr32_flash_readRegister(AVR32_FLASHC_FSR) & AVR32_FLASHC_FSR_FRDY_MASK);
+}
+
+
+// Main functions
 void	__AVR32_Flash_Initialize(void)
 {
-	
+	// Nothing special here
 }
 
-void	__AVR32_Flash_WritePage(char* szData, unsigned int iAddress, unsigned int iSize)
+void	__AVR32_Flash_WriteUserPage(char* szData)
 {
+	// Erase the flash first...
+	__avr32_flash_eraseUserData();
 	
+	// Write...
+	__avr32_flash_writeUserData(szData);
 }
 
-void	__AVR32_Flash_ReadPage (char* szData, unsigned int iAddress, unsigned int iSize)
+void	__AVR32_Flash_ReadUserPage (char* szData)
 {
-	
+	// Write...
+	__avr32_flash_readUserData(szData);	
 }
