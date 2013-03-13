@@ -22,12 +22,14 @@ void init_USB()
 
 
 void USB_wait_stream (char* data,
-					  unsigned int *length,    // output
-					  unsigned int  max_len,   // input
-					  unsigned int *time_out) // Timeout variable
+					  unsigned int  *length,    // output
+					  unsigned int   max_len,   // input
+					  unsigned int  *time_out,  // Timeout variable
+					  unsigned char *invalid_data) // Invalid-Data detected
 {
 	// Initialize length
 	*length = 0;
+	*invalid_data = FALSE;
 
 	// while we have data (indicated in status register), read it
 	// there is a cap of max_len bytes
@@ -55,6 +57,9 @@ void USB_wait_stream (char* data,
 		{
 			byte_received = USB_read_byte();
 			
+			unsigned int iLen = 0;
+			unsigned int iLenM1 = 0;
+			
 			if (length_detected == FALSE)
 			{
 				// If this is the first byte we're receiving, then it's our length indicator
@@ -66,11 +71,16 @@ void USB_wait_stream (char* data,
 				// We take the byte as UL32 as total length is less than maximum length.
 				// Like this if we're in a problematic transaction, we won't encounter buffer overrun
 				// and at the same time we will clear FTDI's buffer for the newer transactions
-				if (*length < max_len) data[*length++] = byte_received;
+				iLen	= (unsigned int)*length;
+				iLen	= iLen + 1;
+				*length = iLen;
+				iLenM1	= iLen - 1;
+				if (iLenM1 < max_len) data[iLenM1] = byte_received;				
 			}			
 			
 			// Check for signature
-			EOS_detected = ((*length >= max_len) || (*length == length_detected));			
+			iLen = *length;
+			EOS_detected = ((iLen >= max_len) || (iLen == expected_length));			
 		}
 
 		// Ok, now we check if we have detected the sign already
@@ -82,14 +92,14 @@ void USB_wait_stream (char* data,
 		}			 
 
 		// No, so we wait for more inbound data
-		while (USB_inbound_USB_data() == FALSE && *time_out > 1) { *time_out = *time_out - 1;} // Loop until there is some data again...
+		while ((USB_inbound_USB_data() == FALSE) && (*time_out > 1)) { *time_out = *time_out - 1;} // Loop until there is some data again...
 	}
 
 	// OK, we're done at this point. Most likely we'll have our packet, unless
 	// there is a timeout, or buffer is bigger than req_size (which means something must've gone wrong)
 	if (!EOS_detected)
 	{
-		USB_send_string("ERR:UNKNOWN!!!\n");
+		*invalid_data = TRUE;
 	}	
 }
 

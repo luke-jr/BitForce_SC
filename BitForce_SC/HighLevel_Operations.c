@@ -54,7 +54,7 @@ volatile void HighLevel_Operations_Spin()
 		static volatile UL32 iInitialTimeHolder = 0;
 		volatile UL32 iActualTickHolder = MACRO_GetTickCountRet;
 		
-		if (iActualTickHolder - iInitialTimeHolder > 500000) // 500,000 us = 0.5sec
+		if (iActualTickHolder - iInitialTimeHolder > 500000) // 0,500,000 us = 0.5sec
 		{
 			iInitialTimeHolder = iActualTickHolder;
 			
@@ -85,10 +85,14 @@ volatile void HighLevel_Operations_Spin()
 					
 				// Now set the LED
 				if (actualBlinkValue == TRUE)
+				{
 					MCU_MainLED_Set();
+				}					
 				else
+				{
 					MCU_MainLED_Reset();
-					
+				}
+									
 				// BTW, Reduct he GLOBAL_BLINK_REQUEST
 				GLOBAL_BLINK_REQUEST--;
 			}

@@ -293,7 +293,7 @@ int ASIC_get_job_status(unsigned int *iNonceList, char *iNonceCount)
 				iNonceList[iDetectedNonces++] = iNonceX; 
 			}	
 						
-			// Clear the engine [ NOTE : CCCCCCCOOOOOOOORRRRRRRRRRRREEEEEEEEEECCCCCCCCCTTTTTTTTTT !!!!!!!!!!!! ]
+			// Clear the engine [ NOTE : CORRECT !!!!!!!!!!!! ]
 			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT );
 			
 			// Check total nonces found

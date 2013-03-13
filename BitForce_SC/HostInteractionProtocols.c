@@ -104,9 +104,9 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"FIRMWARE: %s\n", __FIRMWARE_VERSION);
 	strcat(szInfoReq, szTemp);
 	
-	volatile UL32 uL1;
-	volatile UL32 uL2;
-	volatile UL32 uLRes;
+	volatile UL32 uL1   = 0;    
+	volatile UL32 uL2   = 0;    
+	volatile UL32 uLRes = 0;    
 	
 	// Atomic Full-Asm Special CPLD Write latency
 	uL1 = MACRO_GetTickCountRet;
@@ -215,12 +215,175 @@ PROTOCOL_RESULT Protocol_fan_set(char iValue)
 
 PROTOCOL_RESULT Protocol_save_string(void)
 {
+	// Our result
+	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
+	
+	// We can take the job (either we start processing or we put it in the buffer)
+	// Send data to ASIC and wait for response...
+	// Send OK first
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string("OK\n");	
+	}	
+	else
+	{
+		unsigned int bYTimeoutDetected = 0;
+		XLINK_SLAVE_respond_transact("OK\n", sizeof("OK\n"), __XLINK_TRANSACTION_TIMEOUT__, &bYTimeoutDetected, FALSE);
+	}
+	
+	// Wait for job data (96 Bytes)
+	volatile char sz_buf[513];
+	volatile unsigned int i_read;
+	volatile unsigned int i_timeout = 1000000000;
+	volatile unsigned char i_invaliddata = FALSE;
+	
+
+	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &i_invaliddata);
+	}
+	else
+	{
+		char bTimeoutDetectedX = FALSE;
+		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 1024, __XLINK_TRANSACTION_TIMEOUT__, &bTimeoutDetectedX, FALSE, FALSE);
+		if (bTimeoutDetectedX == TRUE) return PROTOCOL_FAILED;
+	}
+
+	// Timeout?
+	if (i_timeout < 2)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:TIMEOUT\n");  // Send it to USB
+		}			
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:TIMEOUT\n",
+										 sizeof("ERR:TIMEOUT\n"),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bXTimeoutDetected,
+										 FALSE);
+		}
+		
+		return PROTOCOL_TIMEOUT;
+	}
+
+	// Check integrity
+	if (i_invaliddata == TRUE) // We should've received the correct byte count
+	{
+		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
+		
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string(sz_buf);  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact(sz_buf,
+										 strlen(sz_buf),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bXTimeoutDetected,
+										 FALSE);
+		}
+		
+		return PROTOCOL_INVALID_USB_DATA;
+	}
+	
+	// Get string length and put 0 there
+	volatile char string_to_save[512];
+	volatile char iStringLen = i_read;
+	sz_buf[i_read+1] = 0; // Null-Termination
+	
+	// Now copy it
+	strcpy(string_to_save, (char*)(sz_buf));	
+	
+	// Add signature
+	string_to_save[509] = 0x0AA;
+	string_to_save[510] = 0x0BB;
+	string_to_save[511] = 0x055;
+	
+	// Save it
+	__AVR32_Flash_WriteUserPage((char*)(string_to_save));
+	
+	// We're ok
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string("SUCCESS\n");  // Send it to USB
+	}
+	else // We're a slave... send it by XLINK
+	{
+		unsigned int bXTimeoutDetected = 0;
+		XLINK_SLAVE_respond_transact("SUCCESS\n",
+									 strlen("SUCCESS\n"),
+									 __XLINK_TRANSACTION_TIMEOUT__,
+									 &bXTimeoutDetected,
+									 FALSE);
+	}	
+		
+	// Return our result
+	return res;
 	
 }
 
 PROTOCOL_RESULT Protocol_load_string(void)
 {
+	// Our result
+	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
 	
+	// The string buffer
+	volatile char string_buffer[512];
+	
+	// Clear signature
+	string_buffer[509] = 0x0;
+	string_buffer[510] = 0x0;
+	string_buffer[511] = 0x0;
+	
+	// Read
+	__AVR32_Flash_ReadUserPage(string_buffer);
+	
+	// Check signature
+	if ((string_buffer[509] == 0x0AA) &&
+	    (string_buffer[510] == 0x0BB) &&
+	    (string_buffer[511] == 0x055))
+	{
+		// String is correct, send it
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string(string_buffer);  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			char bTimeoutDetected = FALSE;
+			XLINK_SLAVE_respond_transact(string_buffer,
+										strlen(string_buffer),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bTimeoutDetected,
+										FALSE);
+		}			   
+	}
+	else
+	{
+		// String is correct, send it
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("MEMORY EMPTY\n");  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			char bTimeoutDetected = FALSE;
+			XLINK_SLAVE_respond_transact("MEMORY EMPTY\n",
+										 strlen("MEMORY EMPTY\n"),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bTimeoutDetected,
+										 FALSE);
+		}		
+	}
+
+	// Return our result...
+	return res;	
 }
 
 PROTOCOL_RESULT Protocol_Blink(void)
@@ -394,6 +557,9 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	// Now we send message to XLINK_GENERAL_DISPATCH_ADDRESS for an ECHO and count the successful iterations
 	for (unsigned int x = 0; x < 100000; x++)
 	{
+		// Reset WAtchdog
+		WATCHDOG_RESET;
+		
 		// Clear input
 		MACRO_XLINK_clear_RX;
 		
@@ -413,7 +579,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		// Send the command
 		//MACRO_XLINK_send_packet(1, "ZAX", 3, TRUE, FALSE);
 		//MACRO_XLINK_wait_packet(szResponse, iRespLen, 90, bTimedOut, iSendersAddress, iLP, iBC );
-		XLINK_MASTER_transact(3,"ZRX", 3, szResponse, &iRespLen, 128, __XLINK_TRANSACTION_TIMEOUT__, &bDevNotResponded, &bTimedOut, TRUE);
+		XLINK_MASTER_transact(1,"ZRX", 3, szResponse, &iRespLen, 128, __XLINK_TRANSACTION_TIMEOUT__, &bDevNotResponded, &bTimedOut, TRUE);
 	
 		// Update turnaround time
 		iSecondaryTickTemp = MACRO_GetTickCountRet;
@@ -610,11 +776,12 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 	char sz_buf[1024];
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
+	unsigned char bInvalidData = FALSE;
 
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
 	{
-		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &bInvalidData);
 	}		
 	else
 	{
@@ -642,7 +809,7 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 	}
 
 	// Check integrity
-	if (i_read < sizeof(job_packet)) // Extra 16 bytes are preamble / postamble
+	if ((bInvalidData) || (i_read < sizeof(job_packet))) // Extra 16 bytes are preamble / postamble
 	{
 		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
 		
@@ -761,11 +928,12 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 	char sz_buf[512];
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
+	unsigned char bInvalidData = FALSE;
 
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
 	{
-		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &bInvalidData);
 	}		
 	else
 	{
@@ -808,7 +976,7 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 	// --------------------------------------	
 
 	// Check integrity
-	if (i_read < sizeof(job_packet) + 1 + 1 + 1 + 1) // sizeof(job_packet) + payloadSize + signature + jobsInArray + endOfWrapper
+	if ((bInvalidData) || (i_read < sizeof(job_packet) + 1 + 1 + 1 + 1)) // sizeof(job_packet) + payloadSize + signature + jobsInArray + endOfWrapper
 	{
 		sprintf(sz_buf, "ERR:INVALID DATA\n");
 		
@@ -1070,10 +1238,11 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	char sz_buf[1024];
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
+	unsigned char bInvalidData = FALSE;
 
 	if (XLINK_ARE_WE_MASTER)
 	{
-	    USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+	    USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &bInvalidData);
 	}		
 	else
 	{
@@ -1101,7 +1270,7 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	}
 
 	// Check integrity
-	if (i_read < sizeof(job_packet)) // Extra 16 bytes are preamble / postamble
+	if ((bInvalidData) || (i_read < sizeof(job_packet))) // Extra 16 bytes are preamble / postamble
 	{
 		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
 		
@@ -1176,10 +1345,11 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	char sz_buf[1024];
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
-
+	unsigned char bInvalidData = FALSE;
+	
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
-		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &bInvalidData);
 	else
 	{
 		char bTimeoutDetected = FALSE;
@@ -1202,7 +1372,7 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	}
 
 	// Check integrity
-	if (i_read < sizeof(job_packet_p2p)) // Extra 16 bytes are preamble / postamble
+	if ((bInvalidData) || (i_read < sizeof(job_packet_p2p))) // Extra 16 bytes are preamble / postamble
 	{
 		strcpy(sz_buf, "ERR:INVALID DATA\n");
 		
@@ -1430,10 +1600,13 @@ PROTOCOL_RESULT  Protocol_set_freq_factor()
 	char sz_buf[1024];
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
+	unsigned char bInvalidData  = FALSE;
 
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
-		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+	{
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &bInvalidData);
+	}		
 	else
 	{
 		char bTimeoutDetected = FALSE;
@@ -1453,7 +1626,7 @@ PROTOCOL_RESULT  Protocol_set_freq_factor()
 	}
 	
 	// If i_read is not 4, we've got something wrong...
-	if (i_read != 4)
+	if ((bInvalidData) || (i_read != 4))
 	{
 		if (XLINK_ARE_WE_MASTER)
 			USB_send_string("ERR:INVALID DATA\n");  // Send it to USB
@@ -1505,10 +1678,11 @@ PROTOCOL_RESULT  Protocol_set_xlink_address()
 	char sz_buf[1024];
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
-
+	unsigned char bInvalidData = FALSE;
+	
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
-		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout);
+		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &bInvalidData);
 	else
 	{
 		char bTimeoutDetected = FALSE;
@@ -1528,7 +1702,7 @@ PROTOCOL_RESULT  Protocol_set_xlink_address()
 	}
 
 	// If i_read is not 4, we've got something wrong...
-	if (i_read != 4)
+	if ((bInvalidData) || (i_read != 4))
 	{
 		if (XLINK_ARE_WE_MASTER)
 		USB_send_string("ERR:INVALID DATA\n");  // Send it to USB
@@ -1669,7 +1843,7 @@ void Flush_buffer_into_engines()
 		// Copy data...
 		memcpy((void*)__buf_job_results[i_result_index_to_put].midstate, 	(void*)__inprocess_midstate, 		32);
 		memcpy((void*)__buf_job_results[i_result_index_to_put].block_data, 	(void*)__inprocess_blockdata, 		32);
-		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_list,	(void*)	 i_found_nonce_list, 		16*sizeof(int));
+		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_list,	(void*)	 i_found_nonce_list, 		8*sizeof(int));
 		__buf_job_results[i_result_index_to_put].i_nonce_count = i_found_nonce_count;
 
 		// Increase the result count (if possible)
@@ -1694,7 +1868,8 @@ void Flush_buffer_into_engines()
 		// Verify the result counter is correct
 		if (__buf_job_results_count == PIPE_MAX_BUFFER_DEPTH)
 		{
-			// Then do nothing in this case (for the moment)
+			// Then move all items one-index back (resulting in loss of the job-result at index 0)
+			
 		}
 
 		// Read the result and put it here...

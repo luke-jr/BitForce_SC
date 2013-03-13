@@ -1095,7 +1095,8 @@ volatile void __avr32_flash_readUserData(char* szStream) {
 		szStream[x]   = GET_BYTE_FROM_DWORD(read_word, 3) ;
 		szStream[x+1] = GET_BYTE_FROM_DWORD(read_word, 2) ;
 		szStream[x+2] = GET_BYTE_FROM_DWORD(read_word, 1) ;
-		szStream[x+3] = GET_BYTE_FROM_DWORD(read_word, 0) ;
+		szStream[x+3] = 
+		GET_BYTE_FROM_DWORD(read_word, 0) ;
 	}
 }
 

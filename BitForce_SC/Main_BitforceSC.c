@@ -85,8 +85,12 @@ int main(void)
 	MCU_MainLED_Initialize();
 	MCU_MainLED_Set();
 	
+	// Initialize flash-saving sequence
+	__AVR32_Flash_Initialize();
+	
 	// Initialize FAN subsystem
 	FAN_SUBSYS_Initialize();
+	
 	
 	// Detect if we're chain master or not [MODIFY]
 	XLINK_ARE_WE_MASTER = XLINK_detect_if_we_are_master(); // For the moment we're the chain master [MODIFY]

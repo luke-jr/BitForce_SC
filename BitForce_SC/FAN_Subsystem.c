@@ -23,11 +23,16 @@ volatile void FAN_SUBSYS_Initialize(void)
 	FAN_SUBSYS_SetFanState(FAN_STATE_AUTO);		
 }
 
-#define FAN_CONTROL_BYTE_VERY_SLOW	0
-#define FAN_CONTROL_BYTE_SLOW		0
-#define FAN_CONTROL_BYTE_MEDIUM		0
-#define FAN_CONTROL_BYTE_FAST		0
-#define FAN_CONTROL_BYTE_VERY_FAST	0
+#define FAN_CONTROL_BYTE_VERY_SLOW		(FAN_CTRL3)
+#define FAN_CONTROL_BYTE_SLOW			(FAN_CTRL2)
+#define FAN_CONTROL_BYTE_MEDIUM			(FAN_CTRL2 | FAN_CTRL3)
+#define FAN_CONTROL_BYTE_FAST			(FAN_CTRL0)
+#define FAN_CONTROL_BYTE_VERY_FAST		(FAN_CTRL0 | FAN_CTRL1)
+
+#define FAN_CTRL0	 0b0
+#define FAN_CTRL1	 0b010
+#define FAN_CTRL2	 0b0100
+#define FAN_CTRL3	 0b01000
 
 volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 {
@@ -55,7 +60,7 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 		GLOBAL_CRITICAL_TEMPERATURE = FALSE;
 	}	
 	
-	// Are we in critical situation? Override FAN if necessary
+	// Are we close to the critical temperature? Override FAN if necessary
 	if (iTempAveraged > 90)
 	{
 		// Override fan, set it to maximum

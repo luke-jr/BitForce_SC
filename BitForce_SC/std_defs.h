@@ -87,7 +87,6 @@ typedef struct _tag_buf_job_result_packet
 	unsigned int  nonce_list[8];
 } buf_job_result_packet, *pbuf_job_result_packet;
 
-
 // String Identification Memory
 typedef struct _tag_string_storage
 {

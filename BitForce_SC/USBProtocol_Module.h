@@ -12,15 +12,16 @@
 void	init_USB(void);
 
 void	USB_wait_packet(char* data,
-					    unsigned int *length,    // output
-					    unsigned int  req_size,   // input
-					    unsigned int  max_len,	  // input
-					    unsigned int *time_out);  // time_out is in/out
+					    unsigned int  *length,    // output
+					    unsigned int   req_size,   // input
+					    unsigned int   max_len,	  // input
+					    unsigned int  *time_out);  // time_out is in/out
 
 void	USB_wait_stream(char* data,
-						unsigned int *length,    // output
-						unsigned int  max_len,   // input
-						unsigned int *time_out); // Timeout variable
+						unsigned int  *length,    // output
+						unsigned int   max_len,   // input
+						unsigned int  *time_out, // Timeout variable
+						unsigned char *invalid_data); // Invalid data detected
 
 void	USB_send_string(const char* data);
 char	USB_write_data (const char* data, unsigned int length);
