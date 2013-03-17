@@ -312,6 +312,9 @@ void XLINK_MASTER_Refresh_Chain()
 	// This operation could take a while to execute, so Watchdog Reset is important
 	volatile char bNoResponseToEnumeration = FALSE;
 	
+	// First question, is the CPLD present at all?
+	if (XLINK_is_cpld_present() == FALSE) return;
+		
 	// Main counter
 	for (char aIDToAssign = 1; aIDToAssign < 31; aIDToAssign++)
 	{

@@ -733,36 +733,47 @@ volatile void __AVR32_SC_Initialize()
 	// Activate SPI1
 	AVR32_SPI0_CR 	= (1 << 0); // SPIEN = 1
 	AVR32_SPI0_MR   = (0b01 | (1<<4)); // MSTR = 1, The rest have their default value... 
-	AVR32_SPI0_CSR0 = (0b00000000000000000000000000000010) | (1<<8) | (0b01000 << 4)  ; // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 1, BITS = 1000 (16 Bit mode)
+	// NOTE: SPI FREQ REDUCED, PLEASE CORRECT FOR PRODUCTION
+	// AVR32_SPI0_CSR0 = (0b00000000000000000000000000000010) | (0b0100 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
+	AVR32_SPI0_CSR0 = (0b00000000000000000000000000000010) | (0b0110 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
 	
 	////////////////// Activate SC_CHIP_DONE
 	AVR32_GPIO.port[1].oderc = (AVR32_SC_CHIP_DONE0)  |  (AVR32_SC_CHIP_DONE1)  |  (AVR32_SC_CHIP_DONE2) | (AVR32_SC_CHIP_DONE3) |
 							   (AVR32_SC_CHIP_DONE4)  |  (AVR32_SC_CHIP_DONE5)  |  (AVR32_SC_CHIP_DONE6) | (AVR32_SC_CHIP_DONE7) ;
+	NOP_OPERATION;
+	NOP_OPERATION;
 	
 	AVR32_GPIO.port[1].gpers = (AVR32_SC_CHIP_DONE0)  |  (AVR32_SC_CHIP_DONE1)  |  (AVR32_SC_CHIP_DONE2) | (AVR32_SC_CHIP_DONE3) |
 							   (AVR32_SC_CHIP_DONE4)  |  (AVR32_SC_CHIP_DONE5)  |  (AVR32_SC_CHIP_DONE6) | (AVR32_SC_CHIP_DONE7) ;
+							   
+	NOP_OPERATION;
+	NOP_OPERATION;
 }
 
 volatile inline void __AVR32_ASIC_Activate_CS()
 {
 	AVR32_GPIO.port[0].ovrc   = AVR32_SPI0_PIN_NPCS;
+	NOP_OPERATION;
 }
 
 volatile inline void __AVR32_ASIC_Deactivate_CS()
 {
 	AVR32_GPIO.port[0].ovrs   = AVR32_SPI0_PIN_NPCS;
+	NOP_OPERATION;
 }
 
 volatile inline void __AVR32_SPI0_SendWord(unsigned short data)
 {
 	// Put data in register and wait until its sent
 	AVR32_SPI0_TDR = (data & 0x0FFFF);
+	NOP_OPERATION;
 	while ((AVR32_SPI0_SR & (1 << 9)) == 0);
 }
 
 volatile unsigned short __AVR32_SPI0_ReadWord()
 {
-	__AVR32_SPI0_SendWord(0x0FF); // FF stands for no-care
+	__AVR32_SPI0_SendWord(0x0FFFF); // FF stands for no-care
+	NOP_OPERATION;
 	return (AVR32_SPI0_RDR & 0x0FFFF);
 }
 
@@ -788,7 +799,7 @@ volatile unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned ch
 	volatile unsigned short iCommand = 0;
 	
 	// Generate the command
-	iCommand = (0) |  // RW COMMAND (0 = Read)
+	iCommand = (ASIC_SPI_RW_COMMAND) |  // RW COMMAND (1 = Read)
 			   (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
 			   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
 		       (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
@@ -803,8 +814,8 @@ volatile unsigned int __AVR32_SC_WriteData(char iChip, char iEngine, unsigned ch
 	volatile unsigned short iCommand = 0;
 	
 	// Generate the command
-	iCommand = (ASIC_SPI_RW_COMMAND) |  // RW COMMAND (1 = WRITE)
-			   (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+	// RW COMMAND (0 = WRITE)
+	iCommand = (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
 			   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
 			   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
 							  							  
@@ -842,11 +853,13 @@ void	__AVR32_MainLED_Reset()
 void	__AVR32_LED_Initialize()
 {
 	// Enable GPIOs on Port A
+	NOP_OPERATION;
 	AVR32_GPIO.port[1].gpers =  __AVR32_ENGINE_LED1 | __AVR32_ENGINE_LED2 |	__AVR32_ENGINE_LED3 | __AVR32_ENGINE_LED4 |
 								__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8 ;
-	
+	NOP_OPERATION;
 	AVR32_GPIO.port[1].oders =  __AVR32_ENGINE_LED1 | __AVR32_ENGINE_LED2 | __AVR32_ENGINE_LED3 | __AVR32_ENGINE_LED4 |
 								__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8 ;
+	NOP_OPERATION;								
 }
 
 void	__AVR32_LED_SetAccess()
@@ -872,6 +885,9 @@ void	__AVR32_LED_Set  (char iLed)
 		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED7;
 	else if (iLed == 8)
 		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED8;
+		
+	// IO Sync Delay
+	NOP_OPERATION;
 }
 
 void	__AVR32_LED_Reset(char iLed)
@@ -892,6 +908,9 @@ void	__AVR32_LED_Reset(char iLed)
 		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED7;
 	else if (iLed == 8)
 		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED8;
+		
+	// IO Sync Delay
+	NOP_OPERATION;
 }
 
 /////////////////////////////////////////////

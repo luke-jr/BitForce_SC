@@ -91,6 +91,18 @@ int main(void)
 	// Initialize FAN subsystem
 	FAN_SUBSYS_Initialize();
 	
+	// Perform an ASIC GET CHIP COUNT
+	ASIC_get_chip_count();
+	
+	// Now set the side-led's accordingly
+	if (ASIC_does_chip_exist(0) == TRUE) MCU_LED_Set(1);
+	if (ASIC_does_chip_exist(1) == TRUE) MCU_LED_Set(2);
+	if (ASIC_does_chip_exist(2) == TRUE) MCU_LED_Set(3);
+	if (ASIC_does_chip_exist(3) == TRUE) MCU_LED_Set(4);
+	if (ASIC_does_chip_exist(4) == TRUE) MCU_LED_Set(5);
+	if (ASIC_does_chip_exist(5) == TRUE) MCU_LED_Set(6);
+	if (ASIC_does_chip_exist(6) == TRUE) MCU_LED_Set(7);
+	if (ASIC_does_chip_exist(7) == TRUE) MCU_LED_Set(8);
 	
 	// Detect if we're chain master or not [MODIFY]
 	XLINK_ARE_WE_MASTER = XLINK_detect_if_we_are_master(); // For the moment we're the chain master [MODIFY]

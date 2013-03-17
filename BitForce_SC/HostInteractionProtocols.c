@@ -34,7 +34,15 @@ PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned int 
 	
 	for (unsigned int umx = 0; umx < 2048; umx++) szRespData[umx] = 0;
 	
-	XLINK_MASTER_transact(iTarget,
+	volatile char iTotalAttempts = 0; // In case of an error, we'll retry several times. The error can be 3, 5 or 50
+	
+	while (iTotalAttempts < 3)
+	{
+		// Reset Watchdog
+		WATCHDOG_RESET;
+		
+		// Proceed
+		XLINK_MASTER_transact(iTarget,
 						  sz_cmd,
 						  iCmdLen,
 						  szRespData,
@@ -45,19 +53,31 @@ PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned int 
 						  &bTimeoutDetected,
 						  TRUE);
 	
-	// Check response errors
-	if (bDeviceNotResponded)
-	{
-		USB_send_string("ERR:NO RESPONSE");
-		return PROTOCOL_FAILED;
+		// Check response errors
+		if (bDeviceNotResponded)
+		{
+			USB_send_string("ERR:NO RESPONSE");
+			return PROTOCOL_FAILED;
+		}
+	
+		if (bTimeoutDetected)
+		{
+			if ((iTotalAttempts < 3) && ((bTimeoutDetected == 3) || (bTimeoutDetected == 5) || (bTimeoutDetected == 50)))
+			{
+				// Just retry
+				iTotalAttempts++;
+				continue;
+			}
+			else
+			{
+				sprintf(szRespData,"ERR:TIMEOUT %d\n", bTimeoutDetected);
+				USB_send_string(szRespData);
+				return PROTOCOL_FAILED;				
+			}
+		}		
 	}
 	
-	if (bTimeoutDetected)
-	{
-		sprintf(szRespData,"ERR:TIMEOUT %d\n", bTimeoutDetected);
-		USB_send_string(szRespData);
-		return PROTOCOL_FAILED;
-	}
+	
 	
 	// Send the response back to our host
 	USB_write_data (szRespData, iRespLen);
@@ -88,6 +108,130 @@ PROTOCOL_RESULT Protocol_id(void)
 }
 
 
+
+
+//==================================================================
+void LoadBarrierAdder(int CHIP, int ENGINE){
+	__ASIC_WriteEngine(CHIP,ENGINE,0x6E,0xFF7F);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x6F,0xFFFF);
+}
+
+//==================================================================
+void LoadLimitRegisters(int CHIP, int ENGINE){
+	__ASIC_WriteEngine(CHIP,ENGINE,0xA6,0x0082);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xA7,0x0081);
+}
+
+//==================================================================
+void LoadRegistersValues_H0(int CHIP, int ENGINE){
+	__ASIC_WriteEngine(CHIP,ENGINE,0x80,0x423C);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x81,0xA849);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x82,0xC5E1);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x83,0x7845);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x84,0x2DA5);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x85,0xC183);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x86,0xE501);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x87,0x8EC5);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x88,0x2FF5);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x89,0x0D03);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x8A,0x2EEE);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x8B,0x299D);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x8C,0x94B6);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x8D,0xDF9A);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x8E,0x95A6);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x8F,0xAE97);
+}
+
+//==================================================================
+void LoadRegistersValues_H1(int CHIP, int ENGINE){
+	__ASIC_WriteEngine(CHIP,ENGINE,0x90,0xE667);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x91,0x6A09);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x92,0xAE85);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x93,0xBB67);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x94,0xF372);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x95,0x3C6E);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x96,0xF53A);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x97,0xA54F);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x98,0x527F);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x99,0x510E);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x9A,0x688C);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x9B,0x9B05);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x9C,0xD9AB);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x9D,0x1F83);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x9E,0xCD19);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x9F,0x5BE0);
+}
+
+//==================================================================
+void LoadRegistersValues_W(int CHIP, int ENGINE){
+
+	__ASIC_WriteEngine(CHIP,ENGINE,0xA0,0x84AC);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xA1,0x8BF5);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xA2,0x594D);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xA3,0x4DB7);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xA4,0x021B);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xA5,0x5285);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xA9,0x8000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xAA,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xAB,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xAC,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xAD,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xAE,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xAF,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB0,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB1,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB2,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB3,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB4,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB5,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB6,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB7,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB8,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xB9,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xBA,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xBB,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xBC,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xBD,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xBE,0x0280);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xBF,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC0,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC1,0x8000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC2,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC3,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC4,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC5,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC6,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC7,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC8,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xC9,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xCA,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xCB,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xCC,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xCD,0x0000);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xCE,0x0100);
+	__ASIC_WriteEngine(CHIP,ENGINE,0xCF,0x0000);
+}
+
+// ------------------------------------------------------------------------
+void LoadCounterBounds(int CHIP, int ENGINE, int lower, int upper){
+	int up_lsb;
+	int up_msb;
+	int lo_lsb;
+	int lo_msb;
+
+	lo_lsb = lower & 0x0000FFFF;
+	lo_msb = (lower & 0xFFFF0000) >> 16;
+	up_lsb = upper & 0x0000FFFF;
+	up_msb = (upper & 0xFFFF0000) >> 16;
+
+	__ASIC_WriteEngine(CHIP,ENGINE,0x40,lo_lsb);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x41,lo_msb);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x42,up_lsb);
+	__ASIC_WriteEngine(CHIP,ENGINE,0x43,up_msb);
+}
+
+
+
 PROTOCOL_RESULT Protocol_info_request(void)
 {
 	// Our result
@@ -109,6 +253,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	volatile UL32 uLRes = 0;    
 	
 	// Atomic Full-Asm Special CPLD Write latency
+	/*
 	uL1 = MACRO_GetTickCountRet;
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
@@ -129,12 +274,144 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
 	sprintf(szTemp,"ATOMIC MACRO SEND PACKET: %u us\n", (unsigned int)uLRes);
-	strcat(szInfoReq, szTemp);	
+	strcat(szInfoReq, szTemp);*/
+	
+	volatile unsigned int iStats[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+		
+	#define CHIP_TO_TEST 0	
+		
+	__MCU_ASIC_Activate_CS();
+	iStats[0]  = __ASIC_ReadEngine(CHIP_TO_TEST,0,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[1]  = __ASIC_ReadEngine(CHIP_TO_TEST,1,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[2]  = __ASIC_ReadEngine(CHIP_TO_TEST,2,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[3]  = __ASIC_ReadEngine(CHIP_TO_TEST,3,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[4]  = __ASIC_ReadEngine(CHIP_TO_TEST,4,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[5]  = __ASIC_ReadEngine(CHIP_TO_TEST,5,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[6]  = __ASIC_ReadEngine(CHIP_TO_TEST,6,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[7]  = __ASIC_ReadEngine(CHIP_TO_TEST,7,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[8]  = __ASIC_ReadEngine(CHIP_TO_TEST,8,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();	
+	iStats[9]  = __ASIC_ReadEngine(CHIP_TO_TEST,9,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[10] = __ASIC_ReadEngine(CHIP_TO_TEST,10,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[11] = __ASIC_ReadEngine(CHIP_TO_TEST,11,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[12] = __ASIC_ReadEngine(CHIP_TO_TEST,12,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[13] = __ASIC_ReadEngine(CHIP_TO_TEST,13,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[14] = __ASIC_ReadEngine(CHIP_TO_TEST,14,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+	
+	__MCU_ASIC_Activate_CS();
+	iStats[15] = __ASIC_ReadEngine(CHIP_TO_TEST,15,ASIC_SPI_READ_STATUS_REGISTER+0);
+	__MCU_ASIC_Deactivate_CS();
+		
+	
+	//iStats[0]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000);
+	//iStats[1]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+1);
+	//iStats[2]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+2);
+	//iStats[3]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+3);
+	//iStats[4]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+4);
+	//iStats[5]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+5);
+	//iStats[6]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+6);
+	//iStats[7]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+7);
+	//iStats[8]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+8);
+	//iStats[9]  = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+9);
+	//iStats[10] = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+10);
+	//iStats[11] = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+11);
+	//iStats[12] = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+12);
+	//iStats[13] = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+13);
+	//iStats[14] = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+14);
+	//iStats[15] = __ASIC_ReadEngine(CHIP_TO_TEST,12,0b010000000+15);
 
-	// Add Engine count
-	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_chip_count());
+	// Say Read-Complete
+	ASIC_ReadComplete(CHIP_TO_TEST,0);
+	ASIC_ReadComplete(CHIP_TO_TEST,1);
+	ASIC_ReadComplete(CHIP_TO_TEST,2);
+	ASIC_ReadComplete(CHIP_TO_TEST,3);
+	ASIC_ReadComplete(CHIP_TO_TEST,4);
+	ASIC_ReadComplete(CHIP_TO_TEST,5);
+	ASIC_ReadComplete(CHIP_TO_TEST,6);
+	ASIC_ReadComplete(CHIP_TO_TEST,7);
+	ASIC_ReadComplete(CHIP_TO_TEST,8);
+	ASIC_ReadComplete(CHIP_TO_TEST,9);
+	ASIC_ReadComplete(CHIP_TO_TEST,10);
+	ASIC_ReadComplete(CHIP_TO_TEST,11);
+	ASIC_ReadComplete(CHIP_TO_TEST,12);
+	ASIC_ReadComplete(CHIP_TO_TEST,13);
+	ASIC_ReadComplete(CHIP_TO_TEST,14);
+	ASIC_ReadComplete(CHIP_TO_TEST,15);
+	
+	/*
+	ASIC_reset_engine(CHIP_TO_TEST,0);
+	ASIC_reset_engine(CHIP_TO_TEST,1);
+	ASIC_reset_engine(CHIP_TO_TEST,2);
+	ASIC_reset_engine(CHIP_TO_TEST,3);
+	ASIC_reset_engine(CHIP_TO_TEST,4);
+	ASIC_reset_engine(CHIP_TO_TEST,5);
+	ASIC_reset_engine(CHIP_TO_TEST,6);
+	ASIC_reset_engine(CHIP_TO_TEST,7);
+	ASIC_reset_engine(CHIP_TO_TEST,8);
+	ASIC_reset_engine(CHIP_TO_TEST,9);
+	ASIC_reset_engine(CHIP_TO_TEST,10);
+	ASIC_reset_engine(CHIP_TO_TEST,11);
+	ASIC_reset_engine(CHIP_TO_TEST,12);
+	ASIC_reset_engine(CHIP_TO_TEST,13);
+	ASIC_reset_engine(CHIP_TO_TEST,14);
+	*/
+		
+	
+	sprintf(szTemp,"STATS:\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X \n", 
+			iStats[0], iStats[1], iStats[2], iStats[3], iStats[4], iStats[5], iStats[6], iStats[7],
+			iStats[8], iStats[9], iStats[10], iStats[11], iStats[12], iStats[13], iStats[14], iStats[15]);
+			
 	strcat(szInfoReq, szTemp);
 	
+
+	// Add Engine count
+	
+	//sprintf(szTemp,"ENGINES: %d\n", ASIC_get_chip_count());
+	//strcat(szInfoReq, szTemp);
+	
+	/*
 	// Add Chain Status
 	sprintf(szTemp,"XLINK MODE: %s\n", XLINK_ARE_WE_MASTER ? "MASTER" : "SLAVE" );
 	strcat(szInfoReq, szTemp);
@@ -142,6 +419,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	// Add XLINK chip installed status
 	sprintf(szTemp,"XLINK PRESENT: %s\n", (XLINK_is_cpld_present() == TRUE) ? "YES" : "NO");
 	strcat(szInfoReq, szTemp);
+	*/
 	
 	// If we are master, how many devices exist in chain?
 	if ((XLINK_ARE_WE_MASTER == TRUE) && (XLINK_is_cpld_present() == TRUE))
@@ -515,6 +793,60 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	char bDevNotResponded = FALSE;
 	char bTimedOut = FALSE;
 	
+	
+	// Activate all engines...
+	job_packet jp; // We don't need to change anything in it. Some random data exists i'm sure
+	unsigned int ilr_counter = 0;
+	unsigned char iCurrentLEDState = 0;
+	
+	// Run for theoretical 7.5seconds
+	//for (volatile unsigned int x = 0; x < 10; x++)
+	//{
+		WATCHDOG_RESET;
+		//ASIC_job_issue_to_specified_engine(0,4,&jp, 0, 0x0FFFFFFFF);
+		ASIC_job_issue(&jp,0x080000000,0x090000000);
+		
+		/*__MCU_ASIC_Activate_CS();
+		
+		LoadBarrierAdder(0,1);
+		LoadLimitRegisters(0,1);
+		LoadRegistersValues_H0(0,1);
+		LoadRegistersValues_H1(0,1);
+		LoadRegistersValues_W(0,1);
+		LoadCounterBounds(0,1,0,0x0FFFFFFFF);
+		ASIC_WriteComplete(0,1);
+		
+		__MCU_ASIC_Deactivate_CS();*/
+		
+		// Wait for it to be finished
+		/*while (ASIC_is_processing() == TRUE)
+		{
+			WATCHDOG_RESET;
+			
+			// Blink
+			if ((ilr_counter % 100000) == 0)
+			{
+				if (iCurrentLEDState != 0)
+				{
+					 MCU_MainLED_Set();
+					 iCurrentLEDState = 0;
+				}
+				else
+				{
+					MCU_MainLED_Reset();
+					iCurrentLEDState = 1;
+				}				
+			}
+			
+			ilr_counter++;
+		}*/
+	//}
+	
+	MCU_MainLED_Set();
+	
+	
+	return PROTOCOL_SUCCESS; // We will not proceed with the code here
+	
 	///////////////////////////////////////////////////////////
 	// CPLD TEST Write different values to CPLD and read back
 	//////////////////////////////////////////////////////////
@@ -540,8 +872,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	volatile char szFailures[12000];
 	volatile char szFailTemp[128];
 	strcpy(szFailTemp,"");
-	strcpy(szFailures,"");
-	
+	strcpy(szFailures,"");	
 	
 	volatile char iTotal3Error = 0;
 	volatile char iTotal5Error = 0;
