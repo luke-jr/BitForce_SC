@@ -278,7 +278,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	
 	volatile unsigned int iStats[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 		
-	#define CHIP_TO_TEST 0	
+	#define CHIP_TO_TEST 6	
 		
 	__MCU_ASIC_Activate_CS();
 	iStats[0]  = __ASIC_ReadEngine(CHIP_TO_TEST,0,ASIC_SPI_READ_STATUS_REGISTER+0);
@@ -379,8 +379,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	ASIC_ReadComplete(CHIP_TO_TEST,13);
 	ASIC_ReadComplete(CHIP_TO_TEST,14);
 	ASIC_ReadComplete(CHIP_TO_TEST,15);
-	
-	/*
+
 	ASIC_reset_engine(CHIP_TO_TEST,0);
 	ASIC_reset_engine(CHIP_TO_TEST,1);
 	ASIC_reset_engine(CHIP_TO_TEST,2);
@@ -396,8 +395,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	ASIC_reset_engine(CHIP_TO_TEST,12);
 	ASIC_reset_engine(CHIP_TO_TEST,13);
 	ASIC_reset_engine(CHIP_TO_TEST,14);
-	*/
-		
+
 	
 	sprintf(szTemp,"STATS:\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X \n", 
 			iStats[0], iStats[1], iStats[2], iStats[3], iStats[4], iStats[5], iStats[6], iStats[7],

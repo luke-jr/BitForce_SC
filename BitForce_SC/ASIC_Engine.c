@@ -207,15 +207,17 @@ void ASIC_Bootup_Chips()
 		*/
 		
 		MCU_SC_WriteData(iHover,
+				0, // Issue to processor 0
+				0,
+				(__ActualRegister0Value));
+		
+		MCU_SC_WriteData(iHover,
 						 0b0,// Issue to processor 0
 						 ASIC_SPI_OSC_CONTROL,
 						 0b1111111111111111); // Slowest mode		
 					 
 
-		MCU_SC_WriteData(iHover,
-						 0, // Issue to processor 0
-						 0,
-						 (__ActualRegister0Value));
+
 
 		// TEST: Disable clocks for all engines
 		MCU_SC_WriteData(iHover, 0, ASIC_SPI_CLOCK_OUT_ENABLE, 0x0FFFF); // Activate clocks for all 16 engines on the chip
