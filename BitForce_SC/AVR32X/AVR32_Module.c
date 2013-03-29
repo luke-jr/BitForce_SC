@@ -734,8 +734,9 @@ volatile void __AVR32_SC_Initialize()
 	AVR32_SPI0_CR 	= (1 << 0); // SPIEN = 1
 	AVR32_SPI0_MR   = (0b01 | (1<<4)); // MSTR = 1, The rest have their default value... 
 	// NOTE: SPI FREQ REDUCED, PLEASE CORRECT FOR PRODUCTION
-	// AVR32_SPI0_CSR0 = (0b00000000000000000000000000000010) | (0b0100 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
-	AVR32_SPI0_CSR0 = (0b00000000000000000000000000000010) | (0b0110 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
+	AVR32_SPI0_CSR0   = (0b010) | (0b0100 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
+	//AVR32_SPI0_CSR0 = (0b010) | (0b0111 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
+	//AVR32_SPI0_CSR0 = (0b010) | (0b0111 << 8) | (0b01000 << 4); // NPCHA = 0, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
 	
 	////////////////// Activate SC_CHIP_DONE
 	AVR32_GPIO.port[1].oderc = (AVR32_SC_CHIP_DONE0)  |  (AVR32_SC_CHIP_DONE1)  |  (AVR32_SC_CHIP_DONE2) | (AVR32_SC_CHIP_DONE3) |
@@ -754,11 +755,27 @@ volatile inline void __AVR32_ASIC_Activate_CS()
 {
 	AVR32_GPIO.port[0].ovrc   = AVR32_SPI0_PIN_NPCS;
 	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
 }
 
 volatile inline void __AVR32_ASIC_Deactivate_CS()
 {
 	AVR32_GPIO.port[0].ovrs   = AVR32_SPI0_PIN_NPCS;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
 	NOP_OPERATION;
 }
 
@@ -767,12 +784,28 @@ volatile inline void __AVR32_SPI0_SendWord(unsigned short data)
 	// Put data in register and wait until its sent
 	AVR32_SPI0_TDR = (data & 0x0FFFF);
 	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
 	while ((AVR32_SPI0_SR & (1 << 9)) == 0);
 }
 
 volatile unsigned short __AVR32_SPI0_ReadWord()
 {
 	__AVR32_SPI0_SendWord(0x0FFFF); // FF stands for no-care
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
 	NOP_OPERATION;
 	return (AVR32_SPI0_RDR & 0x0FFFF);
 }

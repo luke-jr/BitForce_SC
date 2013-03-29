@@ -60,12 +60,13 @@ void init_ASIC(void)
 	__ASIC_WriteEngine(0,0,0,0);
 	__ASIC_WriteEngine(0,0,0,0);
 	__ASIC_WriteEngine(0,0,0,0);
-	
+
+	// Also here we set the Oscillator Control Register
+	ASIC_Bootup_Chips();
+		
 	// Proceed...
 	ASIC_get_chip_count();
 	
-	// Also here we set the Oscillator Control Register
-	ASIC_Bootup_Chips();
 }
 
 // This function checks to see if the processor in this engine is correctly operating. We must find the correct nonce here...
@@ -181,129 +182,87 @@ void __Reset_Engine(int CHIP, int ENGINE)
 	__ActualRegister0Value &= ~(MASK_RESET_ENGINE_0);
 	DATAIN    = __ActualRegister0Value;
 
+	// For engine zero, do not clear the reset
 	__AVR32_SC_WriteData(CHIP, ENGINE, 0x00, DATAIN);
 }
 
 
+void __Write_SPI(int iChip, int iEngine, int iAddress, int iData)
+{
+	__MCU_ASIC_Activate_CS();
+	__ASIC_WriteEngine(iChip, iEngine, iAddress, iData);
+	__MCU_ASIC_Deactivate_CS();
+}
+
+unsigned int __Read_SPI(int iChip, int iEngine, int iAddress)
+{
+	unsigned int iRetVal = 0;
+	__MCU_ASIC_Activate_CS();
+	iRetVal = __ASIC_ReadEngine(iChip, iEngine, iAddress);
+	__MCU_ASIC_Deactivate_CS();
+	return iRetVal;
+}
+
 // Working...
 void ASIC_Bootup_Chips()
 {
-	// Send initialization clocks
-	__ASIC_WriteEngine(0,0,0,0);
-	
+
 	unsigned int iHover = 0;
-
-	// Reset it...
-	for (iHover = 0; iHover < 8; iHover++)
-	{
-		// We have data to write...
-		__MCU_ASIC_Activate_CS();
-
-		/*
-		MCU_SC_WriteData(iHover,
-						 0b0,// Issue to processor 0
-						 ASIC_SPI_OSC_CONTROL,
-						 0b0101010101010101); // Slowest mode	
-		*/
+	unsigned int DATAIN;
+	unsigned int CHIP = 0;
 		
-		MCU_SC_WriteData(iHover,
-				0, // Issue to processor 0
-				0,
-				(__ActualRegister0Value));
-		
-		MCU_SC_WriteData(iHover,
-						 0b0,// Issue to processor 0
-						 ASIC_SPI_OSC_CONTROL,
-						 0b1111111111111111); // Slowest mode		
-					 
-
-
-
-		// TEST: Disable clocks for all engines
-		MCU_SC_WriteData(iHover, 0, ASIC_SPI_CLOCK_OUT_ENABLE, 0x0FFFF); // Activate clocks for all 16 engines on the chip
-								 
-						 
-		/*MCU_SC_WriteData(iHover,
-						 0b0,// Issue to processor 0
-						 ASIC_SPI_OSC_CONTROL,
-						 0b0101010101010101);*/
-						 
-					 
-		// Enable clock
-		// MCU_SC_WriteData(((iHover & 0b01110000) >> 4), (iHover & 0b01111), ASIC_SPI_CLOCK_OUT_ENABLE, 0x0FFFF); // Activate clocks for all 16 engines on the chip
-			
-
-		// Activate clocks for all engines
-		__MCU_ASIC_Deactivate_CS();
-	}	
+	int c=0;
 	
-	
-	// Now we're done here, we need to execute the next command for all the 256 engines in system
-	unsigned int iResetEngineCommand1Base = 0;
-	unsigned int iResetEngineCommand2Base = (1<<12);
-	unsigned int iResetEngineCommand3Base = 0;
-	
-	unsigned int iResetEngineCommand1BaseE0 = __ActualRegister0Value;
-	unsigned int iResetEngineCommand2BaseE0 = (1<<12) | __ActualRegister0Value;
-	unsigned int iResetEngineCommand3BaseE0 = __ActualRegister0Value;
-	
-	// Run through all the chips
-	__MCU_ASIC_Activate_CS();
-			
-	for (iHover = 0; iHover <= 0x07F; iHover++)
+	for (CHIP = 0; CHIP < 8; CHIP++)
 	{
-			unsigned int iResetEngineCommand1 = iResetEngineCommand1BaseE0 | (iHover << 24);
-			unsigned int iResetEngineCommand2 = iResetEngineCommand2BaseE0 | (iHover << 24);
-			unsigned int iResetEngineCommand3 = iResetEngineCommand3BaseE0 | (iHover << 24);
-					
-			MCU_SC_WriteData((unsigned char)((iResetEngineCommand1 >> 24) & 0x0FF),
-							 (unsigned char)((iResetEngineCommand1 >> 16) & 0x0FF),
-						 	 (unsigned char)((iResetEngineCommand1 >> 8) & 0x0FF),
-							 (unsigned int)((iResetEngineCommand1 ) & 0x0FFFF));
+		//Select ExtClk mode div1
+		//DATAREG0[15]='0';//0=INT_CLK
+		//DATAREG0[14]='0';//0=div2
+		//DATAREG0[13]='1';//0=div4
+		//DATAREG0[12]='0';//1=RESET
+		//DATAREG0[0]='1'; //0=div 1
+		DATAIN=0x2001;//INT_CLK, div/2
+		__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
 
-			MCU_SC_WriteData((unsigned char)((iResetEngineCommand2 >> 24) & 0x0FF),
-							 (unsigned char)((iResetEngineCommand2 >> 16) & 0x0FF),
-							 (unsigned char)((iResetEngineCommand2 >> 8) & 0x0FF),
-							 (unsigned int)((iResetEngineCommand2 ) & 0x0FFFF));
-							 
+		//Reset all instances (0-15):
+		//Reset engine 0:
+		//DATAREG0[12]='1'; 
+		DATAIN=0x3001;//INT_CLK, div/2, reset
+		__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
+		
+		//Reset instances 1-15:
+		DATAIN=0x1000;// bit[12]==reset
+		for(c=1;c<16;c++){
+			__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
+		}
 
-			//#if defined(DO_NOT_USE_ENGINE_ZERO)
-			//// ENGINE 0 MUST REMAIN IN RESET SINCE W'RE USING DIV2 OR DIV4
-			//if ((iHover & 0b01111) == 0)
-			//{
-				//MCU_SC_WriteData((unsigned char)((iResetEngineCommand3 >> 24) & 0x0FF),
-				//(unsigned char)((iResetEngineCommand3 >> 16) & 0x0FF),
-				//(unsigned char)((iResetEngineCommand3 >> 8) & 0x0FF),
-				//(unsigned int)((iResetEngineCommand3 ) & 0x0FFFF));
-			//}
-			//#else
-			MCU_SC_WriteData((unsigned char)((iResetEngineCommand3 >> 24) & 0x0FF),
-							 (unsigned char)((iResetEngineCommand3 >> 16) & 0x0FF),
-							 (unsigned char)((iResetEngineCommand3 >> 8) & 0x0FF),
-							 (unsigned int)((iResetEngineCommand3 ) & 0x0FFFF));
-			
-		/*
-		__Reset_Engine(((iHover & 0b01110000) >> 4), (iHover & 0b01111));
-		__ResetSPIErrFlags(((iHover & 0b01110000) >> 4), (iHover & 0b01111)); */
+		//Enable Clock Out, all instances:
+		DATAIN=0xFFFF;//
+		__Write_SPI(CHIP,0,0x61, DATAIN);//int caddr, int engine, int reg, int data
 
+		//Set Osc Control to slowest frequency:0000 (highest=0xCD55)
+		DATAIN=0xCD55;
+		__Write_SPI(CHIP,0,0x60,DATAIN);//int caddr, int engine, int reg, int data
+
+		//Clear the Reset engine 1-15
+		DATAIN=0x0000;
+		for(c=1;c<16;c++){
+			__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
+		}
+
+		//Disable Clock Out, all engines
+		DATAIN=0xFFFE; // Engine 0 clock is not enabled here
+		__Write_SPI(CHIP,0,0x61,DATAIN);//int caddr, int engine, int reg, int data
 	}
 	
-			
-	__MCU_ASIC_Deactivate_CS();
 	
-	/*
-	for (iHover = 0; iHover < 8; iHover++)
-	{
-		__MCU_ASIC_Activate_CS();
-		
-		MCU_SC_WriteData(iHover, 0, ASIC_SPI_WRITE_REGISTER,iResetEngineCommand1Base);
-		MCU_SC_WriteData(iHover, 0, ASIC_SPI_WRITE_REGISTER,iResetEngineCommand2Base);
-		MCU_SC_WriteData(iHover, 0, ASIC_SPI_WRITE_REGISTER,iResetEngineCommand3Base);
-		
-		__MCU_ASIC_Deactivate_CS();
-	}*/
 	
-	// Boot process finished...
+
+	//CHIP STATE: Internal Clock, All Registers Reset,All BUT 0 Resets=0,
+	//All clocks Disabled				
+	return;				
+	
+
 }
 
 int	ASIC_GetFrequencyFactor()
@@ -563,26 +522,51 @@ void ASIC_job_issue(void* pJobPacket,
 	
 	// Activate the SPI
 	__MCU_ASIC_Activate_CS();
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
 	
 	// Send the jobs to the chips..
 	// Try to read their results...
+	// ASIC_Bootup_Chips();
+	static int iVC = 0;
+	
+	//for (volatile int x_chip = 4; x_chip < 5; x_chip++)	
 	for (volatile int x_chip = 0; x_chip < 8; x_chip++)
 	{
 		if (CHIP_EXISTS(x_chip) == 0) continue; // Skip it...
+		
+		// We must sleep for 500ms before starting a new chip
+		// Sleep(500000); // 500,000 micro seconds
+		
+		// Wait 0.5 seconds
+		//Sleep(000);
+		
+		// DEBUGGGGGGGGGGGGG
+		// if ((x_chip != 3) && (x_chip != 4) && (x_chip != 5) && (x_chip != 6)) continue;
 				
 		// We assign the job to each engine in each chip
 		for (volatile int y_engine = 0; y_engine < 16; y_engine++)
 		{
 			// Is this processor healthy?
-			if (!IS_PROCESSOR_OK(x_chip, y_engine)) continue;			
+			if (!IS_PROCESSOR_OK(x_chip, y_engine)) continue;
 			
-			// Some things to do...
-			//__Reset_Engine(x_chip, y_engine);
-			//__ResetSPIErrFlags(x_chip, y_engine);
+			// DEBUGGGGGGGGGGGGG
+			if (y_engine == 0) continue; // Do not start engine 0
 			
-			// We have to correct the nonce-range if it's the last engine in the last chip
-			// if ((iTotalChipsHovered + 1 == iChipCount) && (y_engine == 15)) iUpperRange += ;
-						
+			// Sleep
+			//Sleep(200000); // Sleep 200ms
+
+			// Reset the engine
+			__ASIC_WriteEngine(x_chip,y_engine, 0, (1<<9) | (1<<12));
+			__ASIC_WriteEngine(x_chip,y_engine, 0, 0);
+
 			// ***** Submit the job to the engine *****
 			// Set dynamic midstates...
 			unsigned int test_midstates[] = {0x423CA849,0xC5E17845,0x2DA5C183,0xE5018EC5,0x2FF50D03,0x2EEE299D,0x94B6DF9A,0x95A6AE97};
@@ -601,31 +585,34 @@ void ASIC_job_issue(void* pJobPacket,
 			//
 			
 			// TEST
-			for (unsigned int inx = 0; inx < 8; inx++ , iMemAddress += 2)
+			/*for (unsigned int inx = 0; inx < 8; inx++ , iMemAddress += 2)
 			{
 				__ASIC_WriteEngine(x_chip, y_engine, iMemAddress + 1, (test_midstates[inx] & 0x0FFFF));
 				__ASIC_WriteEngine(x_chip, y_engine, iMemAddress + 0, (test_midstates[inx] & 0x0FFFF0000) >> 16);
-			}
+			}*/
 						
 			// Set static midstates...
-			iMemAddress = ASIC_SPI_MAP_H1_A_LWORD;
+			/*iMemAddress = ASIC_SPI_MAP_H1_A_LWORD;
 			
 			for (unsigned int inx = 0; inx < 8; inx++, iMemAddress += 2)
 			{
 				__ASIC_WriteEngine(x_chip, y_engine, iMemAddress + 0, (STATIC_H1[inx] & 0x0FFFF));
 				__ASIC_WriteEngine(x_chip, y_engine, iMemAddress + 1, (STATIC_H1[inx] & 0x0FFFF0000) >> 16);
-			}
+			} */
 			
 			// Set barrier offset to -129
-			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_LWORD, 0x0FF7F);
-			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_HWORD, 0x0FFFF);		
+	
 			
 			// Reset limit (W3)
-			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_LWORD, 0x0082);
-			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_HWORD, 0x0081);
-
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_LWORD, 0x0082);
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_HWORD, 0x0081);
+			
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_LWORD, 0x82);
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_HWORD, 0x81);
+			
+			
 			// Set Data
-			iMemAddress = ASIC_SPI_MAP_W0_LWORD;
+			// iMemAddress = ASIC_SPI_MAP_W0_LWORD;
 			
 			//
 			//for (unsigned int inx = 0; inx < 32; inx++, iMemAddress += 2)
@@ -648,41 +635,154 @@ void ASIC_job_issue(void* pJobPacket,
 			//}
 			
 			//// TEST
-			for (unsigned int inx = 0; inx < 52; inx++)
+			/*for (unsigned int inx = 0; inx < 52; inx++)
 			{
 				__ASIC_WriteEngine(x_chip, y_engine, iMemAddress + inx, (test_blockdata[inx] & 0x0FFFF));
-			}			
+			}*/
 			
+			// Load H1
+			__ASIC_WriteEngine(x_chip,y_engine,0x90,0xE667);
+			__ASIC_WriteEngine(x_chip,y_engine,0x91,0x6A09);
+			__ASIC_WriteEngine(x_chip,y_engine,0x92,0xAE85);
+			__ASIC_WriteEngine(x_chip,y_engine,0x93,0xBB67);
+			__ASIC_WriteEngine(x_chip,y_engine,0x94,0xF372);
+			__ASIC_WriteEngine(x_chip,y_engine,0x95,0x3C6E);
+			__ASIC_WriteEngine(x_chip,y_engine,0x96,0xF53A);
+			__ASIC_WriteEngine(x_chip,y_engine,0x97,0xA54F);
+			__ASIC_WriteEngine(x_chip,y_engine,0x98,0x527F);
+			__ASIC_WriteEngine(x_chip,y_engine,0x99,0x510E);
+			__ASIC_WriteEngine(x_chip,y_engine,0x9A,0x688C);
+			__ASIC_WriteEngine(x_chip,y_engine,0x9B,0x9B05);
+			__ASIC_WriteEngine(x_chip,y_engine,0x9C,0xD9AB);
+			__ASIC_WriteEngine(x_chip,y_engine,0x9D,0x1F83);
+			__ASIC_WriteEngine(x_chip,y_engine,0x9E,0xCD19);
+			__ASIC_WriteEngine(x_chip,y_engine,0x9F,0x5BE0);
+			
+			// Load H0
+			__ASIC_WriteEngine(x_chip,y_engine,0x80,0x423C);
+			__ASIC_WriteEngine(x_chip,y_engine,0x81,0xA849);
+			__ASIC_WriteEngine(x_chip,y_engine,0x82,0xC5E1);
+			__ASIC_WriteEngine(x_chip,y_engine,0x83,0x7845);
+			__ASIC_WriteEngine(x_chip,y_engine,0x84,0x2DA5);
+			__ASIC_WriteEngine(x_chip,y_engine,0x85,0xC183);
+			__ASIC_WriteEngine(x_chip,y_engine,0x86,0xE501);
+			__ASIC_WriteEngine(x_chip,y_engine,0x87,0x8EC5);
+			__ASIC_WriteEngine(x_chip,y_engine,0x88,0x2FF5);
+			__ASIC_WriteEngine(x_chip,y_engine,0x89,0x0D03);
+			__ASIC_WriteEngine(x_chip,y_engine,0x8A,0x2EEE);
+			__ASIC_WriteEngine(x_chip,y_engine,0x8B,0x299D);
+			__ASIC_WriteEngine(x_chip,y_engine,0x8C,0x94B6);
+			__ASIC_WriteEngine(x_chip,y_engine,0x8D,0xDF9A);
+			__ASIC_WriteEngine(x_chip,y_engine,0x8E,0x95A6);
+			__ASIC_WriteEngine(x_chip,y_engine,0x8F,0xAE97);
+			
+			// Load W
+			__ASIC_WriteEngine(x_chip,y_engine,0xA0,0x84AC);
+			__ASIC_WriteEngine(x_chip,y_engine,0xA1,0x8BF5);
+			__ASIC_WriteEngine(x_chip,y_engine,0xA2,0x594D);
+			__ASIC_WriteEngine(x_chip,y_engine,0xA3,0x4DB7);
+			__ASIC_WriteEngine(x_chip,y_engine,0xA4,0x021B);
+			__ASIC_WriteEngine(x_chip,y_engine,0xA5,0x5285);
+			
+			__ASIC_WriteEngine(x_chip,y_engine,0xA8,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xA9,0x8000);
+			
+			__ASIC_WriteEngine(x_chip,y_engine,0xAA,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xAB,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xAC,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xAD,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xAE,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xAF,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB0,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB1,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB2,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB3,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB4,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB5,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB6,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB7,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB8,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xB9,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xBA,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xBB,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xBC,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xBD,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xBE,0x0280);
+			__ASIC_WriteEngine(x_chip,y_engine,0xBF,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC0,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC1,0x8000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC2,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC3,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC4,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC5,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC6,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC7,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC8,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xC9,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xCA,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xCB,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xCC,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xCD,0x0000);
+			__ASIC_WriteEngine(x_chip,y_engine,0xCE,0x0100);
+			__ASIC_WriteEngine(x_chip,y_engine,0xCF,0x0000);			
+						
 			// All data sent, now set range
-			
+			/*
 			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (iLowerRange & 0x0FFFF));
 			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (iLowerRange & 0x0FFFF0000) >> 16);
 			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (iUpperRange & 0x0FFFF));
 			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (iUpperRange & 0x0FFFF0000) >> 16);
+			*/
 			
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0));
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0));
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0x0FFFFFF));
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x0FFFFFF));
 			
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0 & 0x0FFFF));
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0 & 0x0FFFF0000) >> 16);
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0x0FFFFFFFF & 0x0FFFF));
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x0FFFFFFFF & 0x0FFFF0000) >> 16);
+			
+			
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0xB675));
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x8D9C));
+			
+			/*
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0xB675));
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x4D9C));
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0xB680));
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x9D9C));
+			*/
+			
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0x4250));
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x38E9));
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0x4280));
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x38E9));
+			
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_LWORD, 0x0);
+			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_HWORD, 0x0);		
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_LWORD, 0x0FF7F);
+			__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_HWORD, 0x0FFFF);	
+						
+			//
 			// We're all set, for this chips... Tell the engine to start
-			//if (y_engine == 0)
-			//{
+			if ((y_engine == 0))
+			{
 				__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));			
 				__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
-			//}
-			//else
-			//{
-			//	__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT));			
-			//	__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, 0); // Clear Write-Register Valid Bit
-			//}
-						
+			}
+			else
+			{
+				__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT ));			
+				__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, 0); // Clear Write-Register Valid Bit
+			}
+								
 			
 			// Increase our range
 			iLowerRange += iRangeSlice;
 			iUpperRange += iRangeSlice;
 		}	
 	}	
+	
+	iVC++;
+	if (iVC == 8) iVC = 0;
 	
 	// Deactivate the SPI
 	__MCU_ASIC_Deactivate_CS();
@@ -826,7 +926,7 @@ void ASIC_reset_engine(char iChip, char iEngine)
 {
 	__MCU_ASIC_Activate_CS();
 	__Reset_Engine(iChip, iEngine);
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Deactivate_CS();
 }
 
 ///////////////////////////////////////////////////////////////
@@ -877,6 +977,8 @@ int ASIC_get_chip_count()
 	if (iChipCount != 0)
 		return iChipCount;
 		
+
+		
 	// Activate CS# of ASIC engines
 	__MCU_ASIC_Activate_CS();
 		
@@ -885,17 +987,24 @@ int ASIC_get_chip_count()
 	
 	for (int x_chip = 0; x_chip < 8; x_chip++)
 	{
-		__ASIC_WriteEngine(x_chip, 0, ASIC_SPI_READ_TEST_REGISTER,0x0F81F);
-		if (__ASIC_ReadEngine(x_chip,0, ASIC_SPI_READ_TEST_REGISTER) == 0x0F81F)
+		// SPI Sync Clear
+		// __ResetSPIErrFlags(0,0);
+		
+		// Proceed
+		for (int iRepeating = 0; iRepeating < 100; iRepeating++)
 		{
-			iActualChipCount++;
-			//#if defined(DO_NOT_USE_ENGINE_ZERO)
-			//	__chip_existence_map[x_chip] = 0x0FFFFFFFF & (~(0b01));
-			//#else
-				__chip_existence_map[x_chip] = 0x0FFFFFFFF;
-			//#endif
-		}			
-
+			__ASIC_WriteEngine(x_chip, 0, ASIC_SPI_READ_TEST_REGISTER,0x0F81F + x_chip);
+			if (__ASIC_ReadEngine(x_chip,0, ASIC_SPI_READ_TEST_REGISTER) == 0x0F81F + x_chip)
+			{
+				iActualChipCount++;
+				//#if defined(DO_NOT_USE_ENGINE_ZERO)
+				//	__chip_existence_map[x_chip] = 0x0FFFFFFFF & (~(0b01));
+				//#else
+					__chip_existence_map[x_chip] = 0x0FFFFFFFF;
+				//#endif
+				break;
+			}						
+		}
 	}
 	
 	// Deactivate CS# of ASIC engines

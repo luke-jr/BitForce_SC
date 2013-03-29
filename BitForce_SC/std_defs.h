@@ -15,7 +15,7 @@
 
 /*************** Operating Frequency ******************/
 // #define __OPERATING_FREQUENCY_16MHz__
-// #define __OPERATING_FREQUENCY_32MHz__ 
+//#define __OPERATING_FREQUENCY_32MHz__ 
 // #define __OPERATING_FREQUENCY_48MHz__
 #define __OPERATING_FREQUENCY_64MHz__
 
@@ -25,6 +25,7 @@
 #define __PRODUCT_MODEL_SINGLE__
 // #define __PRODUCT_MODEL_MINIRIG__
 
+#define CHIP_TO_TEST 0
 
 /*************** XLINK Operations Timeout ***********/
 #define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
@@ -117,6 +118,9 @@ volatile unsigned int GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK;
 // Basic boolean definition
 #define TRUE	1
 #define FALSE	0
+
+// Our sleep function
+volatile void Sleep(unsigned int iSleepPeriod);
 
 // Assembly NOP operation
 #ifdef __OPERATING_FREQUENCY_64MHz__

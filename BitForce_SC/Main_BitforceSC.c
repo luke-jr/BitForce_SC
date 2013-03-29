@@ -23,6 +23,7 @@
 #include "A2D_Module.h"
 #include "ASIC_Engine.h"
 #include <avr32/io.h>
+#include "JohnChengASIC.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -65,7 +66,6 @@ int main(void)
 	init_mcu_led();
 	init_pipe_job_system();
 	init_XLINK();
-	init_ASIC();
 	init_USB();
 	
 	// Initialize A2D
@@ -92,6 +92,16 @@ int main(void)
 	FAN_SUBSYS_Initialize();
 	
 	// Perform an ASIC GET CHIP COUNT
+	init_ASIC();
+	//MCU_SC_Initialize();
+	//initEngines(0);
+	//initEngines(1);
+	//initEngines(2);
+	//initEngines(3);
+	//initEngines(4);
+	//initEngines(5);
+	//initEngines(6);
+	//initEngines(7);
 	ASIC_get_chip_count();
 	
 	// Now set the side-led's accordingly
@@ -157,6 +167,17 @@ int main(void)
 	global_vals[5] = 0;
 
 	GLOBAL_BLINK_REQUEST = 0;
+	
+	// ASIC Submit Jobs
+	/*while (TRUE)
+	{
+		job_packet jp;
+		ASIC_job_issue(&jp,0, 0xFFFFFFFF);
+		while (ASIC_is_processing())
+		{
+			WATCHDOG_RESET;
+		}
+	}*/
 	
 	// Go to our protocol main loop
 	MCU_Main_Loop();

@@ -7,6 +7,15 @@
 
 #include "std_defs.h"
 #include "Generic_Module.h"
+#include "AVR32_OptimizedTemplates.h"
+#include <avr32/io.h>
 
 // Set our initial value for the critical temperature
 extern volatile char GLOBAL_CRITICAL_TEMPERATURE = FALSE;
+
+
+volatile void Sleep(unsigned int iSleepPeriod)
+{
+	volatile unsigned int iActualCounter = MACRO_GetTickCountRet;
+	while (MACRO_GetTickCountRet - iActualCounter < iSleepPeriod) WATCHDOG_RESET;
+}
