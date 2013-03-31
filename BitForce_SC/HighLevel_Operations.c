@@ -33,9 +33,11 @@ volatile void HighLevel_Operations_Spin()
 	WATCHDOG_RESET;	
 	
 	// Job-Pipe Scheduling
-	// Flush_buffer_into_engines();
+	Flush_buffer_into_engines();
 	
 	// Scan XLINK Chain, to be executed every 1.2 seconds
+	
+	
 	if (XLINK_ARE_WE_MASTER == TRUE)
 	{
 		// We refresh the chain every 1.2 seconds
@@ -48,6 +50,7 @@ volatile void HighLevel_Operations_Spin()
 			XLINK_MASTER_Refresh_Chain();
 		}		
 	}
+		
 	
 	// Fan-Spin must be executed every 0.5 seconds
 	{
@@ -62,6 +65,7 @@ volatile void HighLevel_Operations_Spin()
 			FAN_SUBSYS_IntelligentFanSystem_Spin();
 		}
 	}
+	
 	
 	// Global Blink-Request subsystem
 	{
@@ -102,8 +106,6 @@ volatile void HighLevel_Operations_Spin()
 			iInitialTimeHolder = MACRO_GetTickCountRet;
 		}			
 	}
-	
-
 	
 }
 

@@ -151,9 +151,9 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"ATOMIC MACRO SEND PACKET: %u us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);*/
 	
-	volatile unsigned int iStats[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	//volatile unsigned int iStats[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 		
-	__MCU_ASIC_Activate_CS();
+	//__MCU_ASIC_Activate_CS();
 	
 	/*
 	iStats[0]  = __ASIC_ReadEngine(CHIP_TO_TEST,0,ASIC_SPI_READ_STATUS_REGISTER+0);
@@ -176,8 +176,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	iStats[15] = __ASIC_ReadEngine(CHIP_TO_TEST+7,1,ASIC_SPI_READ_STATUS_REGISTER+0);
 	*/
 	
-	#define FIFO_ADDRESS_TO_READ 0x80
-	
+	/*#define FIFO_ADDRESS_TO_READ 0x80
 	#define EXA_CHIP CHIP_TO_TEST
 			
 	iStats[0]  = __ASIC_ReadEngine(EXA_CHIP,1,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,1,FIFO_ADDRESS_TO_READ+1) << 16);
@@ -196,7 +195,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	iStats[13] = __ASIC_ReadEngine(EXA_CHIP,14,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,14,FIFO_ADDRESS_TO_READ+1) << 16);
 	iStats[14] = __ASIC_ReadEngine(EXA_CHIP,15,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,15,FIFO_ADDRESS_TO_READ+1) << 16);
 	//iStats[15] = __ASIC_ReadEngine(CHIP_TO_TEST,16,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(CHIP_TO_TEST,16,FIFO_ADDRESS_TO_READ+1) << 16);
-	
+	*/
 		
 	// Read FSM Status Word 1
 	/*
@@ -292,7 +291,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	iStats[14] = __ASIC_ReadEngine(CHIP_TO_TEST,13,0b010000000+14);
 	iStats[15] = __ASIC_ReadEngine(CHIP_TO_TEST,13,0b010000000+15);*/
 	
-	__MCU_ASIC_Deactivate_CS();	
+	//__MCU_ASIC_Deactivate_CS();	
 
 	// Say Read-Complete
 	
@@ -325,6 +324,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	if ((iStats[15] & 0b01) == 0b01) { __MCU_ASIC_Activate_CS(); iStats[15] = (__ASIC_ReadEngine(CHIP_TO_TEST, 15, FIFO_ADDRESS_TO_READ) & 0x0FFFF) | (__ASIC_ReadEngine(CHIP_TO_TEST, 15, FIFO_ADDRESS_TO_READ+1) << 16); __MCU_ASIC_Deactivate_CS(); ASIC_ReadComplete(CHIP_TO_TEST,15);}
 	*/
 	
+	/*
 	ASIC_ReadComplete(CHIP_TO_TEST,1); 
 	ASIC_ReadComplete(CHIP_TO_TEST,2); 
 	ASIC_ReadComplete(CHIP_TO_TEST,3); 
@@ -340,7 +340,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	ASIC_ReadComplete(CHIP_TO_TEST,13);
 	ASIC_ReadComplete(CHIP_TO_TEST,14);
 	ASIC_ReadComplete(CHIP_TO_TEST,15);
-
+	*/
 	
 	
 /*
@@ -362,28 +362,29 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	ASIC_reset_engine(CHIP_TO_TEST,13);
 	ASIC_reset_engine(CHIP_TO_TEST,14);*/
 		
-	
+	/*
 	sprintf(szTemp,"STATS:\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X \n", 
 		    iStats[0], iStats[1], iStats[2], iStats[3], iStats[4], iStats[5], iStats[6], iStats[7],
 			iStats[8], iStats[9], iStats[10], iStats[11], iStats[12], iStats[13], iStats[14], iStats[15]);
 			
 	strcat(szInfoReq, szTemp);
-	
+	*/
 
 	// Add Engine count
+	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_processor_count());
+	strcat(szInfoReq, szTemp);
 	
-	//sprintf(szTemp,"ENGINES: %d\n", ASIC_get_chip_count());
-	//strcat(szInfoReq, szTemp);
-	
-	/*
+	// Add Engine freuqnecy
+	sprintf(szTemp,"FREQUENCY: 280MHz\n");
+	strcat(szInfoReq, szTemp);
+		
 	// Add Chain Status
 	sprintf(szTemp,"XLINK MODE: %s\n", XLINK_ARE_WE_MASTER ? "MASTER" : "SLAVE" );
 	strcat(szInfoReq, szTemp);
 	
 	// Add XLINK chip installed status
 	sprintf(szTemp,"XLINK PRESENT: %s\n", (XLINK_is_cpld_present() == TRUE) ? "YES" : "NO");
-	strcat(szInfoReq, szTemp);
-	*/
+	strcat(szInfoReq, szTemp);	
 	
 	// If we are master, how many devices exist in chain?
 	if ((XLINK_ARE_WE_MASTER == TRUE) && (XLINK_is_cpld_present() == TRUE))
@@ -474,7 +475,8 @@ PROTOCOL_RESULT Protocol_save_string(void)
 	}
 	
 	// Wait for job data (96 Bytes)
-	volatile char sz_buf[513];
+	volatile char  sz_buf_tag[513];
+	volatile char* sz_buf = sz_buf_tag;
 	volatile unsigned int i_read;
 	volatile unsigned int i_timeout = 1000000000;
 	volatile unsigned char i_invaliddata = FALSE;
@@ -489,7 +491,12 @@ PROTOCOL_RESULT Protocol_save_string(void)
 	{
 		char bTimeoutDetectedX = FALSE;
 		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 1024, __XLINK_TRANSACTION_TIMEOUT__, &bTimeoutDetectedX, FALSE, FALSE);
+		
+		// Error check
 		if (bTimeoutDetectedX == TRUE) return PROTOCOL_FAILED;
+		
+		// Since XLINK will save the first character received, we have to advance the pointer
+		sz_buf++;
 	}
 
 	// Timeout?
@@ -1221,7 +1228,8 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 	}
 	
 	// Wait for job data (96 Bytes)
-	char sz_buf[512];
+	volatile char sz_buf_tag[512];
+	volatile char* sz_buf = sz_buf_tag;
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
 	unsigned char bInvalidData = FALSE;
@@ -1240,6 +1248,9 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 		{
 			 return PROTOCOL_FAILED;
 		}			 
+		
+		// Increment sz_buf since header byte does exist in XLINK and we don't need it
+		sz_buf = sz_buf + 1;
 	}
 
 	// Timeout?
@@ -1531,7 +1542,8 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	}		
 
 	// Wait for job data (96 Bytes)
-	char sz_buf[1024];
+	volatile char sz_buf_tag[1024];
+	volatile char* sz_buf = sz_buf_tag;
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
 	unsigned char bInvalidData = FALSE;
@@ -1548,6 +1560,9 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 					
 		// Check
 		if (bTimeoutDetectedOnXLINK) return PROTOCOL_FAILED;	
+		
+		// Since XLINK will save the first character received, we have to advance the pointer
+		sz_buf++;
 	}
 
 	// Timeout?
@@ -1566,9 +1581,10 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	}
 
 	// Check integrity
-	if ((bInvalidData) || (i_read < sizeof(job_packet))) // Extra 16 bytes are preamble / postamble
+	if ((bInvalidData) || (i_read < sizeof(job_packet))) // Extra 16 bytes are preamble / postamble 
+														   // We write i_read because the byte-header is trimmed out when length is returned by the function
 	{
-		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
+		sprintf(sz_buf, "ERR:INVALID DATA\n");
 		
 		if (XLINK_ARE_WE_MASTER)
 		{
@@ -1584,6 +1600,20 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 
 	// All is ok, send data to ASIC for processing, and respond with OK
 	pjob_packet p_job = (pjob_packet)(sz_buf);
+	
+	// Check signature
+	if (p_job->signature != 0xAA)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:SIGNATURE<\n");  // Send it to USB
+		}		
+		else // We're a slave... send it by XLINK
+		{
+			XLINK_SLAVE_respond_string("ERR:SIGNATURE<\n");	
+		}
+		return PROTOCOL_FAILED;
+	}
 
 	// We have all what we need, send it to ASIC-COMM interface
 	ASIC_job_issue(p_job, 0, 0x0FFFFFFFF);
@@ -1638,7 +1668,8 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 		XLINK_SLAVE_respond_string("OK\n");
 
 	// Wait for job data (96 Bytes)
-	char sz_buf[1024];
+	volatile char sz_buf_tag[1024];
+	volatile char* sz_buf = sz_buf_tag;
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
 	unsigned char bInvalidData = FALSE;
@@ -1651,6 +1682,9 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 		char bTimeoutDetected = FALSE;
 		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 256, 200, &bTimeoutDetected, FALSE, FALSE);
 		if (bTimeoutDetected) return PROTOCOL_FAILED;
+		
+		// Since XLINK will save the first character received, we have to advance the pointer
+		sz_buf++;		
 	}		
 
 	// Timeout?
@@ -1687,11 +1721,25 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	// All is ok, send data to ASIC for processing, and respond with OK
 	pjob_packet_p2p p_job = (pjob_packet_p2p)(sz_buf); // 4 Bytes are for the initial '>>>>'
 
+	// Check signature
+	if (p_job->signature != 0xAA)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:SIGNATURE<\n");  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			XLINK_SLAVE_respond_string("ERR:SIGNATURE<\n");
+		}
+		return PROTOCOL_FAILED;
+	}
+	
 	// We have all what we need, send it to ASIC-COMM interface
 	ASIC_job_issue(p_job, 
 				   p_job->nonce_begin, 
-				   p_job->nonce_end);
-
+				   p_job->nonce_end);				   
+				   
 	// Send our OK	
 	if (XLINK_ARE_WE_MASTER)
 	{
@@ -1708,19 +1756,17 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 
 PROTOCOL_RESULT Protocol_get_status()
 {
-	// Our result
-	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
-
 	// Here, we must return our chip status
-	unsigned int  nonce_list[16];
-	char i;
-	char nonce_count = 0;
-	char stat;
+	volatile unsigned int nonce_list[16];
+	volatile char i;
+	volatile int nonce_count = 0;
+	volatile char stat;
 
-	char sz_report[1024];
-	char sz_tmp[48];
+	volatile char sz_report[1024];
+	volatile char sz_tmp[48];
 
 	stat = ASIC_get_job_status(nonce_list, &nonce_count);
+	//stat = ASIC_JOB_IDLE;
 
 	// What is our status?
 	if (stat == ASIC_JOB_IDLE)
@@ -1797,7 +1843,7 @@ PROTOCOL_RESULT Protocol_get_status()
 	}
 
 	// Return our result...
-	return res;
+	return PROTOCOL_SUCCESS;
 }
 
 PROTOCOL_RESULT Protocol_temperature()
@@ -2138,7 +2184,7 @@ void Flush_buffer_into_engines()
 
 		// Copy data...
 		memcpy((void*)__buf_job_results[i_result_index_to_put].midstate, 	(void*)__inprocess_midstate, 		32);
-		memcpy((void*)__buf_job_results[i_result_index_to_put].block_data, 	(void*)__inprocess_blockdata, 		32);
+		memcpy((void*)__buf_job_results[i_result_index_to_put].block_data, 	(void*)__inprocess_blockdata, 		12);
 		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_list,	(void*)	 i_found_nonce_list, 		8*sizeof(int));
 		__buf_job_results[i_result_index_to_put].i_nonce_count = i_found_nonce_count;
 
@@ -2198,10 +2244,10 @@ void Flush_buffer_into_engines()
 
 	// Before we issue the job, we must put the correct information
 	memcpy((void*)__inprocess_midstate, 	(void*)job_from_pipe.midstate, 	 32);
-	memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 32);
+	memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 12);
 
 	// Send it to processing...
-	ASIC_job_issue(&job_from_pipe, 0x0, 0x0FFFFFFFF);
+	ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF);
 
 	// Our job is p2p now...
 	_prev_job_was_from_pipe = 1;

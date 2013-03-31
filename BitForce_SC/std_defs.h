@@ -37,7 +37,10 @@
 #define __FIRMWARE_VERSION		"1.0.0"
 
 /*************** UNIT ID STRING ********************/
-#define  UNIT_ID_STRING			"BitForce SC 1.0"
+#define  UNIT_ID_STRING			"BitForce SHA256 SC 1.0"
+
+/********* TOTAL CHIPS INSTALLED ON BOARD **********/
+#define	 TOTAL_CHIPS_INSTALLED	8
 
 // Unit Identification String
 #define UNIT_FIRMWARE_ID_STRING	">>>>ID: BitFORCE SC SHA256 Version 1.0>>>>\n"
@@ -70,6 +73,7 @@ typedef struct _tag_job_packet
 {
 	char midstate[32]; // 256Bits of midstate
 	char block_data[12]; // 12 Bytes of data
+	char signature;	// 1 byte, it's 0xAA
 } job_packet, *pjob_packet;
 
 typedef struct _tag_job_packet_p2p
@@ -78,6 +82,7 @@ typedef struct _tag_job_packet_p2p
 	char block_data[12]; // 12 Bytes of data
 	unsigned int  nonce_begin; // 4 Bytes of Nonce-Begin (Little-Endian)
 	unsigned int  nonce_end; // 4 Bytes of Nonce-End (Little-Endian)
+	char signature; // 1 byte, it's 0xAA
 } job_packet_p2p, *pjob_packet_p2p;
 
 typedef struct _tag_buf_job_result_packet

@@ -9,6 +9,7 @@
 #include "Generic_Module.h"
 #include "string.h"
 #include "std_defs.h"
+#include <avr32/io.h>
 
 #define TRUE  1
 #define FALSE 0
@@ -33,7 +34,11 @@ void USB_wait_stream (char* data,
 
 	// while we have data (indicated in status register), read it
 	// there is a cap of max_len bytes
-	while (USB_inbound_USB_data() == FALSE && (*time_out) > 1){*time_out = *time_out - 1;} ; // Loop until there is some data
+	while (USB_inbound_USB_data() == FALSE && (*time_out) > 1)
+	{
+		WATCHDOG_RESET;
+		*time_out = *time_out - 1;
+	}; // Loop until there is some data
 
 	// Is there timeout? abort in this case
 	if (*time_out == 1)
@@ -50,15 +55,19 @@ void USB_wait_stream (char* data,
 	// Now continue until buffer is empty
 	while ((*length < max_len) && *time_out-- > 1)
 	{
+		// Reset WATCHDOG
+		WATCHDOG_RESET;
+		
 		// We read as UL32 as there is inbound data, and max-len was not surpassed
 		while ((*length < max_len) && 
 			   (USB_inbound_USB_data() != FALSE) && 
 			   (!EOS_detected))
 		{
-			byte_received = USB_read_byte();
+			// Reset watchdog
+			WATCHDOG_RESET;
 			
-			unsigned int iLen = 0;
-			unsigned int iLenM1 = 0;
+			// Proceed
+			byte_received = USB_read_byte();
 			
 			if (length_detected == FALSE)
 			{
@@ -71,28 +80,32 @@ void USB_wait_stream (char* data,
 				// We take the byte as UL32 as total length is less than maximum length.
 				// Like this if we're in a problematic transaction, we won't encounter buffer overrun
 				// and at the same time we will clear FTDI's buffer for the newer transactions
-				iLen	= (unsigned int)*length;
-				iLen	= iLen + 1;
-				*length = iLen;
-				iLenM1	= iLen - 1;
-				if (iLenM1 < max_len) data[iLenM1] = byte_received;				
+				if ((*length) < max_len) data[(*length)] = byte_received;
+				*length = *length + 1;				
 			}			
 			
 			// Check for signature
-			iLen = *length;
-			EOS_detected = ((iLen >= max_len) || (iLen == expected_length));			
+			EOS_detected = (((*length) >= max_len) || ((*length) == expected_length));			
 		}
 
 		// Ok, now we check if we have detected the sign already
 		if ((*length >= max_len) || (EOS_detected))
 		{
 			// Read the remainder of bytes in FTDI fifo until it's empty
-			while (USB_inbound_USB_data() == TRUE) { byte_received = USB_read_byte(); } 
+			while (USB_inbound_USB_data() == TRUE) 
+			{ 
+				WATCHDOG_RESET;
+				byte_received = USB_read_byte(); 
+			} 
 			break;
 		}			 
 
 		// No, so we wait for more inbound data
-		while ((USB_inbound_USB_data() == FALSE) && (*time_out > 1)) { *time_out = *time_out - 1;} // Loop until there is some data again...
+		while ((USB_inbound_USB_data() == FALSE) && (*time_out > 1)) 
+		{ 
+			WATCHDOG_RESET;
+			*time_out = *time_out - 1;
+		} // Loop until there is some data again...
 	}
 
 	// OK, we're done at this point. Most likely we'll have our packet, unless
