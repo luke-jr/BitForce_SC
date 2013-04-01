@@ -193,7 +193,7 @@ volatile int   __AVR32_A2D_GetPWR_MAIN(void);
 
 void	__AVR32_USB_Initialize(void);
 void	__AVR32_USB_SetAccess(void);
-char	__AVR32_USB_WriteData(char* iData, char iCount);
+char	__AVR32_USB_WriteData(char* iData, unsigned int iCount);
 int		__AVR32_USB_GetInformation(void);
 char	__AVR32_USB_GetData(char* iData, char iMaxCount);
 void	__AVR32_USB_FlushInputData(void);
@@ -217,7 +217,8 @@ void	__AVR32_SC_Initialize(void);
 void	__AVR32_SC_SetAccess(void);
 unsigned int __AVR32_SC_GetDone  (char iChip);
 unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs);
-unsigned int __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData);
+void __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData);
+void __AVR32_SC_WriteData_Express(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData);
 
 void __AVR32_ASIC_Activate_CS(void); 
 void __AVR32_ASIC_Deactivate_CS(void);

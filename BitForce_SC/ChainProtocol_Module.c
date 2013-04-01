@@ -896,7 +896,7 @@ RETRY_POINT_1:
 		// No timeout was detected, check resp. If it was not ok, try again
 		if ((szDevResponse[0] != 'A') || 
 			(szDevResponse[1] != 'R') ||
-			(szDevResponse[2] != ((iExpectedChecksum & 0x0FF00) >> 8) & 0x0FF) ||
+			(szDevResponse[2] != (((iExpectedChecksum & 0x0FF00) >> 8) & 0x0FF)) ||
 			(szDevResponse[3] !=  (iExpectedChecksum & 0x0FF)) ||
 			(__iRespLen != 4) ||
 			(__senders_address != iAdrs)) // Check both for address-match and 'OK' response

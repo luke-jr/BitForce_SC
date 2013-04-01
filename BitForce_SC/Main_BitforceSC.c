@@ -236,7 +236,7 @@ void MCU_Main_Loop()
 		if (XLINK_ARE_WE_MASTER)
 		{
 			// We listen to USB
-			i = 3000;
+			i = 1000;
 			while (!USB_inbound_USB_data() && i-- > 1);
 			
 			// Check, if 'i' equals zero, we discard the actual command buffer

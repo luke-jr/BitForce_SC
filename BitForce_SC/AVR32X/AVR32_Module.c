@@ -323,7 +323,7 @@ volatile void __AVR32_USB_SetAccess()
 	return;
 }
 
-volatile char __AVR32_USB_WriteData(char* iData, char iCount)
+volatile char __AVR32_USB_WriteData(char* iData, unsigned int iCount)
 {
 	// Return if we're zero
 	if (iCount == 0) return 0;
@@ -825,11 +825,31 @@ volatile inline unsigned int __AVR32_SC_GetDone  (char iChip)
 	if (iChip == 5) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE5) != 0);
 	if (iChip == 6) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE6) != 0);
 	if (iChip == 7) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE7) != 0);
+	return FALSE; // SHOULDNT REACH HERE
 }
 
-volatile unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs)
+#define MACRO__AVR32_SPI0_SendWord(x) \
+		{ \
+			AVR32_SPI0_TDR = (x & 0x0FFFF); \
+			while ((AVR32_SPI0_SR & (1 << 9)) == 0); \
+		}
+		
+#define MACRO__AVR32_SPI0_SendWord_Express(x) \
+		{ \
+			AVR32_SPI0_TDR = (x & 0x0FFFF); \
+			while ((AVR32_SPI0_SR & (1 << 1)) == 0); \
+		}
+		
+		
+#define MACRO__AVR32_SPI0_ReadWord(x) \
+		{ \
+			MACRO__AVR32_SPI0_SendWord(0x0FFFF); \ 
+			x = (AVR32_SPI0_RDR & 0x0FFFF); \
+		}		
+
+inline unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs)
 {
-	volatile unsigned short iCommand = 0;
+	unsigned int iCommand = 0;
 	
 	// Generate the command
 	iCommand = (ASIC_SPI_RW_COMMAND) |  // RW COMMAND (1 = Read)
@@ -838,13 +858,33 @@ volatile unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned ch
 		       (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
 		
 	// Send it via SPI
-	__AVR32_SPI0_SendWord(iCommand);
-	return (__AVR32_SPI0_ReadWord() & 0x0FFFF);
+	///__AVR32_SPI0_SendWord(iCommand);
+	//return __AVR32_SPI0_ReadWord() & 0x0FFFF);
+	int iRetVal = 0;
+	MACRO__AVR32_SPI0_SendWord_Express(iCommand);
+	MACRO__AVR32_SPI0_ReadWord(iRetVal);
+	return iRetVal;
+	
 }
 
-volatile unsigned int __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
+inline void __AVR32_SC_WriteData_Express(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
 {
-	volatile unsigned short iCommand = 0;
+	unsigned int iCommand = 0;
+	
+	// Generate the command
+	// RW COMMAND (0 = WRITE)
+	iCommand = (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+	(((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+	(((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+	
+	// Send it via SPI
+	MACRO__AVR32_SPI0_SendWord_Express(iCommand);
+	MACRO__AVR32_SPI0_SendWord_Express(iData & 0x0FFFF);
+}
+
+inline void __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
+{
+	unsigned int iCommand = 0;
 	
 	// Generate the command
 	// RW COMMAND (0 = WRITE)
@@ -853,8 +893,8 @@ volatile unsigned int __AVR32_SC_WriteData(char iChip, char iEngine, unsigned ch
 			   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
 							  							  
 	// Send it via SPI
-	__AVR32_SPI0_SendWord(iCommand);
-	__AVR32_SPI0_SendWord(iData & 0x0FFFF);							  
+	MACRO__AVR32_SPI0_SendWord_Express(iCommand);
+	MACRO__AVR32_SPI0_SendWord_Express(iData & 0x0FFFF);	
 }
 
 ////////////////////////////////////////////////////

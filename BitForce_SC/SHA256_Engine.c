@@ -286,4 +286,5 @@ int SHA256_Digest(char* szData, int iDataLen, int* retValsAtoH)
   retValsAtoH[6] = H_VALS[6];
   retValsAtoH[7] = H_VALS[7];
   
+  return 0;
 }

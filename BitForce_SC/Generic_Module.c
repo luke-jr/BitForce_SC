@@ -297,10 +297,11 @@ volatile unsigned int MCU_SC_ReadData(char iChip, char iEngine, unsigned char iA
 	#endif
 }
 
-volatile unsigned int MCU_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
+inline unsigned int MCU_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
-		return __AVR32_SC_WriteData(iChip, iEngine, iAdrs, iData);
+		__AVR32_SC_WriteData(iChip, iEngine, iAdrs, iData);
+		return TRUE;
 	#elif defined( __COMPILING_FOR_STM32__)
 		return __STM32_SC_WriteData(iChip, iEngine, iAdrs, iData);
 	#elif defined( __COMPILING_FOR_PIC32__)

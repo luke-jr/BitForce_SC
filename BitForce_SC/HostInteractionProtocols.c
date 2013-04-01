@@ -128,13 +128,17 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	volatile UL32 uLRes = 0;    
 	
 	// Atomic Full-Asm Special CPLD Write latency
-	/*
+	
 	uL1 = MACRO_GetTickCountRet;
+	job_packet jp;
+	//ASIC_is_processing();
+	ASIC_job_issue(&jp,0,0xFFFFFFFF);
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
-	sprintf(szTemp,"MACRO_GetTickCount roundtime: %u us\n", (unsigned int)uLRes);
+	sprintf(szTemp,"MACRO_GetTickCount round-time: %u us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);
 	
+	/*
 	// FAN Process latency
 	uL1 = MACRO_GetTickCountRet;
 	FAN_SUBSYS_IntelligentFanSystem_Spin();
@@ -419,9 +423,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 
 PROTOCOL_RESULT Protocol_fan_set(char iValue)
 {
-	// Our result
-	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
-		
+			
 	// Requests...		
 	volatile unsigned char iRequestedMod = iValue - 48;
 	volatile unsigned char szResponse[64];
@@ -454,6 +456,8 @@ PROTOCOL_RESULT Protocol_fan_set(char iValue)
 									 __XLINK_TRANSACTION_TIMEOUT__, 
 									 &bTimeoutDetected, FALSE);
 	}	
+	
+	return PROTOCOL_SUCCESS;
 }		
 
 PROTOCOL_RESULT Protocol_save_string(void)
@@ -522,7 +526,7 @@ PROTOCOL_RESULT Protocol_save_string(void)
 	// Check integrity
 	if (i_invaliddata == TRUE) // We should've received the correct byte count
 	{
-		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
+		sprintf(sz_buf, "ERR:INVALID DATA\n");
 		
 		if (XLINK_ARE_WE_MASTER)
 		{
@@ -1076,7 +1080,8 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 	}
 	
 	// Wait for job data (96 Bytes)
-	char sz_buf[1024];
+	volatile char sz_buf_tag[1024];
+	volatile char* sz_buf = sz_buf_tag;
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
 	unsigned char bInvalidData = FALSE;
@@ -1091,6 +1096,9 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 		char bTimeoutDetectedX = FALSE;
 		XLINK_SLAVE_wait_transact(sz_buf, &i_read, 1024, __XLINK_TRANSACTION_TIMEOUT__, &bTimeoutDetectedX, FALSE, FALSE);
 		if (bTimeoutDetectedX == TRUE) return PROTOCOL_FAILED;
+		
+		// Advance pointer, as XLINK will intercept the first character which is not used here
+		sz_buf++;
 	}
 
 	// Timeout?
@@ -1114,7 +1122,7 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 	// Check integrity
 	if ((bInvalidData) || (i_read < sizeof(job_packet))) // Extra 16 bytes are preamble / postamble
 	{
-		sprintf(sz_buf, "ERR:INVALID DATA\n", i_read);
+		sprintf(sz_buf, "ERR:INVALID DATA\n");
 		
 		if (XLINK_ARE_WE_MASTER)
 		{
@@ -1135,6 +1143,30 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 
 	// All is ok, send data to ASIC for processing, and respond with OK
 	pjob_packet p_job = (pjob_packet)(sz_buf); 
+	
+	// Check signature
+	if (p_job->signature != 0xAA)
+	{
+		sprintf(sz_buf, "ERR:SIGNATURE\n");
+
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string(sz_buf);  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact(sz_buf,
+										 strlen(sz_buf),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bXTimeoutDetected,
+										 FALSE);
+		}
+
+		return PROTOCOL_INVALID_USB_DATA;		
+	}
+	
+	// Job is ok, push it to stack
 	JobPipe__pipe_push_job(p_job);
 	
 	// SIGNATURE CHECK
@@ -1145,7 +1177,9 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 
 	// Job was pushed into buffer, let the host know
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK:QUEUED\n");  // Send it to USB
+	}
 	else // We're a slave... send it by XLINK
 	{
 		unsigned int bXTimeoutDetected = 0;
@@ -1233,11 +1267,13 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 	unsigned int i_read;
 	unsigned int i_timeout = 1000000000;
 	unsigned char bInvalidData = FALSE;
-
+	unsigned char iDetectedPayloadSize = 0;
+	
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
 	{
 		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &bInvalidData);
+		iDetectedPayloadSize = (unsigned char)i_read;
 	}		
 	else
 	{
@@ -1250,8 +1286,11 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 		}			 
 		
 		// Increment sz_buf since header byte does exist in XLINK and we don't need it
+		iDetectedPayloadSize = sz_buf[0];
+		i_read = i_read - 1; // Since XLINK does transfer the Payload Length to us, which is not considered as data in our case. Thus we have to ignore it.
 		sz_buf = sz_buf + 1;
 	}
+	
 
 	// Timeout?
 	if (i_timeout < 2)
@@ -1275,12 +1314,35 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 	
 	// THIS IS THE STRUCTURE OF THE JOB PACK
 	// --------------------------------------
-	// unsigned __int8 payloadSize;
+	// unsigned __int8 payloadSize; // NOT SEEN IN OUR RESULT
 	// unsigned __int8 signature;   == 0x0C1
 	// unsigned __int8 jobsInArray;
 	// job_packets[<jobsInArray>];
 	// unsigned __int8 endOfWrapper == 0x0FE
 	// --------------------------------------	
+	
+	// Received length should not be greater than 255. Check for it...
+	if (i_read > 255)
+	{
+		// Some fault
+		sprintf(sz_buf, "ERR:INVALID DATA\n");
+
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string(sz_buf);  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact(sz_buf,
+			strlen(sz_buf),
+			__XLINK_TRANSACTION_TIMEOUT__,
+			&bXTimeoutDetected,
+			FALSE);
+		}
+
+		return PROTOCOL_INVALID_USB_DATA;
+	}
 
 	// Check integrity
 	if ((bInvalidData) || (i_read < sizeof(job_packet) + 1 + 1 + 1 + 1)) // sizeof(job_packet) + payloadSize + signature + jobsInArray + endOfWrapper
@@ -1305,17 +1367,17 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 	}
 
 	// All is OK, send data to ASIC for processing, and respond with OK
-	volatile unsigned char stream__payloadSize = sz_buf[0];
-	volatile unsigned char stream__signature   = sz_buf[1];
-	volatile unsigned char stream__jobsInArray = sz_buf[2];
-	volatile unsigned char stream__endOfWrapper= sz_buf[i_read - 1];
+	volatile unsigned char stream__payloadSize  = iDetectedPayloadSize;
+	volatile unsigned char stream__signature    = sz_buf[0];
+	volatile unsigned char stream__jobsInArray  = sz_buf[1];
+	volatile unsigned char stream__endOfWrapper = sz_buf[i_read - 1];
 		
 	// SIGNATURE CHECK
 	// Respond with 'ERR:SIGNATURE' if not matched
 	if ((stream__payloadSize  > 255+3)  ||
-		(stream__signature    != 0x0C1) ||
+		(stream__signature    != 0x0C1) || // Initial Signature
 		(stream__jobsInArray  > 5)		||
-		(stream__jobsInArray  == 0)		||
+		(stream__jobsInArray  == 0)		|| // Terminating Signature
 		(stream__endOfWrapper != 0x0FE))
 	{
 		if (XLINK_ARE_WE_MASTER)
@@ -1334,18 +1396,22 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 	}
 	
 	// Now our famous JobPackets
-	volatile pjob_packet pointer_to_jobs = (pjob_packet)(sz_buf + 3);
+	volatile pjob_packet pointer_to_jobs_0 = (pjob_packet)((void*)(sz_buf + 3 + (0*(sizeof(job_packet)+1) + 1)));
+	volatile pjob_packet pointer_to_jobs_1 = (pjob_packet)((void*)(sz_buf + 3 + (1*(sizeof(job_packet)+1) + 1)));
+	volatile pjob_packet pointer_to_jobs_2 = (pjob_packet)((void*)(sz_buf + 3 + (2*(sizeof(job_packet)+1) + 1)));
+	volatile pjob_packet pointer_to_jobs_3 = (pjob_packet)((void*)(sz_buf + 3 + (3*(sizeof(job_packet)+1) + 1)));
+	volatile pjob_packet pointer_to_jobs_4 = (pjob_packet)((void*)(sz_buf + 3 + (4*(sizeof(job_packet)+1) + 1))); // Last +1 is to skip the sigunature
 	
 	// Now check how many jobs we can take...
 	volatile char total_space_available = JobPipe__available_space();
 	volatile char total_jobs_to_take    = (total_space_available > stream__jobsInArray) ? stream__jobsInArray : total_space_available;
 		
 	// Push the job...
-	if (total_jobs_to_take == 1) JobPipe__pipe_push_job((void*)(pointer_to_jobs+0));
-	if (total_jobs_to_take == 2) JobPipe__pipe_push_job((void*)(pointer_to_jobs+1));
-	if (total_jobs_to_take == 3) JobPipe__pipe_push_job((void*)(pointer_to_jobs+2));
-	if (total_jobs_to_take == 4) JobPipe__pipe_push_job((void*)(pointer_to_jobs+3));
-	if (total_jobs_to_take == 5) JobPipe__pipe_push_job((void*)(pointer_to_jobs+4));
+	if (total_jobs_to_take == 1) JobPipe__pipe_push_job((void*)(pointer_to_jobs_0));
+	if (total_jobs_to_take == 2) JobPipe__pipe_push_job((void*)(pointer_to_jobs_1));
+	if (total_jobs_to_take == 3) JobPipe__pipe_push_job((void*)(pointer_to_jobs_2));
+	if (total_jobs_to_take == 4) JobPipe__pipe_push_job((void*)(pointer_to_jobs_3));
+	if (total_jobs_to_take == 5) JobPipe__pipe_push_job((void*)(pointer_to_jobs_4));
 	
 	// Job was pushed into buffer, let the host know
 	// Generate the message
@@ -1418,8 +1484,8 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 
 	// How many jobs can we take in?
 	strcpy(sz_rep,"");
-	sprintf(sz_temp, "STORAGE:%d\n", PIPE_MAX_BUFFER_DEPTH-__total_jobs_in_buffer);
-	strcat(sz_rep, sz_temp);
+	/*sprintf(sz_temp, "STORAGE:%d\n", PIPE_MAX_BUFFER_DEPTH-__total_jobs_in_buffer);
+	strcat(sz_rep, sz_temp);*/
 
 	// What is the actual
 	// Are we processing something?
@@ -1434,40 +1500,45 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	if (JobPipe__pipe_get_buf_job_results_count() == 0)
 	{
 		// We simply do nothing... Just add the <LF> to the end of the line
-		strcat(sz_rep,"\n");
 	}
 	else
 	{
 		// Now post them one by one
 		for (i_cnt = 0; i_cnt < JobPipe__pipe_get_buf_job_results_count(); i_cnt++)
 		{
+			// Get our job
+			pbuf_job_result_packet pjob_res = (pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt));
+			
 			// Also say which midstate and nonce-range is in process
-			stream_to_hex(((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->midstate , sz_temp2, 64, &istream_len);
-			sz_temp2[(istream_len * 2)] = 0;
-			stream_to_hex(((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->midstate , sz_temp3, 24, &istream_len);
-			sz_temp3[(istream_len * 2)] = 0;			
+			stream_to_hex(pjob_res->midstate , sz_temp2, 32, &istream_len);
+			sz_temp2[istream_len] = 0;
+			stream_to_hex(pjob_res->block_data, sz_temp3, 12, &istream_len);
+			sz_temp3[istream_len] = 0;		
 			
 			// Add nonce-count...
-			volatile unsigned char iNonceCount = ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count;
+			volatile unsigned char iNonceCount = pjob_res->i_nonce_count;
 			sprintf(sz_temp,"%s,%s,%d", sz_temp2, sz_temp3, iNonceCount); // Add midstate, block-data, count and nonces...
 			strcat(sz_rep, sz_temp);
 			
 			// If there are nonces, add a comma here
-			if (iNonceCount > 0) strcat(sz_rep,",");
+			if (iNonceCount > 0)
+			{
+				 strcat(sz_rep,",");
+			}				 
 					
 			// Nonces found...
-			if ( ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count > 0)
+			if ( pjob_res->i_nonce_count > 0)
 			{
 				// Our loop counter
 				unsigned char ix = 0;
 				
-				for (ix = 0; ix < ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->i_nonce_count; ix++)
+				for (ix = 0; ix < pjob_res->i_nonce_count; ix++)
 				{
-					sprintf(sz_temp2, "%08X", ((pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt)))->nonce_list[ix]);
+					sprintf(sz_temp2, "%08X", pjob_res->nonce_list[ix]);
 					strcat(sz_rep, sz_temp2);
 
 					// Add a comma if it's not the last nonce
-					if (ix != found_nonce_count - 1) strcat(sz_rep,",");
+					if (ix != pjob_res->i_nonce_count - 1) strcat(sz_rep,",");
 				}
 
 				// Add the 'Enter' character
@@ -1481,6 +1552,10 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 
 	// Add the OK to our response (finilizer)
 	strcat(sz_rep, "OK\n");
+	
+	volatile int iStrLen = 0;
+	iStrLen = strlen(sz_rep);
+	
 
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
@@ -1497,6 +1572,9 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 									 FALSE);
 	}		
 
+	// Also, we clear the results buffer
+	JobPipe__pipe_set_buf_job_results_count(0);
+	
 	// Return the result...
 	return res;
 }
@@ -2157,25 +2235,30 @@ void Flush_buffer_into_engines()
 {
 	// Our flag which tells us where the previous job
 	// was a P2P job processed or not :)
-	static char _prev_job_was_from_pipe = 0;
+	static char _prev_job_was_from_pipe = FALSE;
 
 	// Take the job from buffer and put it here...
 	// (We take element 0, and push all the arrays back...)
-
-	// Special case: if processing is finished, it's not ok to pop and
-	// _prev_job_was_p2p is set to one, then we must take the result
-	// and put it in our result list
-	if ((!JobPipe__pipe_ok_to_pop()) && (!ASIC_is_processing()) && _prev_job_was_from_pipe)
+	if (ASIC_is_processing() == TRUE) return; // We won't do anything, since there isn't anything we can do
+	
+	// Now if we're not processing, we MAY need to save the results if the previous job was from the pipe
+	if (_prev_job_was_from_pipe == TRUE)
 	{
 		// Verify the result counter is correct
 		if (__buf_job_results_count == PIPE_MAX_BUFFER_DEPTH)
 		{
-			// Then do nothing in this case (for the moment)
+			// Then move all items one-index back (resulting in loss of the job-result at index 0)
+			for (char pIndex = 0; pIndex < PIPE_MAX_BUFFER_DEPTH - 1; pIndex += 1) // PIPE_MAX_BUFFER_DEPTH - 1 because we don't touch the last item in queue
+			{
+				memcpy((void*)__buf_job_results[pIndex].midstate, 	(void*)__buf_job_results[pIndex+1].midstate, 	32);
+				memcpy((void*)__buf_job_results[pIndex].block_data, (void*)__buf_job_results[pIndex+1].block_data, 	12);
+				memcpy((void*)__buf_job_results[pIndex].nonce_list,	(void*)__buf_job_results[pIndex+1].nonce_list,  8*sizeof(UL32)); // 8 nonces maximum
+			}
 		}
 
 		// Read the result and put it here...
 		unsigned int  i_found_nonce_list[16];
-		char i_found_nonce_count;
+		volatile int i_found_nonce_count;
 		char i_result_index_to_put = 0;
 		ASIC_get_job_status(i_found_nonce_list, &i_found_nonce_count);
 
@@ -2191,54 +2274,29 @@ void Flush_buffer_into_engines()
 		// Increase the result count (if possible)
 		if (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH - 1) __buf_job_results_count++;
 
-		// Also clear the _prev_job_was_p2p flag,
-		// this prevents the loop from adding additional results
-		// to the results list when they really don't exist...
-		_prev_job_was_from_pipe = 0;
-
 		// We return, since there is nothing left to do
+	}
+	
+	// Ok, now we have recovered any potential results that could've been useful to us
+	// Now, Are there any jobs in our pipe system? If so, we need to start processing on that right away and set _prev_job_from_pipe.
+	// If not, we just clear _prev_job_from_pipe and exit
+
+	if (JobPipe__pipe_ok_to_pop() == FALSE)
+	{
+		_prev_job_was_from_pipe = FALSE;
 		return;
 	}
 
-	// Do we have anything to pop? Are we processing?
-	if ((!JobPipe__pipe_ok_to_pop()) || (ASIC_is_processing())) 	return;
+	// Ok so there are jobs that require processing. Suck them in and start processing
 
-	// Ok, at this stage, we take the result of the previous operation
-	// and put it in our result buffer
-	if (TRUE)
-	{
-		// Verify the result counter is correct
-		if (__buf_job_results_count == PIPE_MAX_BUFFER_DEPTH)
-		{
-			// Then move all items one-index back (resulting in loss of the job-result at index 0)
-			
-		}
 
-		// Read the result and put it here...
-		unsigned int  i_found_nonce_list[16];
-		char i_found_nonce_count;
-		char i_result_index_to_put = 0;
-		ASIC_get_job_status(i_found_nonce_list, &i_found_nonce_count);
-
-		// Set the correct index
-		i_result_index_to_put = (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH) ?  (__buf_job_results_count) : (PIPE_MAX_BUFFER_DEPTH - 1);
-
-		// Copy data...
-		memcpy((void*)__buf_job_results[i_result_index_to_put].midstate, 	(void*)__inprocess_midstate, 	32);
-		memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_list,	(void*)i_found_nonce_list, 		8*sizeof(UL32)); // 8 nonces maxium
-		__buf_job_results[i_result_index_to_put].i_nonce_count = i_found_nonce_count;
-
-		// Increase the result count (if possible)
-		if (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH - 1) __buf_job_results_count++;
-	}
-
-	// -------------
+	// ***********************************************************
 	// We have something to pop, get it...
 	job_packet job_from_pipe;
 	if (JobPipe__pipe_pop_job(&job_from_pipe) == PIPE_JOB_BUFFER_EMPTY)
 	{
 		// This is odd!!! Don't do anything...
-		_prev_job_was_from_pipe = 0; // Obviously, this must be cleared...
+		_prev_job_was_from_pipe = FALSE; // Obviously, this must be cleared...
 		return;
 	}
 
@@ -2249,8 +2307,8 @@ void Flush_buffer_into_engines()
 	// Send it to processing...
 	ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF);
 
-	// Our job is p2p now...
-	_prev_job_was_from_pipe = 1;
+	// The job is coming from the PIPE...
+	_prev_job_was_from_pipe = TRUE;
 }
 
 
@@ -2321,25 +2379,15 @@ void stream_to_hex(char* sz_stream, char* sz_hex, unsigned int i_stream_len, uns
 	// OK, convert sz_stream
 	char sz_temp[2];
 	unsigned int index;
-	strcpy(sz_hex, "");
-	*i_hex_len = 0;
+	sz_hex[0] = 0x0; // Clear the hex string
 
 	for (index = 0; index < i_stream_len; index++)
 	{
 		sprintf(sz_temp, "%02X", sz_stream[index]);
 		strcat(sz_hex, sz_temp);
-
-		if (index % 16 == 0)
-		{
-			strcat(sz_hex, " ");
-			*i_hex_len += sizeof("") + 2;
-		}
-		else
-		{
-			strcat(sz_hex, " ");
-			*i_hex_len += sizeof("") + 2;
-		}
 	}
+	
+	*i_hex_len = i_stream_len * 2;
 
 	// We're done...
 }
