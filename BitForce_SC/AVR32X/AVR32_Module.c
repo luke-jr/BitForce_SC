@@ -858,12 +858,12 @@ inline unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char
 		       (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
 		
 	// Send it via SPI
-	///__AVR32_SPI0_SendWord(iCommand);
-	//return __AVR32_SPI0_ReadWord() & 0x0FFFF);
-	int iRetVal = 0;
-	MACRO__AVR32_SPI0_SendWord_Express(iCommand);
-	MACRO__AVR32_SPI0_ReadWord(iRetVal);
-	return iRetVal;
+	__AVR32_SPI0_SendWord(iCommand);
+	return (__AVR32_SPI0_ReadWord() & 0x0FFFF);
+	//int iRetVal = 0;
+	//MACRO__AVR32_SPI0_SendWord_Express(iCommand);
+	//MACRO__AVR32_SPI0_ReadWord(iRetVal);
+	//return iRetVal;
 	
 }
 
@@ -893,8 +893,10 @@ inline void __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, 
 			   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
 							  							  
 	// Send it via SPI
-	MACRO__AVR32_SPI0_SendWord_Express(iCommand);
-	MACRO__AVR32_SPI0_SendWord_Express(iData & 0x0FFFF);	
+	//MACRO__AVR32_SPI0_SendWord_Express(iCommand);
+	//MACRO__AVR32_SPI0_SendWord_Express(iData & 0x0FFFF);	
+	__AVR32_SPI0_SendWord(iCommand);
+	__AVR32_SPI0_SendWord(iData & 0xFFFF);
 }
 
 ////////////////////////////////////////////////////

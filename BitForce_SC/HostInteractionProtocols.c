@@ -128,15 +128,19 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	volatile UL32 uLRes = 0;    
 	
 	// Atomic Full-Asm Special CPLD Write latency
+	unsigned int iLM[16];
+	unsigned int iNonceCount;
 	
-	uL1 = MACRO_GetTickCountRet;
+	/*uL1 = MACRO_GetTickCountRet;
 	job_packet jp;
 	//ASIC_is_processing();
-	ASIC_job_issue(&jp,0,0xFFFFFFFF);
+	//ASIC_job_issue(&jp,0,0xFFFFFFFF);
+	ASIC_get_job_status(iLM, &iNonceCount);
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
 	sprintf(szTemp,"MACRO_GetTickCount round-time: %u us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);
+	*/
 	
 	/*
 	// FAN Process latency
@@ -155,43 +159,42 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"ATOMIC MACRO SEND PACKET: %u us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);*/
 	
-	//volatile unsigned int iStats[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	volatile unsigned int iStats[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 		
-	//__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS();
 	
-	/*
-	iStats[0]  = __ASIC_ReadEngine(CHIP_TO_TEST,0,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[1]  = __ASIC_ReadEngine(CHIP_TO_TEST,1,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[2]  = __ASIC_ReadEngine(CHIP_TO_TEST,2,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[3]  = __ASIC_ReadEngine(CHIP_TO_TEST,3,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[4]  = __ASIC_ReadEngine(CHIP_TO_TEST,4,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[5]  = __ASIC_ReadEngine(CHIP_TO_TEST,5,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[6]  = __ASIC_ReadEngine(CHIP_TO_TEST,6,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[7]  = __ASIC_ReadEngine(CHIP_TO_TEST,7,ASIC_SPI_READ_STATUS_REGISTER+0);
-	*/
-	/*
-	iStats[8]  = __ASIC_ReadEngine(CHIP_TO_TEST+0,1,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[9]  = __ASIC_ReadEngine(CHIP_TO_TEST+1,1,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[10] = __ASIC_ReadEngine(CHIP_TO_TEST+2,1,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[11] = __ASIC_ReadEngine(CHIP_TO_TEST+3,1,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[12] = __ASIC_ReadEngine(CHIP_TO_TEST+4,1,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[13] = __ASIC_ReadEngine(CHIP_TO_TEST+5,1,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[14] = __ASIC_ReadEngine(CHIP_TO_TEST+6,1,ASIC_SPI_READ_STATUS_REGISTER+0);
-	iStats[15] = __ASIC_ReadEngine(CHIP_TO_TEST+7,1,ASIC_SPI_READ_STATUS_REGISTER+0);
-	*/
+	
+	iStats[0]  = __ASIC_ReadEngine(0,0,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[1]  = __ASIC_ReadEngine(0,1,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[2]  = __ASIC_ReadEngine(0,2,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[3]  = __ASIC_ReadEngine(0,3,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[4]  = __ASIC_ReadEngine(0,4,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[5]  = __ASIC_ReadEngine(0,5,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[6]  = __ASIC_ReadEngine(0,6,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[7]  = __ASIC_ReadEngine(0,7,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[8]  = __ASIC_ReadEngine(0,8,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[9]  = __ASIC_ReadEngine(0,9,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[10] = __ASIC_ReadEngine(0,10,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[11] = __ASIC_ReadEngine(0,11,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[12] = __ASIC_ReadEngine(0,12,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[13] = __ASIC_ReadEngine(0,13,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[14] = __ASIC_ReadEngine(0,14,ASIC_SPI_READ_STATUS_REGISTER+0);
+	iStats[15] = __ASIC_ReadEngine(0,15,ASIC_SPI_READ_STATUS_REGISTER+0);
+	
+	__MCU_ASIC_Deactivate_CS();
 	
 	/*#define FIFO_ADDRESS_TO_READ 0x80
 	#define EXA_CHIP CHIP_TO_TEST
 			
-	iStats[0]  = __ASIC_ReadEngine(EXA_CHIP,1,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,1,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[1]  = __ASIC_ReadEngine(EXA_CHIP,2,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,2,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[2]  = __ASIC_ReadEngine(EXA_CHIP,3,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,3,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[3]  = __ASIC_ReadEngine(EXA_CHIP,4,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,4,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[4]  = __ASIC_ReadEngine(EXA_CHIP,5,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,5,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[5]  = __ASIC_ReadEngine(EXA_CHIP,6,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,6,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[6]  = __ASIC_ReadEngine(EXA_CHIP,7,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,7,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[7]  = __ASIC_ReadEngine(EXA_CHIP,8,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,8,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[8]  = __ASIC_ReadEngine(EXA_CHIP,9,FIFO_ADDRESS_TO_READ+0)    | (__ASIC_ReadEngine(EXA_CHIP,9,FIFO_ADDRESS_TO_READ+1) << 16);
+	iStats[0]  = __ASIC_ReadEngine(EXA_CHIP,1, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,1,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[1]  = __ASIC_ReadEngine(EXA_CHIP,2, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,2,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[2]  = __ASIC_ReadEngine(EXA_CHIP,3, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,3,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[3]  = __ASIC_ReadEngine(EXA_CHIP,4, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,4,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[4]  = __ASIC_ReadEngine(EXA_CHIP,5, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,5,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[5]  = __ASIC_ReadEngine(EXA_CHIP,6, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,6,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[6]  = __ASIC_ReadEngine(EXA_CHIP,7, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,7,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[7]  = __ASIC_ReadEngine(EXA_CHIP,8, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,8,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[8]  = __ASIC_ReadEngine(EXA_CHIP,9, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,9,FIFO_ADDRESS_TO_READ+1)  << 16);
 	iStats[9]  = __ASIC_ReadEngine(EXA_CHIP,10,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,10,FIFO_ADDRESS_TO_READ+1) << 16);
 	iStats[10] = __ASIC_ReadEngine(EXA_CHIP,11,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,11,FIFO_ADDRESS_TO_READ+1) << 16);
 	iStats[11] = __ASIC_ReadEngine(EXA_CHIP,12,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,12,FIFO_ADDRESS_TO_READ+1) << 16);
@@ -366,14 +369,13 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	ASIC_reset_engine(CHIP_TO_TEST,13);
 	ASIC_reset_engine(CHIP_TO_TEST,14);*/
 		
-	/*
+	
 	sprintf(szTemp,"STATS:\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X \n", 
 		    iStats[0], iStats[1], iStats[2], iStats[3], iStats[4], iStats[5], iStats[6], iStats[7],
 			iStats[8], iStats[9], iStats[10], iStats[11], iStats[12], iStats[13], iStats[14], iStats[15]);
 			
 	strcat(szInfoReq, szTemp);
-	*/
-
+	
 	// Add Engine count
 	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_processor_count());
 	strcat(szInfoReq, szTemp);
@@ -1335,10 +1337,10 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 		{
 			unsigned int bXTimeoutDetected = 0;
 			XLINK_SLAVE_respond_transact(sz_buf,
-			strlen(sz_buf),
-			__XLINK_TRANSACTION_TIMEOUT__,
-			&bXTimeoutDetected,
-			FALSE);
+										 strlen(sz_buf),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bXTimeoutDetected,
+										 FALSE);
 		}
 
 		return PROTOCOL_INVALID_USB_DATA;
@@ -1396,22 +1398,22 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 	}
 	
 	// Now our famous JobPackets
-	volatile pjob_packet pointer_to_jobs_0 = (pjob_packet)((void*)(sz_buf + 3 + (0*(sizeof(job_packet)+1) + 1)));
-	volatile pjob_packet pointer_to_jobs_1 = (pjob_packet)((void*)(sz_buf + 3 + (1*(sizeof(job_packet)+1) + 1)));
-	volatile pjob_packet pointer_to_jobs_2 = (pjob_packet)((void*)(sz_buf + 3 + (2*(sizeof(job_packet)+1) + 1)));
-	volatile pjob_packet pointer_to_jobs_3 = (pjob_packet)((void*)(sz_buf + 3 + (3*(sizeof(job_packet)+1) + 1)));
-	volatile pjob_packet pointer_to_jobs_4 = (pjob_packet)((void*)(sz_buf + 3 + (4*(sizeof(job_packet)+1) + 1))); // Last +1 is to skip the sigunature
+	volatile pjob_packet pointer_to_jobs_0 = (pjob_packet)((void*)(sz_buf + 2 + (0*(sizeof(job_packet) + 1)) +1 ));
+	volatile pjob_packet pointer_to_jobs_1 = (pjob_packet)((void*)(sz_buf + 2 + (1*(sizeof(job_packet) + 1)) +1 ));
+	volatile pjob_packet pointer_to_jobs_2 = (pjob_packet)((void*)(sz_buf + 2 + (2*(sizeof(job_packet) + 1)) +1 ));
+	volatile pjob_packet pointer_to_jobs_3 = (pjob_packet)((void*)(sz_buf + 2 + (3*(sizeof(job_packet) + 1)) +1 ));
+	volatile pjob_packet pointer_to_jobs_4 = (pjob_packet)((void*)(sz_buf + 2 + (4*(sizeof(job_packet) + 1)) +1 )); // Last +1 is to skip the sigunature
 	
 	// Now check how many jobs we can take...
 	volatile char total_space_available = JobPipe__available_space();
 	volatile char total_jobs_to_take    = (total_space_available > stream__jobsInArray) ? stream__jobsInArray : total_space_available;
 		
 	// Push the job...
-	if (total_jobs_to_take == 1) JobPipe__pipe_push_job((void*)(pointer_to_jobs_0));
-	if (total_jobs_to_take == 2) JobPipe__pipe_push_job((void*)(pointer_to_jobs_1));
-	if (total_jobs_to_take == 3) JobPipe__pipe_push_job((void*)(pointer_to_jobs_2));
-	if (total_jobs_to_take == 4) JobPipe__pipe_push_job((void*)(pointer_to_jobs_3));
-	if (total_jobs_to_take == 5) JobPipe__pipe_push_job((void*)(pointer_to_jobs_4));
+	if  (total_jobs_to_take >= 1) JobPipe__pipe_push_job((void*)(pointer_to_jobs_0));
+	if ((total_jobs_to_take >= 2) && (stream__jobsInArray > 1)) JobPipe__pipe_push_job((void*)(pointer_to_jobs_1));
+	if ((total_jobs_to_take >= 3) && (stream__jobsInArray > 2)) JobPipe__pipe_push_job((void*)(pointer_to_jobs_2));
+	if ((total_jobs_to_take >= 4) && (stream__jobsInArray > 3)) JobPipe__pipe_push_job((void*)(pointer_to_jobs_3));
+	if ((total_jobs_to_take == 5) && (stream__jobsInArray > 4)) JobPipe__pipe_push_job((void*)(pointer_to_jobs_4));
 	
 	// Job was pushed into buffer, let the host know
 	// Generate the message

@@ -298,6 +298,9 @@ unsigned int __Read_SPI(int iChip, int iEngine, int iAddress)
 	return iRetVal;
 }
 
+// We are going for 500MHz test
+
+
 // Working...
 void ASIC_Bootup_Chips()
 {
@@ -308,48 +311,111 @@ void ASIC_Bootup_Chips()
 		
 	int c=0;
 	
-	for (CHIP = 0; CHIP < TOTAL_CHIPS_INSTALLED; CHIP++)
-	{
-		//Select ExtClk mode div1
-		//DATAREG0[15]='0';//0=INT_CLK
-		//DATAREG0[14]='0';//0=div2
-		//DATAREG0[13]='1';//0=div4
-		//DATAREG0[12]='0';//1=RESET
-		//DATAREG0[0]='1'; //0=div 1
-		DATAIN=0x2001;//INT_CLK, div/2
-		__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
-
-		//Reset all instances (0-15):
-		//Reset engine 0:
-		//DATAREG0[12]='1'; 
-		DATAIN=0x3001;//INT_CLK, div/2, reset
-		__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
-		
-		//Reset instances 1-15:
-		DATAIN=0x1000;// bit[12]==reset
-		for(c=1;c<16;c++){
-			__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
-		}
-
-		//Enable Clock Out, all instances:
-		DATAIN=0xFFFF;//
-		__Write_SPI(CHIP,0,0x61, DATAIN);//int caddr, int engine, int reg, int data
-
-		//Set Osc Control to slowest frequency:0000 (highest=0xCD55)
-		DATAIN=0xCD55;
-		__Write_SPI(CHIP,0,0x60,DATAIN);//int caddr, int engine, int reg, int data
-
-		//Clear the Reset engine 1-15
-		DATAIN=0x0000;
-		for(c=1;c<16;c++){
-			__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
-		}
-
-		//Disable Clock Out, all engines
-		DATAIN=0xFFFE; // Engine 0 clock is not enabled here
-		__Write_SPI(CHIP,0,0x61,DATAIN);//int caddr, int engine, int reg, int data
-	}
 	
+	// Operates at 250MHz, all Engines ACTIVE
+	#if !defined(FIVE_HUNDRED_MHZ_TEST)
+	
+		for (CHIP = 0; CHIP < TOTAL_CHIPS_INSTALLED; CHIP++)
+		{
+			//Select ExtClk mode div1
+			//DATAREG0[15]='0';//0=INT_CLK
+			//DATAREG0[14]='0';//0=div2
+			//DATAREG0[13]='1';//0=div4
+			//DATAREG0[12]='0';//1=RESET
+			//DATAREG0[0]='1'; //0=div 1
+			DATAIN=0x2001;//INT_CLK, div/2
+			__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
+
+			//Reset all instances (0-15):
+			//Reset engine 0:
+			//DATAREG0[12]='1'; 
+			DATAIN=0x3001;//INT_CLK, div/2, reset
+			__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
+		
+			//Reset instances 1-15:
+			DATAIN=0x1000;// bit[12]==reset
+			for(c=1;c<16;c++)
+			{
+				__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
+			}
+		
+			//Enable Clock Out, all instances:
+			DATAIN=0xFFFF;//
+			__Write_SPI(CHIP,0,0x61, DATAIN);//int caddr, int engine, int reg, int data
+
+			//Set Osc Control to slowest frequency:0000 (highest=0xCD55)
+			//DATAIN=0xCD55; operates at 280
+			DATAIN = 0xFFDF; // Operates 250MHz
+			//DATAIN = 0xCDFF; // Operates 280MHz
+			//DATAIN = 0xFFFF; // Operates Less than 250MHz
+			__Write_SPI(CHIP,0,0x60,DATAIN);//int caddr, int engine, int reg, int data
+
+			//Clear the Reset engine 1-15
+			DATAIN=0x0000;
+			for(c=1;c<16;c++){
+				__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
+			}
+
+			//Disable Clock Out, all engines
+			DATAIN=0xFFFE; // Engine 0 clock is not enabled here
+			__Write_SPI(CHIP,0,0x61,DATAIN);//int caddr, int engine, int reg, int data
+		}	
+	
+	#else
+	
+		// Operates at 500MHz, engine 0 is active
+		for (CHIP = 0; CHIP < TOTAL_CHIPS_INSTALLED; CHIP++)
+		{
+			//Select ExtClk mode div1
+			//DATAREG0[15]='0';//0=INT_CLK
+			//DATAREG0[14]='0';//0=div2
+			//DATAREG0[13]='1';//0=div4
+			//DATAREG0[12]='0';//1=RESET
+			//DATAREG0[0]='1'; //0=div 1
+			DATAIN=(1 << 13) | (1<<14);//INT_CLK, (div/2 & div/4)
+			__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
+
+			//Reset all instances (0-15):
+			//Reset engine 0:
+			//DATAREG0[12]='1';
+			DATAIN=(1 << 13) | (1<<14) | (1<<12) ;//INT_CLK, (div/2 & div/4), reset
+			__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
+		
+			//Reset instances 1-15:
+			DATAIN=0x1000;// bit[12]==reset
+			for(c=1;c<16;c++)
+			{
+				__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
+			}
+		
+			//Enable Clock Out, all instances:
+			DATAIN=0xFFFF; 
+			__Write_SPI(CHIP,0,0x61, DATAIN);//int caddr, int engine, int reg, int data
+
+			//Set Osc Control to slowest frequency:0000 (highest=0xCD55)
+			DATAIN = 0xFFD5; // Operates 500MHz
+			__Write_SPI(CHIP,0,0x60,DATAIN);//int caddr, int engine, int reg, int data
+
+			//Clear the Reset engine 1-15
+			DATAIN=0x0000;
+			for(c=1;c<16;c++){
+				__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
+			}
+
+			//Disable Clock Out, all engines
+			if (CHIP == 0) 
+			{
+				DATAIN=0xFFFE; // Engine 0 clock is not enabled here
+			}
+			else
+			{
+				DATAIN=0; // No engines is enabled for chips other than 0 
+			}				
+			__Write_SPI(CHIP,0,0x61,DATAIN);//int caddr, int engine, int reg, int data
+		}
+	
+	#endif
+
 	//CHIP STATE: Internal Clock, All Registers Reset,All BUT 0 Resets=0,
 	//All clocks Disabled				
 	return;				
@@ -780,7 +846,6 @@ void ASIC_job_issue(void* pJobPacket,
 			//__ASIC_WriteEngine(x_chip,y_engine,0x8D,0xDF9A);
 			//__ASIC_WriteEngine(x_chip,y_engine,0x8E,0x95A6);
 			//__ASIC_WriteEngine(x_chip,y_engine,0x8F,0xAE97);
-			
 
 			// Load H0 (MIDSTATE)
 			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x80,((pjob_packet)(pJobPacket))->midstate[0]  | (((pjob_packet)(pJobPacket))->midstate[1]  << 8));
@@ -799,7 +864,7 @@ void ASIC_job_issue(void* pJobPacket,
 			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x8D,((pjob_packet)(pJobPacket))->midstate[26] | (((pjob_packet)(pJobPacket))->midstate[27] << 8));
 			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x8E,((pjob_packet)(pJobPacket))->midstate[28] | (((pjob_packet)(pJobPacket))->midstate[29] << 8));
 			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x8F,((pjob_packet)(pJobPacket))->midstate[30] | (((pjob_packet)(pJobPacket))->midstate[31] << 8));			
-			
+
 			// Load W (From JOBs)
 			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xA0,((pjob_packet)(pJobPacket))->block_data[0]  | (((pjob_packet)(pJobPacket))->block_data[1]  << 8));
 			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xA1,((pjob_packet)(pJobPacket))->block_data[2]  | (((pjob_packet)(pJobPacket))->block_data[3]  << 8));
@@ -853,33 +918,27 @@ void ASIC_job_issue(void* pJobPacket,
 				MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCD,0x0000);
 				MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCE,0x0100);
 				MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCF,0x0000);			
-			}
-			
+			}			
 						
 			// All data sent, now set range
 			MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (iLowerRange & 0x0FFFF));
 			MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (iLowerRange & 0x0FFFF0000) >> 16);
 			MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (iUpperRange & 0x0FFFF));
 			MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (iUpperRange & 0x0FFFF0000) >> 16);
-			
-					
-			
+						 
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0 & 0x0FFFF));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0 & 0x0FFFF0000) >> 16);
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0x0FFFFFFFF & 0x0FFFF));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x0FFFFFFFF & 0x0FFFF0000) >> 16);
 			
-			
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0xB675));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x8D9C));
-			
-			
+						
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0xB675));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x4D9C));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0xB680));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x9D9C));
-			
-			
+						
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0x4250));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x38E9));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0x4280));

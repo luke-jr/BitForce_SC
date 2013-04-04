@@ -388,6 +388,7 @@ void MCU_Main_Loop()
 					sz_cmd[1] != PROTOCOL_REQ_GET_FIRMWARE_VERSION &&
 					sz_cmd[1] != PROTOCOL_REQ_BLINK &&
 					sz_cmd[1] != PROTOCOL_REQ_TEMPERATURE &&
+					sz_cmd[1] != PROTOCOL_REQ_BUF_PUSH_JOB_PACK &&
 					sz_cmd[1] != PROTOCOL_REQ_BUF_PUSH_JOB &&
 					sz_cmd[1] != PROTOCOL_REQ_BUF_STATUS &&
 					sz_cmd[1] != PROTOCOL_REQ_BUF_FLUSH &&
@@ -434,6 +435,7 @@ void MCU_Main_Loop()
 					
 					// Job-Issuing commands
 					if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB)			Protocol_PIPE_BUF_PUSH();
+					if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB_PACK)    Protocol_PIPE_BUF_PUSH_PACK();
 					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB)			Protocol_handle_job();
 					
 					// Load String / Save String
