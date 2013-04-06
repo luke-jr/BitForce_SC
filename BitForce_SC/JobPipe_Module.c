@@ -11,10 +11,13 @@
 /// This is our Pipelined job processing system (holder of 2 jobs + 1 process)
 ////////////////////////////////////////////////////////////////////////////////
 
+// Job interleaving
+char __was_last_job_loaded_into_engines;
+char __interleaved_loading_progress;
+
 // Information about the result we're holding
 buf_job_result_packet __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
 char __buf_job_results_count;  // Total of results in our __buf_job_results
-	
 job_packet PIPE_PROC_BUF[PIPE_MAX_BUFFER_DEPTH];
 
 void init_pipe_job_system()
@@ -25,18 +28,23 @@ void init_pipe_job_system()
 
 	// Put zeros everywhere
 	unsigned int tx = 0;
-	for (tx = 0; tx < sizeof(__inprocess_midstate); tx++) 	 __inprocess_midstate[tx] = 0;
-	for (tx = 0; tx < sizeof(__inprocess_midstate); tx++) 	 __inprocess_blockdata[tx] = 0;
+	for (tx = 0; tx < sizeof(__inprocess_midstate); tx++) __inprocess_midstate[tx] = 0;
+	for (tx = 0; tx < sizeof(__inprocess_midstate); tx++) __inprocess_blockdata[tx] = 0;
 	
 	// Reset results...
 	__buf_job_results_count = 0;
+	
+	// Clear interleaving
+	__was_last_job_loaded_into_engines = FALSE;
+	__interleaved_loading_progress = 0;
 }
 
 void JobPipe__pipe_flush_buffer()
 {
 	// simply reset its counter;
-	__buf_job_results_count = 0;
-	__total_jobs_in_buffer = 0;	
+	__buf_job_results_count = FALSE;
+	__total_jobs_in_buffer	= FALSE;
+	__was_last_job_loaded_into_engines = FALSE;
 }
 
 char JobPipe__available_space()
@@ -83,7 +91,6 @@ char JobPipe__pipe_pop_job(void* __output_pipe_job_info)
 
 	// Shift all elements back
 	char tx = 0;
-
 	for (tx = 1; tx < __total_jobs_in_buffer; tx++)
 	{
 		memcpy((void*)((char*)(PIPE_PROC_BUF) + ((tx - 1) * sizeof(job_packet))),
@@ -98,6 +105,19 @@ char JobPipe__pipe_pop_job(void* __output_pipe_job_info)
 	return PIPE_JOB_BUFFER_OK;
 }
 
+char JobPipe__pipe_preview_next_job(void* __output_pipe_job_info)
+{
+	// If no job is in the buffer, don't do anything...
+	if (__total_jobs_in_buffer == 0) return PIPE_JOB_BUFFER_EMPTY;
+	
+	// Copy memory block (from element 0)
+	memcpy(__output_pipe_job_info,
+		   (void*)((char*)(PIPE_PROC_BUF)),
+		   sizeof(job_packet));
+
+	// Proceed... All is ok!
+	return PIPE_JOB_BUFFER_OK;	
+}
 
 void* JobPipe__pipe_get_buf_job_result(unsigned int iIndex)
 {
@@ -112,4 +132,14 @@ unsigned int  JobPipe__pipe_get_buf_job_results_count(void)
 void  JobPipe__pipe_set_buf_job_results_count(unsigned int iCount)
 {
 	__buf_job_results_count = iCount;
+}
+
+void  JobPipe__was_last_job_loaded_in_engines(void)
+{
+	return __was_last_job_loaded_into_engines;
+}
+
+void  JobPipe__set_last_job_loaded_in_engines(char iVal)
+{
+	__was_last_job_loaded_into_engines = iVal;
 }

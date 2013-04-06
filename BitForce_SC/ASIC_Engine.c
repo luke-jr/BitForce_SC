@@ -344,8 +344,9 @@ void ASIC_Bootup_Chips()
 			__Write_SPI(CHIP,0,0x61, DATAIN);//int caddr, int engine, int reg, int data
 
 			//Set Osc Control to slowest frequency:0000 (highest=0xCD55)
-			//DATAIN=0xCD55; operates at 280
-			DATAIN = 0xFFDF; // Operates 250MHz
+			DATAIN=0xCD55; // operates at 280
+			//DATAIN = 0xFFDF; // Operates 250MHz
+			//DATAIN = 0x0000; // Operates 170MHz
 			//DATAIN = 0xCDFF; // Operates 280MHz
 			//DATAIN = 0xFFFF; // Operates Less than 250MHz
 			__Write_SPI(CHIP,0,0x60,DATAIN);//int caddr, int engine, int reg, int data

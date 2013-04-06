@@ -33,7 +33,9 @@ volatile void HighLevel_Operations_Spin()
 	WATCHDOG_RESET;	
 	
 	// Job-Pipe Scheduling
+	/*
 	Flush_buffer_into_engines();
+	*/
 	
 	// Scan XLINK Chain, to be executed every 1.2 seconds
 	/*if (XLINK_ARE_WE_MASTER == TRUE)

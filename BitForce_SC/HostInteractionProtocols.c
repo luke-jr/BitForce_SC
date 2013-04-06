@@ -21,8 +21,9 @@
 #include <stdio.h>
 
 // Information about the result we're holding
-extern buf_job_result_packet  __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
-extern char 		   __buf_job_results_count;  // Total of results in our __buf_job_results
+extern buf_job_result_packet __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
+extern char __buf_job_results_count;  // Total of results in our __buf_job_results
+static char _prev_job_was_from_pipe = FALSE;
 
 PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned int iCmdLen)
 {
@@ -131,16 +132,16 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	unsigned int iLM[16];
 	unsigned int iNonceCount;
 	
-	/*uL1 = MACRO_GetTickCountRet;
-	job_packet jp;
 	//ASIC_is_processing();
 	//ASIC_job_issue(&jp,0,0xFFFFFFFF);
-	ASIC_get_job_status(iLM, &iNonceCount);
-	uL2 = MACRO_GetTickCountRet;
-	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
-	sprintf(szTemp,"MACRO_GetTickCount round-time: %u us\n", (unsigned int)uLRes);
-	strcat(szInfoReq, szTemp);
-	*/
+	//ASIC_get_job_status(iLM, &iNonceCount);
+	//uL1 = MACRO_GetTickCountRet;
+	//Flush_buffer_into_engines();
+	//ASIC_job_issue(&jp,0,0x0FFFFFFFF);
+	//uL2 = MACRO_GetTickCountRet;
+	//uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
+	//sprintf(szTemp,"MACRO_GetTickCount round-time: %u us\n", (unsigned int)uLRes);
+	//strcat(szInfoReq, szTemp);
 	
 	/*
 	// FAN Process latency
@@ -159,7 +160,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"ATOMIC MACRO SEND PACKET: %u us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);*/
 	
-	volatile unsigned int iStats[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	/*volatile unsigned int iStats[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 		
 	__MCU_ASIC_Activate_CS();
 	
@@ -182,7 +183,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	iStats[15] = __ASIC_ReadEngine(0,15,ASIC_SPI_READ_STATUS_REGISTER+0);
 	
 	__MCU_ASIC_Deactivate_CS();
-	
+	*/
 	/*#define FIFO_ADDRESS_TO_READ 0x80
 	#define EXA_CHIP CHIP_TO_TEST
 			
@@ -369,12 +370,13 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	ASIC_reset_engine(CHIP_TO_TEST,13);
 	ASIC_reset_engine(CHIP_TO_TEST,14);*/
 		
-	
+	/*
 	sprintf(szTemp,"STATS:\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X\n%08X %08X %08X %08X \n", 
 		    iStats[0], iStats[1], iStats[2], iStats[3], iStats[4], iStats[5], iStats[6], iStats[7],
 			iStats[8], iStats[9], iStats[10], iStats[11], iStats[12], iStats[13], iStats[14], iStats[15]);
 			
 	strcat(szInfoReq, szTemp);
+	*/
 	
 	// Add Engine count
 	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_processor_count());
@@ -1446,17 +1448,21 @@ PROTOCOL_RESULT  Protocol_PIPE_BUF_FLUSH(void)
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
 
 	// Reset the FIFO
+	int iTotalJobsActuallyInBuffer = __total_jobs_in_buffer;
 	JobPipe__pipe_flush_buffer();
-
+	
 	// Send OK first
+	char szFlshString[32];
+	sprintf(szFlshString, "OK:FLUSHED %02d\n", iTotalJobsActuallyInBuffer);
+	
 	if (XLINK_ARE_WE_MASTER)
 	{
-		USB_send_string("OK\n");  // Send it to USB
+		USB_send_string(szFlshString);  // Send it to USB
 	}		
 	else // We're a slave... send it by XLINK
 	{
 		unsigned int bXTimeoutDetected = 0;
-		XLINK_SLAVE_respond_transact("OK\n", sizeof("OK\n"),
+		XLINK_SLAVE_respond_transact(szFlshString, strlen(szFlshString),
 									__XLINK_TRANSACTION_TIMEOUT__,
 									&bXTimeoutDetected,
 									FALSE);
@@ -1495,8 +1501,12 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	char found_nonce_count;
 
 	// How many results?
+	sprintf(sz_temp,"INPROCESS:%d\n", (_prev_job_was_from_pipe == TRUE) ? 1 : 0);
+	strcat(sz_rep, sz_temp);
+		
 	sprintf(sz_temp,"COUNT:%d\n", JobPipe__pipe_get_buf_job_results_count());
 	strcat(sz_rep, sz_temp);
+	
 	
 	// Ok, return the last result as well
 	if (JobPipe__pipe_get_buf_job_results_count() == 0)
@@ -2237,7 +2247,7 @@ void Flush_buffer_into_engines()
 {
 	// Our flag which tells us where the previous job
 	// was a P2P job processed or not :)
-	static char _prev_job_was_from_pipe = FALSE;
+
 
 	// Take the job from buffer and put it here...
 	// (We take element 0, and push all the arrays back...)
@@ -2274,7 +2284,7 @@ void Flush_buffer_into_engines()
 		__buf_job_results[i_result_index_to_put].i_nonce_count = i_found_nonce_count;
 
 		// Increase the result count (if possible)
-		if (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH - 1) __buf_job_results_count++;
+		if (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH) __buf_job_results_count++;
 
 		// We return, since there is nothing left to do
 	}

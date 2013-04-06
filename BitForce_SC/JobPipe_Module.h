@@ -34,5 +34,8 @@ void*			JobPipe__pipe_get_buf_job_result(unsigned int iIndex);
 unsigned int	JobPipe__pipe_get_buf_job_results_count(void);
 void			JobPipe__pipe_set_buf_job_results_count(unsigned int iCount);
 void			JobPipe__pipe_flush_buffer(void);
+char			JobPipe__pipe_preview_next_job(void* __output_pipe_job_info);
+void			JobPipe__was_last_job_loaded_in_engines(void);
+void			JobPipe__set_last_job_loaded_in_engines(char iVal);
 
 #endif /* MCU_INITIALIZATION_H_ */
