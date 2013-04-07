@@ -124,6 +124,12 @@ volatile unsigned int GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK;
 #define TRUE	1
 #define FALSE	0
 
+// Some useful macros
+#define DO_NOT_USE_ENGINE_ZERO	
+#define CHIP_EXISTS(x)					 ((__chip_existence_map[x] != 0))
+#define IS_PROCESSOR_OK(xchip, yengine)  ((__chip_existence_map[xchip] & (1 << yengine)) != 0)
+unsigned int __chip_existence_map[TOTAL_CHIPS_INSTALLED]; // Bit 0 to Bit 16 in each word says if the engine is OK or not...
+	
 // Our sleep function
 volatile void Sleep(unsigned int iSleepPeriod);
 

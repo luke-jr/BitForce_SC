@@ -39,7 +39,7 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 	// We execute this function every 50th call
 	static volatile char __attempt = 0;
 	
-	if (__attempt++ < 50) return;
+	if (__attempt++ < 10) return;
 	
 	// It is the 50th call
 	__attempt = 0;

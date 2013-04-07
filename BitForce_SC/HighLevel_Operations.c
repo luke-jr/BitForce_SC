@@ -13,18 +13,14 @@
 #include "USBProtocol_Module.h"
 #include "A2D_Module.h"
 #include "ASIC_Engine.h"
-
 #include "HostInteractionProtocols.h"
 #include "HighLevel_Operations.h"
 #include "FAN_Subsystem.h"
-
 #include "AVR32_OptimizedTemplates.h"
 
 #include <string.h>
 #include <stdio.h>
-
 #include <avr32/io.h>
-
 
 volatile void HighLevel_Operations_Spin()
 {
@@ -33,9 +29,7 @@ volatile void HighLevel_Operations_Spin()
 	WATCHDOG_RESET;	
 	
 	// Job-Pipe Scheduling
-	/*
-	Flush_buffer_into_engines();
-	*/
+	Flush_buffer_into_engines();	
 	
 	// Scan XLINK Chain, to be executed every 1.2 seconds
 	/*if (XLINK_ARE_WE_MASTER == TRUE)
@@ -49,9 +43,7 @@ volatile void HighLevel_Operations_Spin()
 			iInitialTimeHolder = iActualTickHolder;
 			XLINK_MASTER_Refresh_Chain();
 		}		
-	}*/
-	
-		
+	}*/		
 	
 	// Fan-Spin must be executed every 0.5 seconds
 	{
@@ -65,8 +57,7 @@ volatile void HighLevel_Operations_Spin()
 			// Call our Fan-Spin
 			FAN_SUBSYS_IntelligentFanSystem_Spin();
 		}
-	}
-	
+	}	
 	
 	// Global Blink-Request subsystem
 	{

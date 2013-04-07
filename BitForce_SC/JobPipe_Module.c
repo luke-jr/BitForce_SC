@@ -12,8 +12,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 // Job interleaving
-char __was_last_job_loaded_into_engines;
-char __interleaved_loading_progress;
+char __interleaved_was_last_job_loaded_into_engines;
+char __interleaved_loading_progress_chip;
+char __interleaved_loading_progress_engine;
+char __interleaved_loading_progress_finished;
 
 // Information about the result we're holding
 buf_job_result_packet __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
@@ -35,30 +37,37 @@ void init_pipe_job_system()
 	__buf_job_results_count = 0;
 	
 	// Clear interleaving
-	__was_last_job_loaded_into_engines = FALSE;
-	__interleaved_loading_progress = 0;
+	__interleaved_loading_progress_chip = FALSE;
+	__interleaved_loading_progress_engine = FALSE;
+	__interleaved_loading_progress_finished = FALSE;
+	__interleaved_was_last_job_loaded_into_engines = FALSE;
 }
 
 void JobPipe__pipe_flush_buffer()
 {
 	// simply reset its counter;
-	__buf_job_results_count = FALSE;
-	__total_jobs_in_buffer	= FALSE;
-	__was_last_job_loaded_into_engines = FALSE;
+	__buf_job_results_count = 0;
+	__total_jobs_in_buffer	= 0;
+	
+	// Interleaved reset...
+	__interleaved_was_last_job_loaded_into_engines = FALSE;
+	__interleaved_loading_progress_finished = FALSE;
+	__interleaved_loading_progress_engine = FALSE;
+	__interleaved_loading_progress_chip = FALSE;	
 }
 
-char JobPipe__available_space()
+inline char JobPipe__available_space()
 {
 	// simply reset its counter;
-	return PIPE_MAX_BUFFER_DEPTH - __total_jobs_in_buffer;
+	return (__total_jobs_in_buffer > PIPE_MAX_BUFFER_DEPTH) ? 0 : (PIPE_MAX_BUFFER_DEPTH - __total_jobs_in_buffer);
 }
 
-char JobPipe__pipe_ok_to_pop()
+inline char JobPipe__pipe_ok_to_pop()
 {
 	return ((__total_jobs_in_buffer > 0) ? 1 : 0);
 }
 
-char JobPipe__pipe_ok_to_push()
+inline char JobPipe__pipe_ok_to_push()
 {
 	return ((__total_jobs_in_buffer < PIPE_MAX_BUFFER_DEPTH) ? 1 : 0);
 }
@@ -124,22 +133,13 @@ void* JobPipe__pipe_get_buf_job_result(unsigned int iIndex)
 	return (void*)&__buf_job_results[iIndex];
 }
 
-unsigned int  JobPipe__pipe_get_buf_job_results_count(void)
-{
-	return __buf_job_results_count;
-}
-
-void  JobPipe__pipe_set_buf_job_results_count(unsigned int iCount)
-{
-	__buf_job_results_count = iCount;
-}
-
-void  JobPipe__was_last_job_loaded_in_engines(void)
-{
-	return __was_last_job_loaded_into_engines;
-}
-
-void  JobPipe__set_last_job_loaded_in_engines(char iVal)
-{
-	__was_last_job_loaded_into_engines = iVal;
-}
+inline unsigned int JobPipe__pipe_get_buf_job_results_count(void)			 {return __buf_job_results_count;}
+inline void JobPipe__pipe_set_buf_job_results_count(unsigned int iCount)	 {__buf_job_results_count = iCount;}
+inline void JobPipe__set_was_last_job_loaded_in_engines(char iVal)			 {__interleaved_was_last_job_loaded_into_engines = iVal;}
+inline char JobPipe__get_was_last_job_loaded_in_engines()					 {return __interleaved_was_last_job_loaded_into_engines;}
+inline void JobPipe__set_interleaved_loading_progress_chip(char iVal)		 {__interleaved_loading_progress_chip = iVal;}
+inline char JobPipe__get_interleaved_loading_progress_chip()				 {return __interleaved_loading_progress_chip;}
+inline void JobPipe__set_interleaved_loading_progress_engine(char iVal)		 {__interleaved_loading_progress_engine = iVal;}
+inline char JobPipe__get_interleaved_loading_progress_engine()				 {return __interleaved_loading_progress_engine;}
+inline void JobPipe__set_interleaved_loading_progress_finished(char iVal)	 {__interleaved_loading_progress_finished = iVal;}
+inline char JobPipe__get_interleaved_loading_progress_finished()			 {return __interleaved_loading_progress_finished;}

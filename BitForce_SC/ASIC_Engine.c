@@ -11,13 +11,6 @@
 #include "Generic_Module.h"
 #include "AVR32X/AVR32_Module.h"
 
-// Some useful macros
-#define CHIP_EXISTS(x)					 ((__chip_existence_map[x] != 0))
-#define IS_PROCESSOR_OK(xchip, yengine)  ((__chip_existence_map[xchip] & (1 << yengine)) != 0)
-
-// We have to define this
-#define DO_NOT_USE_ENGINE_ZERO
-
 //static volatile unsigned int __ActualRegister0Value = (0);
   static volatile unsigned int __ActualRegister0Value = (1<<13);
 //static volatile unsigned int __ActualRegister0Value = (1);
@@ -47,13 +40,21 @@ static const unsigned int STATIC_W0[64] = {
 	0x00000000, 0x00000000, 0x00000000, 0x00000000
 };
 
-// Chip Existence Map
-unsigned int __chip_existence_map[TOTAL_CHIPS_INSTALLED] = {0,0,0,0,0,0,0,0}; // Bit 0 to Bit 16 in each word says if the engine is OK or not...
-	
+
 // Midstate for SHA1-Core, this is provided by the MCU (Which is in turn provided by the GetWork API)
 void init_ASIC(void)
 {
 	MCU_SC_Initialize();
+	
+	// Clear ASIC map
+	__chip_existence_map[0] = 0;
+	__chip_existence_map[1] = 0;
+	__chip_existence_map[2] = 0;
+	__chip_existence_map[3] = 0;
+	__chip_existence_map[4] = 0;
+	__chip_existence_map[5] = 0;
+	__chip_existence_map[6] = 0;
+	__chip_existence_map[7] = 0;
 	
 	// Here we must give 16 clock cycles with CS# inactive, to initialize the ASIC chips
 	__MCU_ASIC_Deactivate_CS();
@@ -133,7 +134,8 @@ char ASIC_diagnose_processor(char iChip, char iEngine)
 	jp.signature  = 0xAA;
 		
 	// Now send the job to the engine
-	ASIC_job_issue_to_specified_engine(iChip,iEngine,&jp, 0x8D9CB670, 0x8D9CB67A);
+	ASIC_job_issue_to_specified_engine(iChip,iEngine,&jp, TRUE, TRUE, 0x8D9CB670, 0x8D9CB67A);
+	ASIC_job_start_processing(iChip, iEngine, TRUE);
 	
 	// Read back results immediately (with a little delay), it shouldv'e been finished since it takes about 40ns
 	NOP_OPERATION;
@@ -481,6 +483,11 @@ int ASIC_are_all_engines_done(unsigned int iChip)
 	return (iExpectedEnginesToBeDone == iTotalEnginesDone);
 }
 
+char ASIC_has_engine_finished_processing(char iChip, char iEngine)
+{
+	return ((__AVR32_SC_ReadData(iChip, iEngine, ASIC_SPI_READ_STATUS_REGISTER) & ASIC_SPI_READ_STATUS_BUSY_BIT) != ASIC_SPI_READ_STATUS_BUSY_BIT);
+}
+
 // How many total processors are there?
 int ASIC_get_processor_count()
 {
@@ -783,14 +790,10 @@ void ASIC_job_issue(void* pJobPacket,
 	// Have we ever come here before? If so, don't program static data in the registers any longer
 	static unsigned char bIsThisOurFirstTime = TRUE;
 
-	//for (volatile int x_chip = 4; x_chip < 5; x_chip++)	
 	for (volatile int x_chip = 0; x_chip < TOTAL_CHIPS_INSTALLED; x_chip++)
 	{
 		if (CHIP_EXISTS(x_chip) == 0) continue; // Skip it...
-		
-		// DEBUG
-		// if ((x_chip != 3) && (x_chip != 4) && (x_chip != 5) && (x_chip != 6)) continue;
-				
+
 		// We assign the job to each engine in each chip
 		for (volatile int y_engine = 1; y_engine < 16; y_engine++)
 		{
@@ -798,7 +801,9 @@ void ASIC_job_issue(void* pJobPacket,
 			if (!IS_PROCESSOR_OK(x_chip, y_engine)) continue;
 			
 			// STATIC RULE - Engine 0 not used
-			if (y_engine == 0) continue; // Do not start engine 0
+			#if defined(DO_NOT_USE_ENGINE_ZERO)
+				if (y_engine == 0) continue; // Do not start engine 0
+			#endif
 			
 			// Reset the engine
 			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, (1<<9) | (1<<12));
@@ -830,24 +835,6 @@ void ASIC_job_issue(void* pJobPacket,
 				MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9F,0x5BE0);				
 			}
 			
-			// Load H0 (MIDSTATE) [ FOR TEST ]
-			//__ASIC_WriteEngine(x_chip,y_engine,0x80,0x423C);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x81,0xA849);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x82,0xC5E1);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x83,0x7845);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x84,0x2DA5);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x85,0xC183);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x86,0xE501);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x87,0x8EC5);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x88,0x2FF5);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x89,0x0D03);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x8A,0x2EEE);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x8B,0x299D);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x8C,0x94B6);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x8D,0xDF9A);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x8E,0x95A6);
-			//__ASIC_WriteEngine(x_chip,y_engine,0x8F,0xAE97);
-
 			// Load H0 (MIDSTATE)
 			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x80,((pjob_packet)(pJobPacket))->midstate[0]  | (((pjob_packet)(pJobPacket))->midstate[1]  << 8));
 			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x81,((pjob_packet)(pJobPacket))->midstate[2]  | (((pjob_packet)(pJobPacket))->midstate[3]  << 8));
@@ -926,20 +913,7 @@ void ASIC_job_issue(void* pJobPacket,
 			MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (iLowerRange & 0x0FFFF0000) >> 16);
 			MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (iUpperRange & 0x0FFFF));
 			MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (iUpperRange & 0x0FFFF0000) >> 16);
-						 
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0 & 0x0FFFF));
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0 & 0x0FFFF0000) >> 16);
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0x0FFFFFFFF & 0x0FFFF));
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x0FFFFFFFF & 0x0FFFF0000) >> 16);
-			
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0xB675));
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x8D9C));
-						
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0xB675));
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x4D9C));
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0xB680));
-			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x9D9C));
-						
+
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0x4250));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x38E9));
 			//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0x4280));
@@ -976,10 +950,46 @@ void ASIC_job_issue(void* pJobPacket,
 
 }
 
+void ASIC_job_start_processing(char iChip, char iEngine, char bForcedStart)
+{
+	// Error Check: _HighRange - _LowRange must be at least 256
+	char x_chip = iChip;
+	char y_engine = iEngine;
+
+	if (bForcedStart == FALSE)
+	{
+		if (!CHIP_EXISTS(iChip)) return;
+		if (!IS_PROCESSOR_OK(x_chip, y_engine)) return;
+	}
+	
+	// Activate the SPI
+	__MCU_ASIC_Activate_CS();
+	NOP_OPERATION;
+	NOP_OPERATION;	
+	
+	// Set Write-Register valid
+	// We're all set, for this chips... Tell the engine to start
+	if ((y_engine == 0))
+	{
+		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));
+		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+	}
+	else
+	{
+		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT ));
+		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, 0); // Clear Write-Register Valid Bit
+	}
+				
+	// Deactivate the SPI
+	__MCU_ASIC_Deactivate_CS();
+}
+
 
 void ASIC_job_issue_to_specified_engine(char  iChip, 
 										char  iEngine,
 										void* pJobPacket,
+										char  bLoadStaticData,
+										char  bResetBeforStart,
 										unsigned int _LowRange,
 										unsigned int _HighRange)
 {
@@ -999,30 +1009,38 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 	NOP_OPERATION;
 
 	// Reset the engine
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, (1<<9) | (1<<12));
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, 0);
-
-	// Set limit register
-	MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_LWORD, 0x82);
-	MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_HWORD, 0x81);
-				
+	if (bResetBeforStart == TRUE)
+	{
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, (1<<9) | (1<<12));
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, 0);
+	}
+	
 	// Set static H values [0..7]
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x90,0xE667);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x91,0x6A09);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x92,0xAE85);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x93,0xBB67);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x94,0xF372);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x95,0x3C6E);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x96,0xF53A);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x97,0xA54F);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x98,0x527F);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x99,0x510E);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9A,0x688C);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9B,0x9B05);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9C,0xD9AB);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9D,0x1F83);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9E,0xCD19);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9F,0x5BE0);	
+	if (bLoadStaticData == TRUE)
+	{
+		// Set limit register
+		MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_LWORD, 0x82);
+		MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_HWORD, 0x81);
+			
+		// Proceed	
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x90,0xE667);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x91,0x6A09);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x92,0xAE85);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x93,0xBB67);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x94,0xF372);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x95,0x3C6E);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x96,0xF53A);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x97,0xA54F);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x98,0x527F);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x99,0x510E);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9A,0x688C);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9B,0x9B05);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9C,0xD9AB);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9D,0x1F83);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9E,0xCD19);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x9F,0x5BE0);		
+	}
+	
 				
 	// Load H0 (MIDSTATE)
 	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0x80,((pjob_packet)(pJobPacket))->midstate[0]  | (((pjob_packet)(pJobPacket))->midstate[1]  << 8));
@@ -1050,71 +1068,63 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xA4,((pjob_packet)(pJobPacket))->block_data[8]  | (((pjob_packet)(pJobPacket))->block_data[9]  << 8));
 	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xA5,((pjob_packet)(pJobPacket))->block_data[10] | (((pjob_packet)(pJobPacket))->block_data[11] << 8));
 
-	// STATIC [W0]
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xA8,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xA9,0x8000);
+	if (bLoadStaticData == TRUE)
+	{
+		// STATIC [W0]
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xA8,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xA9,0x8000);
 			
-	// STATIC [W1]
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAA,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAB,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAC,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAD,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAE,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAF,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB0,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB1,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB2,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB3,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB4,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB5,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB6,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB7,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB8,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB9,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBA,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBB,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBC,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBD,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBE,0x0280);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBF,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC0,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC1,0x8000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC2,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC3,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC4,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC5,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC6,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC7,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC8,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC9,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCA,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCB,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCC,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCD,0x0000);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCE,0x0100);
-	MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCF,0x0000);			
-
+		// STATIC [W1]
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAA,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAB,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAC,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAD,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAE,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xAF,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB0,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB1,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB2,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB3,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB4,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB5,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB6,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB7,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB8,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xB9,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBA,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBB,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBC,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBD,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBE,0x0280);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xBF,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC0,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC1,0x8000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC2,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC3,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC4,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC5,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC6,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC7,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC8,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xC9,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCA,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCB,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCC,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCD,0x0000);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCE,0x0100);
+		MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCF,0x0000);		
+		
+		// Load barrier offset
+		MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_LWORD, 0x0FF7F);
+		MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_HWORD, 0x0FFFF);
+	}
+			
 	// All data sent, now set range
 	MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (_LowRange & 0x0FFFF));
 	MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (_LowRange & 0x0FFFF0000) >> 16);
-	MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (_HighRange & 0x0FFFF));
-	MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (_HighRange & 0x0FFFF0000) >> 16);
-	
-	MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_LWORD, 0x0FF7F);
-	MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_HWORD, 0x0FFFF);	
-						
-	// We're all set, for this chips... Tell the engine to start
-	if ((y_engine == 0))
-	{
-		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));			
-		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
-	}	
-	else
-	{
-		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT ));			
-		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, 0); // Clear Write-Register Valid Bit
-	}
-
+	MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (_HighRange & 0x0FFFF));
+	MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (_HighRange & 0x0FFFF0000) >> 16);
+							
 	// Deactivate the SPI
 	__MCU_ASIC_Deactivate_CS();
 }

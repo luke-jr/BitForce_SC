@@ -123,13 +123,14 @@ void    init_ASIC(void);
 int			 ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount);
 void		 ASIC_job_issue(void* pJobPacket, unsigned int _LowRange,unsigned int _HighRange);
 
-void		 ASIC_job_issue_to_specified_engine(char iChip, char iEngine, 
-												void* pJobPacket, 
-												unsigned int _LowRange,
-												unsigned int _HighRange);
+void		 ASIC_job_issue_to_specified_engine(char  iChip, char  iEngine,	void* pJobPacket, 
+											    char bLoadStaticData, char  bResetBeforStart, 
+												unsigned int _LowRange, unsigned int _HighRange);
 												
+void		 ASIC_job_start_processing(char iChip, char iEngine, char bForcedStart);
 int  		 ASIC_get_chip_count(void);
 int  		 ASIC_get_processor_count(void);
+char		 ASIC_has_engine_finished_processing(char iChip, char iEngine);
 char		 ASIC_diagnose_processor(char iEngine, char iProcessor);
 int			 ASIC_are_all_engines_done(unsigned int iChip);
 void		 ASIC_reset_engine(char iChip, char iEngine);

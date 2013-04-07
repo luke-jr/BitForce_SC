@@ -2243,15 +2243,147 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 	return result;	
 }
 
+
+
+
+// =============================================================
+// Buffer Management ===========================================
+// =============================================================
+
 void Flush_buffer_into_engines()
 {
 	// Our flag which tells us where the previous job
 	// was a P2P job processed or not :)
 
-
 	// Take the job from buffer and put it here...
 	// (We take element 0, and push all the arrays back...)
-	if (ASIC_is_processing() == TRUE) return; // We won't do anything, since there isn't anything we can do
+	if (ASIC_is_processing() == TRUE)
+	{
+		// Ok, since ASICs are processing, at this point we can start loading the next job in queue.
+		// If the previous job is already loaded, then there isn't much we can do
+		if (JobPipe__pipe_ok_to_pop() == FALSE)
+		{
+			// There is nothing to load, just return...
+			return;
+		}
+		
+		// Have we loaded something already and it has finished? If so, nothing to do as well
+		if (JobPipe__get_interleaved_loading_progress_finished() == TRUE)
+		{
+			// Since the job is already loaded, there is nothing to do...
+			return;
+		}
+		
+		// Now we reach here, it means there is a job available for loading, which has not been 100% loaded.
+		// Try to load one engine at a time...
+		job_packet jp;
+		char iRes = JobPipe__pipe_preview_next_job(&jp);
+		
+		// TODO: Take further action
+		if (iRes == PIPE_JOB_BUFFER_EMPTY)
+		{
+			// This is a SERIOUS PROBLEM, it shouldn't be the case... (since we've already executed JobPipe__pipe_ok_to_pop)
+		}
+	
+		// Ok, we have the JOB. We start looping...
+		char iChipToProceed = JobPipe__get_interleaved_loading_progress_chip();
+		char iTotalChipsInstalled = ASIC_get_chip_count();
+		char iEngineToProceed = JobPipe__get_interleaved_loading_progress_engine();
+		char iChipHover = 0;
+		char iEngineHover = 0;
+		
+		unsigned int iProcessorCount = ASIC_get_processor_count();
+		unsigned int iRangeSlice = (0xFFFFFFFF / iProcessorCount);
+		unsigned int iRemainder  =  0xFFFFFFFF - (iRangeSlice * iProcessorCount); // This is reserved for the last engine in the last chip
+		
+		// Initial value is set here... (These are static, as they are only used in this function)
+		static unsigned int iLowerRange = 0;
+		static unsigned int iUpperRange = 0;
+		
+		// Did we perform any writes? If not, it means we're finished
+		char bDidWeWriteAnyEngines = FALSE;
+		char bEngineWasNotFinishedSoWeAborted = FALSE;
+		
+		// We reset lower-range and upper-range if we're dealing with chip-0 and engine-0
+		if ((iChipToProceed == 0) && (iEngineToProceed == 0)) { iLowerRange = 0; iUpperRange = 0 + iRangeSlice; }
+		
+		// Ok, we continue until we get the good chip
+		for (iChipHover = iChipToProceed; iChipHover < iTotalChipsInstalled; iChipHover++)		
+		{
+			// We reach continue to the end...
+			if (!CHIP_EXISTS(iChipHover)) continue;
+			
+			// Hover the engines...
+			for (iEngineHover = iEngineToProceed; iEngineHover < 16; iEngineHover++)
+			{
+				// Is this processor ok?
+				if (!IS_PROCESSOR_OK(iChipHover, iEngineHover)) continue;
+				
+				// Is it engine 0 and we're restricted?
+				#if defined(DO_NOT_USE_ENGINE_ZERO)
+					if (iEngineHover == 0) continue;
+				#endif
+				
+				// Is this engine finished? If yes then we'll write data to it. IF NOT THEN JUST FORGET IT! We abort this part altogether
+				/*if (ASIC_has_engine_finished_processing(iChipHover, iEngineHover) == FALSE)
+				{
+					bEngineWasNotFinishedSoWeAborted = TRUE;
+					break;
+				}*/
+				
+				// Ok, now do Job-Issue to this engine on this chip
+				ASIC_job_issue_to_specified_engine(iChipHover, iEngineHover, &jp, FALSE, FALSE, iLowerRange, iUpperRange);
+				
+				// Increment 
+				iLowerRange += iRangeSlice;
+				iUpperRange += iRangeSlice;
+				
+				// Ok, Set the next engine to be processed...
+				if (iEngineHover == 15)
+				{
+					JobPipe__set_interleaved_loading_progress_chip(iChipHover+1);
+					JobPipe__set_interleaved_loading_progress_engine(0);
+				}
+				else
+				{
+					JobPipe__set_interleaved_loading_progress_chip(iChipHover);
+					JobPipe__set_interleaved_loading_progress_engine(iEngineHover+1);					
+				}
+				
+				// Set the flag
+				bDidWeWriteAnyEngines = TRUE;
+				
+				// Exit the loop
+				break;			
+			}
+			
+			// Did we perform any writes? If so, we're done
+			if (bDidWeWriteAnyEngines == TRUE) break;
+			
+			// Was the designated engine busy? If so, we exit
+			if (bEngineWasNotFinishedSoWeAborted == TRUE) break;
+		}
+				
+		// Did we write any engines? If NOT then we're finished
+		if ((bDidWeWriteAnyEngines == FALSE) && (bEngineWasNotFinishedSoWeAborted == FALSE))
+		{
+			// Set/Reset related settings
+			JobPipe__set_interleaved_loading_progress_finished(TRUE);
+			JobPipe__set_interleaved_loading_progress_chip(0);
+			JobPipe__set_interleaved_loading_progress_engine(0);			
+			
+			// Also clear the bounds
+			iLowerRange = 0;
+			iUpperRange = 0;
+		}
+		else
+		{
+			// We're not finished
+			JobPipe__set_interleaved_loading_progress_finished(FALSE);			
+		}
+			
+		return; // We won't do anything, since there isn't anything we can do
+	}		 
 	
 	// Now if we're not processing, we MAY need to save the results if the previous job was from the pipe
 	if (_prev_job_was_from_pipe == TRUE)
@@ -2292,36 +2424,102 @@ void Flush_buffer_into_engines()
 	// Ok, now we have recovered any potential results that could've been useful to us
 	// Now, Are there any jobs in our pipe system? If so, we need to start processing on that right away and set _prev_job_from_pipe.
 	// If not, we just clear _prev_job_from_pipe and exit
-
 	if (JobPipe__pipe_ok_to_pop() == FALSE)
 	{
+		// Last job was not from pipe...
 		_prev_job_was_from_pipe = FALSE;
+		
+		// Reset interleaved settings as well...
+		JobPipe__set_interleaved_loading_progress_finished(FALSE);
+		JobPipe__set_was_last_job_loaded_in_engines(FALSE);
+		JobPipe__set_interleaved_loading_progress_chip(0); // Reset them
+		JobPipe__set_interleaved_loading_progress_engine(0); // Reset them
+		
+		// Exit the function. Nothing is left to do here...
 		return;
 	}
 
 	// Ok so there are jobs that require processing. Suck them in and start processing
-
+	// At this stage, we have know the ASICS have finished processing. We also know that there is a job to be sent
+	// to the device for processing. However, we need to make a decision:
+	//
+	// 1) This job was interleaved-loaded into chips while they were processing. In this case just start the engines
+	//
+	// 2) No job was interleaved-loaded into chips. In this case, issue a full job. After that, ALSO perform a single interleaved-load action 
+	//    if there are any more jobs to be loaded.
+	//
 
 	// ***********************************************************
 	// We have something to pop, get it...
-	job_packet job_from_pipe;
-	if (JobPipe__pipe_pop_job(&job_from_pipe) == PIPE_JOB_BUFFER_EMPTY)
+	if (JobPipe__get_interleaved_loading_progress_finished() == TRUE)
 	{
-		// This is odd!!! Don't do anything...
-		_prev_job_was_from_pipe = FALSE; // Obviously, this must be cleared...
-		return;
+		// We start the engines...
+		char iEngineHover = 0;
+		char iChipHover = 0;
+		
+		for (iChipHover = 0; iChipHover < TOTAL_CHIPS_INSTALLED; iChipHover++)
+		{
+			if (!CHIP_EXISTS(iChipHover)) continue;
+			
+			for (iEngineHover = 0; iEngineHover < 16; iEngineHover++)
+			{
+				if (!IS_PROCESSOR_OK(iChipHover, iEngineHover))	continue;
+				
+				// Start engine
+				ASIC_job_start_processing(iChipHover, iEngineHover, FALSE);
+			}
+		}
+		
+		// Also POP the previous job, since it's already been fully transferred
+		job_packet jpx_dummy;
+		JobPipe__pipe_pop_job(&jpx_dummy);
+		
+		// Before we issue the job, we must put the correct information
+		memcpy((void*)__inprocess_midstate, 	(void*)jpx_dummy.midstate, 	 32);
+		memcpy((void*)__inprocess_blockdata, 	(void*)jpx_dummy.block_data, 12);
+		
+		// Ok, now no job is loaded in interleaved mode since the old was is now being processed
+		JobPipe__set_interleaved_loading_progress_finished(FALSE);
+		JobPipe__set_interleaved_loading_progress_chip(0);
+		JobPipe__set_interleaved_loading_progress_engine(0);
 	}
+	else
+	{
+		// We have to issue a new job...
+		job_packet job_from_pipe;
+		if (JobPipe__pipe_pop_job(&job_from_pipe) == PIPE_JOB_BUFFER_EMPTY)
+		{
+			// This is odd!!! THIS SHOULD NEVER HAPPEN, however we do set things here by default...
+			_prev_job_was_from_pipe = FALSE; // Obviously, this must be cleared...
+			JobPipe__set_interleaved_loading_progress_finished(FALSE);
+			JobPipe__set_interleaved_loading_progress_chip(0);
+			JobPipe__set_interleaved_loading_progress_engine(0);
+			return;
+		}
 
-	// Before we issue the job, we must put the correct information
-	memcpy((void*)__inprocess_midstate, 	(void*)job_from_pipe.midstate, 	 32);
-	memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 12);
+		// Before we issue the job, we must put the correct information
+		memcpy((void*)__inprocess_midstate, 	(void*)job_from_pipe.midstate, 	 32);
+		memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 12);
 
-	// Send it to processing...
-	ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF);
-
+		// Send it to processing...
+		ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF);	
+		
+		// DEBUG... Wait 150ms
+		// volatile unsigned int iWaitVal = MACRO_GetTickCountRet;
+		// while (MACRO_GetTickCountRet - iWaitVal < 150000);
+	}
+	
 	// The job is coming from the PIPE...
+	// Set we simply have to set the flag here
 	_prev_job_was_from_pipe = TRUE;
 }
+
+
+// ======================================================================================
+// ======================================================================================
+// ======================================================================================
+
+
 
 
 /////////////////////////////////////////
