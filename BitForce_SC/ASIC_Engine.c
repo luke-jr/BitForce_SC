@@ -510,7 +510,16 @@ int ASIC_get_processor_count()
 	return iTotalProcessorCount;
 }
 
-int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount)
+// How many total processors are there?
+int ASIC_get_chip_processor_count(char iChip)
+{
+	int iTotalProcessorCount = 0;
+	if (!CHIP_EXISTS(iChip)) return 0;	
+	for (unsigned char yproc = 0; yproc < 16; yproc++) { if (IS_PROCESSOR_OK(iChip, yproc)) iTotalProcessorCount++;	}
+	return iTotalProcessorCount;
+}
+
+int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, const char iCheckOnlyOneChip, const char iChipToCheck)
 {
 	// Check if any chips are done...
 	int iChipsDone = 0;
@@ -518,8 +527,9 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount)
 	int iDetectedNonces = 0;
 	
 	char iChipDoneFlag[8] = {0,0,0,0,0,0,0,0};
-
-	for (unsigned char index = 0; index < TOTAL_CHIPS_INSTALLED; index++)
+	
+	
+	for (unsigned char index = ((iCheckOnlyOneChip == TRUE) ? iChipToCheck : 0);  index < TOTAL_CHIPS_INSTALLED; index++)
 	{
 		if (CHIP_EXISTS(index))
 		{			
@@ -532,12 +542,15 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount)
 				iChipsDone++;
 				iChipDoneFlag[index] = TRUE;
 			}			
-		}			
+		}
+		
+		// Are we checking a single chip only? If so, exit here			
+		if (iCheckOnlyOneChip == TRUE) break;
 	}
 						
 	// Since jobs are divided equally among the engines. they will all nearly finish the same time... 
 	// (Almost that is...)
-	if (iChipsDone != ASIC_get_chip_count())
+	if (iChipsDone != ((iCheckOnlyOneChip == TRUE) ? 1 : (ASIC_get_chip_count())))
 	{
 		// We're not done yet...
 		return ASIC_JOB_NONCE_PROCESSING;
@@ -546,20 +559,50 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount)
 	// Get the chip count and also check how many chips are IDLE
 	iChipCount = ASIC_get_chip_count();
 	
-	unsigned char iTotalEngines = ASIC_get_processor_count();
+	// Get the number of engines
+	unsigned char iTotalEngines = 0; 
+	if (iCheckOnlyOneChip == TRUE) 
+	{ 
+		iTotalEngines = ASIC_get_processor_count(); 
+	}		
+	else 
+	{
+		iTotalEngines = ASIC_get_chip_processor_count(iChipToCheck);
+	}		
+	
 	unsigned char iEnginesIDLE = 0;
 		
 	// Activate the chips
 	__MCU_ASIC_Activate_CS();
 					
 	// Try to read their results...
-	for (int x_chip = 0; x_chip < iChipCount; x_chip++)
+	for (int x_chip = ((iCheckOnlyOneChip == TRUE) ? iChipToCheck : 0) ; x_chip < iChipCount; x_chip++)
 	{
 		// Check for existence
-		if (CHIP_EXISTS(x_chip) == FALSE) continue;
+		if (CHIP_EXISTS(x_chip) == FALSE)
+		{
+			if (iCheckOnlyOneChip == TRUE)
+			{
+				break;
+			}				
+			else
+			{
+				continue;
+			}				
+		}			 
 		
 		// Check done 
-		if (iChipDoneFlag[x_chip] == FALSE) continue; // Skip it...
+		if (iChipDoneFlag[x_chip] == FALSE)
+		{
+			if (iCheckOnlyOneChip == TRUE)
+			{
+				break;
+			}
+			else
+			{				
+				continue; // Skip it...
+			}				
+		}			 
 		
 		// Test all engines
 		for (int y_engine = 0; y_engine < 16; y_engine++)
@@ -724,6 +767,8 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount)
 			if (iDetectedNonces >= 16) break;
 		}
 		
+		// Are we checking only one chip? If so, we need to exit
+		if (iCheckOnlyOneChip == TRUE) break;
 		
 	}
 	
@@ -740,8 +785,9 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount)
 	}
 	else
 	{
-		return (iDetectedNonces > 0) ? ASIC_JOB_NONCE_FOUND : ASIC_JOB_NONCE_NO_NONCE;	
-	}	
+		return (iDetectedNonces > 0) ? ASIC_JOB_NONCE_FOUND : ASIC_JOB_NONCE_NO_NONCE;
+	}
+	
 }
 
 #define MACRO__ASIC_WriteEngine(x,y,z,d)		__AVR32_SC_WriteData(x,y,z,d);
@@ -765,15 +811,21 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount)
 
 void ASIC_job_issue(void* pJobPacket, 
 					unsigned int _LowRange, 
-					unsigned int _HighRange)
+					unsigned int _HighRange,
+					const char bIssueToSingleChip,
+					const char iChipToIssue)
 {
 	// Error Check: _HighRange - _LowRange must be at least 256
 	if (_HighRange - _LowRange < 256) return;
 	
+	// Does chip exist? If not, return
+	if ((bIssueToSingleChip == TRUE) && (CHIP_EXISTS(iChipToIssue) == FALSE)) return; // We won't do anything as the chip doesn't exist
+	
 	// Break job between chips...
-	volatile int iChipCount  = ASIC_get_chip_count();
-	volatile int iProcessorCount = ASIC_get_processor_count();
+	volatile int iChipCount  = (bIssueToSingleChip == FALSE) ? (ASIC_get_chip_count()) : 1;
+	volatile int iProcessorCount = (bIssueToSingleChip == FALSE) ? (ASIC_get_processor_count()) : (ASIC_get_chip_processor_count(iChipToIssue));
 	// volatile int iProcessorCount = 1; // TEST
+	
 	volatile unsigned int iRangeSlice = ((_HighRange - _LowRange) / iProcessorCount);
 	volatile unsigned int iRemainder = (_HighRange - _LowRange) - (iRangeSlice * iProcessorCount); // This is reserved for the last engine in the last chip
 		
@@ -790,8 +842,10 @@ void ASIC_job_issue(void* pJobPacket,
 	// Have we ever come here before? If so, don't program static data in the registers any longer
 	static unsigned char bIsThisOurFirstTime = TRUE;
 
-	for (volatile int x_chip = 0; x_chip < TOTAL_CHIPS_INSTALLED; x_chip++)
+	for (volatile int x_chip = (bIssueToSingleChip == TRUE) ? (iChipToIssue) : (0); 
+		 x_chip < TOTAL_CHIPS_INSTALLED; x_chip++)
 	{
+		// Check chip existence
 		if (CHIP_EXISTS(x_chip) == 0) continue; // Skip it...
 
 		// We assign the job to each engine in each chip
@@ -940,14 +994,19 @@ void ASIC_job_issue(void* pJobPacket,
 			iLowerRange += iRangeSlice;
 			iUpperRange += iRangeSlice;
 		}	
+		
+		// Are we issuing to one chip only? If so, we need to exit here as we've already issued the job to the desired chip
+		if (bIssueToSingleChip == TRUE) break;		
 	}	
 	
 	// Ok It's no longer our fist time
-	bIsThisOurFirstTime = FALSE;
+	// WARNING: TO BE CORRECTED. THIS CAN CAUSE PROBLEM IF WE'RE ISSUEING TO A SINGLE ENGINE AND OTHERS ARENT INITIALIZED
+	// THIS WILL NOT BE THE CASE TODAY AS WE DIAGNOSE THE ENGINES IN STARTUP. BUT IT COULD BE PROBLEMATIC IF WE DON'T DIAGNOSE
+	// ON STARTUP (I.E. CHIPS WILL NOT HAVE THEIR STATIC VALUES SET)
+	if (bIssueToSingleChip == FALSE) bIsThisOurFirstTime = FALSE; // We only set it to false if we're sending the job to all engines on the BOARD
 
 	// Deactivate the SPI
 	__MCU_ASIC_Deactivate_CS();
-
 }
 
 void ASIC_job_start_processing(char iChip, char iEngine, char bForcedStart)
@@ -1143,9 +1202,9 @@ void ASIC_reset_engine(char iChip, char iEngine)
 int ASIC_is_processing()
 {
 	// Check if any chips are done...
-	volatile int iChipsDone = 0;
-	volatile int iTotalChips = ASIC_get_chip_count();
-	volatile int iTotalChipsDone = 0;
+	int iChipsDone = 0;
+	int iTotalChips = ASIC_get_chip_count();
+	int iTotalChipsDone = 0;
 	
 	for (unsigned char iChip = 0; iChip < TOTAL_CHIPS_INSTALLED; iChip++)
 	{
@@ -1173,6 +1232,28 @@ int ASIC_is_processing()
 	
 	// If we've reached here, it means we're not processing anymore
 	return FALSE;	
+}
+
+int ASIC_is_chip_processing(char iChip)
+{
+	// Check if any chips are done...
+	int iChipsDone = 0;
+	int iTotalChips = ASIC_get_chip_count();
+	int iTotalChipsDone = 0;
+	
+	if (!CHIP_EXISTS(iChip)) return FALSE;
+		
+	// Are all processors done in this engine?
+	if (ASIC_are_all_engines_done(iChip) == TRUE)
+	{
+		// We're no longer processing
+		return FALSE;
+	}
+	else
+	{
+		// Still processing something
+		return TRUE;
+	}		
 }
 
 int ASIC_get_chip_count()

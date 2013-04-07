@@ -32,7 +32,8 @@ volatile void HighLevel_Operations_Spin()
 	Flush_buffer_into_engines();	
 	
 	// Scan XLINK Chain, to be executed every 1.2 seconds
-	/*if (XLINK_ARE_WE_MASTER == TRUE)
+	/*
+	if (XLINK_ARE_WE_MASTER == TRUE)
 	{
 		// We refresh the chain every 1.2 seconds
 		static volatile UL32 iInitialTimeHolder = 0;
@@ -43,7 +44,8 @@ volatile void HighLevel_Operations_Spin()
 			iInitialTimeHolder = iActualTickHolder;
 			XLINK_MASTER_Refresh_Chain();
 		}		
-	}*/		
+	}
+	*/		
 	
 	// Fan-Spin must be executed every 0.5 seconds
 	{

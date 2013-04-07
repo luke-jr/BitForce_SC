@@ -7,8 +7,9 @@
 #ifndef JOBPIPE_MODULE_H_
 #define JOBPIPE_MODULE_H_
 
-// Job structure...
+#include "std_defs.h"
 
+// Job structure...
 #define SHA256_Test_String  "2f33a240bd6785caed5b67b4122079dd9359004ae23c64512c5c2dfbce097b08"
 
 /// ************************** This is our Pipelined job processing system (holder of 2 jobs + 1 process)
@@ -21,8 +22,13 @@ unsigned int    __total_jobs_in_buffer;
 unsigned int	__total_buf_pipe_jobs_ever_received;
 
 // In process information
-volatile char   __inprocess_midstate[32]; // This is the midstate of which we are processing at this moment
-volatile char   __inprocess_blockdata[12]; // This is the midstate of which we are processing at this moment
+volatile char   __inprocess_midstate[32];
+volatile char   __inprocess_blockdata[12];
+
+// This is the SCQ
+volatile char	__inprocess_SCQ_midstate[TOTAL_CHIPS_INSTALLED][32];
+volatile char	__inprocess_SCQ_blockdata[TOTAL_CHIPS_INSTALLED][16];
+volatile char	__inprocess_SCQ_chip_processing[TOTAL_CHIPS_INSTALLED];
 
 void			init_pipe_job_system(void);
 char			JobPipe__available_space(void);

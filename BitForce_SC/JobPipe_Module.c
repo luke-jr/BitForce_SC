@@ -31,7 +31,8 @@ void init_pipe_job_system()
 	// Put zeros everywhere
 	unsigned int tx = 0;
 	for (tx = 0; tx < sizeof(__inprocess_midstate); tx++) __inprocess_midstate[tx] = 0;
-	for (tx = 0; tx < sizeof(__inprocess_midstate); tx++) __inprocess_blockdata[tx] = 0;
+	for (tx = 0; tx < sizeof(__inprocess_blockdata); tx++) __inprocess_blockdata[tx] = 0;
+	for (tx = 0; tx < sizeof(__inprocess_SCQ_chip_processing); tx++) __inprocess_SCQ_chip_processing[tx] = 0;
 	
 	// Reset results...
 	__buf_job_results_count = 0;

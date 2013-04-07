@@ -25,6 +25,23 @@
 #define __PRODUCT_MODEL_SINGLE__
 // #define __PRODUCT_MODEL_MINIRIG__
 
+
+/*************** Features modifying the code behaviour *****************/
+// Some useful macros
+// This means DO NOT USE ENGINE 0. It's needed for the actual Version
+#define DO_NOT_USE_ENGINE_ZERO				1
+
+// This macro forces the Queue Operator to send one job to each chip.
+// Once activated, device will process parallel jobs at nearly the same speed.
+// This also impacts the ZOX response, where the processor that got the job done will be added to the response list
+#define QUEUE_OPERATE_ONE_JOB_PER_CHIP		1
+
+// This macro enforces the queue to use one engine per board ( verses one engine per chip )
+// It will also modify the results queue and no processing chip identifier will exist any longer
+// #define QUEUE_OPERATE_ONE_JOB_PER_BOARD	1
+
+
+/*************** Used for debugging ****************/
 #define CHIP_TO_TEST 0
 
 /*************** XLINK Operations Timeout ***********/
@@ -87,6 +104,10 @@ typedef struct _tag_job_packet_p2p
 
 typedef struct _tag_buf_job_result_packet
 {
+	#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+		char iProcessingChip; // The chip that processed the job
+	#endif
+	
 	char midstate[32];   // 256Bits of midstate
 	char block_data[12]; // 12 Bytes of data
 	char i_nonce_count;  // Number of nonces in result
@@ -123,11 +144,9 @@ volatile unsigned int GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK;
 // Basic boolean definition
 #define TRUE	1
 #define FALSE	0
-
-// Some useful macros
-#define DO_NOT_USE_ENGINE_ZERO	
 #define CHIP_EXISTS(x)					 ((__chip_existence_map[x] != 0))
 #define IS_PROCESSOR_OK(xchip, yengine)  ((__chip_existence_map[xchip] & (1 << yengine)) != 0)
+
 unsigned int __chip_existence_map[TOTAL_CHIPS_INSTALLED]; // Bit 0 to Bit 16 in each word says if the engine is OK or not...
 	
 // Our sleep function

@@ -113,6 +113,7 @@ PROTOCOL_RESULT Protocol_xlink_presence_detection(void);
 
 // Flush the P2P job into engine
 void Flush_buffer_into_engines(void);
+char Flush_buffer_into_single_chip(char iChip);
 
 
 // Some AUX functions
