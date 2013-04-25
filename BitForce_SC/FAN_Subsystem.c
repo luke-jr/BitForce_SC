@@ -23,13 +23,15 @@ volatile void FAN_SUBSYS_Initialize(void)
 	FAN_SUBSYS_SetFanState(FAN_STATE_AUTO);		
 }
 
-#define FAN_CONTROL_BYTE_VERY_SLOW		(FAN_CTRL3)
-#define FAN_CONTROL_BYTE_SLOW			(FAN_CTRL2)
-#define FAN_CONTROL_BYTE_MEDIUM			(FAN_CTRL2 | FAN_CTRL3)
-#define FAN_CONTROL_BYTE_FAST			(FAN_CTRL0)
-#define FAN_CONTROL_BYTE_VERY_FAST		(FAN_CTRL0 | FAN_CTRL1)
+#define FAN_CONTROL_BYTE_VERY_SLOW			(FAN_CTRL3)
+#define FAN_CONTROL_BYTE_SLOW				(FAN_CTRL2)
+#define FAN_CONTROL_BYTE_MEDIUM				(FAN_CTRL2 | FAN_CTRL3)
+#define FAN_CONTROL_BYTE_FAST				(FAN_CTRL0)
+#define FAN_CONTROL_BYTE_VERY_FAST			(FAN_CTRL0 | FAN_CTRL1)
 
-#define FAN_CTRL0	 0b0
+#define FAN_CONTROL_BYTE_REMAIN_FULL_SPEED	(FAN_CTRL0 | FAN_CTRL1 | FAN_CTRL2 | FAN_CTRL3)	// Turn all mosfets off...
+
+#define FAN_CTRL0	 0b01
 #define FAN_CTRL1	 0b010
 #define FAN_CTRL2	 0b0100
 #define FAN_CTRL3	 0b01000
@@ -43,6 +45,12 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 	
 	// It is the 50th call
 	__attempt = 0;
+	
+	// Do we remain at full speed? If so, get it done and return
+	#if defined(FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED)
+		__AVR32_FAN_SetSpeed(FAN_CONTROL_BYTE_REMAIN_FULL_SPEED);
+		return;
+	#endif
 	
 	// Check temperature
 	volatile int iTemp1 = __AVR32_A2D_GetTemp1();

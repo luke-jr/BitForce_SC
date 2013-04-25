@@ -31,14 +31,78 @@
 // This means DO NOT USE ENGINE 0. It's needed for the actual Version
 #define DO_NOT_USE_ENGINE_ZERO				1
 
+// DO NOT SET THIS MACRO
+// If set, basically all the chips will go to IDLE state
+// #define DISABLE_CLOCK_TO_ALL_ENGINES		1
+
 // This macro forces the Queue Operator to send one job to each chip.
 // Once activated, device will process parallel jobs at nearly the same speed.
 // This also impacts the ZOX response, where the processor that got the job done will be added to the response list
-#define QUEUE_OPERATE_ONE_JOB_PER_CHIP		1
+//#define QUEUE_OPERATE_ONE_JOB_PER_CHIP	1
 
 // This macro enforces the queue to use one engine per board ( verses one engine per chip )
 // It will also modify the results queue and no processing chip identifier will exist any longer
-// #define QUEUE_OPERATE_ONE_JOB_PER_BOARD	1
+#define QUEUE_OPERATE_ONE_JOB_PER_BOARD		1
+
+/********* TOTAL CHIPS INSTALLED ON BOARD **********/
+#define	 TOTAL_CHIPS_INSTALLED	8
+
+/********* Pulse Reuqest *************/
+// Pulse the main LED as long as we're processing jobs...
+#define  ENABLE_JOB_PULSING_SYSTEM	1
+
+// ********************** Chip diagnostics verbose
+// This option will provide detailed information when PROTOCOL_REQ_INFO_REQ
+// regarding chips behavior
+//#define	__CHIP_DIAGNOSTICS_VERBOSE			1
+// Also this option enables chip by chip diagnostics
+//#define __CHIP_BY_CHIP_DIAGNOSTICS			1
+//#define __ENGINE_BY_ENGINE_DIAGNOSTICS		1
+//#define __EXPORT_ENGINE_RANGE_SPREADS		1
+
+#if defined(__EXPORT_ENGINE_RANGE_SPREADS)
+	volatile unsigned int __ENGINE_LOWRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
+	volatile unsigned int __ENGINE_HIGHRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
+#endif
+
+// Interleaved job loading enabled?
+// #define __INTERLEAVED_JOB_LOADING
+
+// Enabling this macro will force the results buffer to be cleared when 
+// QUEUE_FLUSH Command is issued
+// #define FLUSH_CLEAR_RESULTS_BUFFER			1
+
+// FAN SUBSYSTEM: FAN REMAIN AT FULL SPEED
+#define FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED		1
+
+// ASIC Operation speed
+//#define ASICS_OPERATE_AT_261MHZ			1
+//#define ASICS_OPERATE_AT_250MHZ			1
+//#define ASICS_OPERATE_AT_242MHZ			1
+//#define ASICS_OPERATE_AT_236MHZ			1
+//#define ASICS_OPERATE_AT_228MHZ			1
+//#define ASICS_OPERATE_AT_264MHZ				1
+//#define ASICS_OPERATE_AT_280MHZ			1
+#define ASICS_OPERATE_AT_170MHZ			1
+
+// If this is defined, the chip 7 will no longer be used
+// #define DECOMISSION_CHIP_15				1
+// #define DECOMISSION_CHIP_14				1
+// #define DECOMISSION_CHIP_13				1
+// #define DECOMISSION_CHIP_12				1
+// #define DECOMISSION_CHIP_11				1
+// #define DECOMISSION_CHIP_10				1
+// #define DECOMISSION_CHIP_9				1
+// #define DECOMISSION_CHIP_8				1
+// #define DECOMISSION_CHIP_7				1
+// #define DECOMISSION_CHIP_6				1
+// #define DECOMISSION_CHIP_5				1
+// #define DECOMISSION_CHIP_4				1
+// #define DECOMISSION_CHIP_3				1
+// #define DECOMISSION_CHIP_2				1
+// #define DECOMISSION_CHIP_1				1
+// #define DECOMISSION_CHIP_0				1
+
 
 
 /*************** Used for debugging ****************/
@@ -54,10 +118,7 @@
 #define __FIRMWARE_VERSION		"1.0.0"
 
 /*************** UNIT ID STRING ********************/
-#define  UNIT_ID_STRING			"BitForce SHA256 SC 1.0"
-
-/********* TOTAL CHIPS INSTALLED ON BOARD **********/
-#define	 TOTAL_CHIPS_INSTALLED	8
+#define  UNIT_ID_STRING			"BitForce SHA256 SC 1.0\n"
 
 // Unit Identification String
 #define UNIT_FIRMWARE_ID_STRING	">>>>ID: BitFORCE SC SHA256 Version 1.0>>>>\n"
@@ -84,6 +145,8 @@ void IncrementTickCounter(void);
 #define GET_BYTE_FROM_DWORD(dword, byte) ((dword >> (byte * 8)) & 0x0FF)
 
 volatile char GLOBAL_InterProcChars[128];
+
+volatile unsigned short GLOBAL_ChipActivityLEDCounter[TOTAL_CHIPS_INSTALLED];
 
 // Some global definitions
 typedef struct _tag_job_packet
@@ -128,6 +191,10 @@ int global_vals[6];
 
 // This should be by default zero
 int GLOBAL_BLINK_REQUEST;
+
+// Global Pulse-Request section
+int  GLOBAL_PULSE_BLINK_REQUEST;
+void System_Request_Pulse_Blink(void);
 
 // Critical Temperature Warning - Abort Jobs!
 volatile static char GLOBAL_CRITICAL_TEMPERATURE;

@@ -77,9 +77,7 @@ PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned int 
 			}
 		}		
 	}
-	
-	
-	
+		
 	// Send the response back to our host
 	USB_write_data (szRespData, iRespLen);
 	
@@ -114,7 +112,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
 	
 	// What is our information request?
-	char szInfoReq[4024];
+	char szInfoReq[8024];
 	char szTemp[256];
 	
 	strcpy(szInfoReq,"DEVICE: BitFORCE SC\n");
@@ -125,35 +123,161 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	strcat(szInfoReq, szTemp);
 	
 	volatile UL32 uL1   = 0;    
-	volatile UL32 uL2   = 0;    
+	volatile UL32 uL2   = 0;
+	volatile UL32 vL1	= 0;
+	volatile UL32 vL2	= 0;    
+	volatile UL32 xL1	= 0;
+	volatile UL32 xL2	= 0;
 	volatile UL32 uLRes = 0;    
 	
 	// Atomic Full-Asm Special CPLD Write latency
 	unsigned int iLM[16];
+	unsigned char ilmCounter = 0;
 	unsigned int iNonceCount;
 	
-	//ASIC_is_processing();
-	//ASIC_job_issue(&jp,0,0xFFFFFFFF);
-	//ASIC_get_job_status(iLM, &iNonceCount);
-	//uL1 = MACRO_GetTickCountRet;
-	//Flush_buffer_into_engines();
-	//ASIC_job_issue(&jp,0,0x0FFFFFFFF);
-	//uL2 = MACRO_GetTickCountRet;
-	//uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
-	//sprintf(szTemp,"MACRO_GetTickCount round-time: %u us\n", (unsigned int)uLRes);
-	//strcat(szInfoReq, szTemp);
 	
-	/*
+	#if defined(__CHIP_DIAGNOSTICS_VERBOSE)
+		// Turn LED OFF
+		MCU_MainLED_Reset();
+				
+		uL1 = MACRO_GetTickCountRet;
+		job_packet jp;
+		ASIC_job_issue(&jp, 0x0, 0xFFFFFFFF, FALSE, 0);
+		xL2 = MACRO_GetTickCountRet - uL1;
+		while (ASIC_is_processing()) 
+		{ 
+			WATCHDOG_RESET;
+		}
+		//Protocol_get_status();
+		//Flush_buffer_into_engines();
+		uL2 = MACRO_GetTickCountRet;
+		uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
+		sprintf(szTemp,"Single-job takes: %u us\n", (unsigned int)uLRes);
+		strcat(szInfoReq, szTemp);
+		sprintf(szTemp,"Job submission takes: %u us\n", (unsigned int)xL2);
+		strcat(szInfoReq, szTemp);
+		sprintf(szTemp,"Device Speed: %u GH/s\n", (4294967 / (uLRes / 1000)));
+		strcat(szInfoReq, szTemp);	
+
+		// Working...
+		volatile char bFailedEngine = FALSE;
+		
+		// Now run chip-by-chip diagnostics
+		#if defined(__CHIP_BY_CHIP_DIAGNOSTICS)
+		
+					
+			unsigned char umx = 0;
+			for (umx = 0; umx < TOTAL_CHIPS_INSTALLED; umx++)
+			{
+				if (!CHIP_EXISTS(umx)) continue;
+				
+				// Test the chip and provide info
+				uL1 = MACRO_GetTickCountRet;
+				job_packet jp;
+				ASIC_job_issue(&jp, 0x0, 0xFFFFFFFF, TRUE, umx);
+				xL2 = MACRO_GetTickCountRet;
+				while (ASIC_are_all_engines_done(umx) == FALSE) WATCHDOG_RESET;
+				uL2 = MACRO_GetTickCountRet;
+				uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
+				sprintf(szTemp,"[CHIP %d] Single-job takes: %u us\n", umx, (unsigned int)uLRes);
+				strcat(szInfoReq, szTemp);
+				sprintf(szTemp,"[CHIP %d] Estimated Frequency: %u MHz\n", umx, ((4294967 / (uLRes / 1000)) / ASIC_get_chip_processor_count(umx)));
+				strcat(szInfoReq, szTemp);
+				sprintf(szTemp,"[CHIP %d] Functional Engines: %u \n", umx, ASIC_get_chip_processor_count(umx));
+				strcat(szInfoReq, szTemp);
+				sprintf(szTemp,"[CHIP %d] Job submission takes: %u us\n", umx, (unsigned int)xL2 - uL1);
+				strcat(szInfoReq, szTemp);
+				
+				// Show spreads?
+				#if defined(__EXPORT_ENGINE_RANGE_SPREADS)
+					sprintf(szTemp,"[CHIP %d] Spreads: %08X-%08X, %08X-%08X, %08X-%08X, %08X-%08X\n", umx, __ENGINE_LOWRANGE_SPREADS[umx][0], __ENGINE_HIGHRANGE_SPREADS[umx][0], __ENGINE_LOWRANGE_SPREADS[umx][1], __ENGINE_HIGHRANGE_SPREADS[umx][1], __ENGINE_LOWRANGE_SPREADS[umx][2], __ENGINE_HIGHRANGE_SPREADS[umx][2], __ENGINE_LOWRANGE_SPREADS[umx][3], __ENGINE_HIGHRANGE_SPREADS[umx][3]);
+					strcat(szInfoReq, szTemp);
+					sprintf(szTemp,"[CHIP %d] Spreads: %08X-%08X, %08X-%08X, %08X-%08X, %08X-%08X\n", umx, __ENGINE_LOWRANGE_SPREADS[umx][4], __ENGINE_HIGHRANGE_SPREADS[umx][4], __ENGINE_LOWRANGE_SPREADS[umx][5], __ENGINE_HIGHRANGE_SPREADS[umx][5], __ENGINE_LOWRANGE_SPREADS[umx][6], __ENGINE_HIGHRANGE_SPREADS[umx][6], __ENGINE_LOWRANGE_SPREADS[umx][7], __ENGINE_HIGHRANGE_SPREADS[umx][7]);
+					strcat(szInfoReq, szTemp);
+					sprintf(szTemp,"[CHIP %d] Spreads: %08X-%08X, %08X-%08X, %08X-%08X, %08X-%08X\n", umx, __ENGINE_LOWRANGE_SPREADS[umx][8], __ENGINE_HIGHRANGE_SPREADS[umx][8], __ENGINE_LOWRANGE_SPREADS[umx][9], __ENGINE_HIGHRANGE_SPREADS[umx][9], __ENGINE_LOWRANGE_SPREADS[umx][10], __ENGINE_HIGHRANGE_SPREADS[umx][10], __ENGINE_LOWRANGE_SPREADS[umx][11], __ENGINE_HIGHRANGE_SPREADS[umx][11]);
+					strcat(szInfoReq, szTemp);					
+					sprintf(szTemp,"[CHIP %d] Spreads: %08X-%08X, %08X-%08X, %08X-%08X, %08X-%08X\n", umx, __ENGINE_LOWRANGE_SPREADS[umx][12], __ENGINE_HIGHRANGE_SPREADS[umx][12], __ENGINE_LOWRANGE_SPREADS[umx][13], __ENGINE_HIGHRANGE_SPREADS[umx][13], __ENGINE_LOWRANGE_SPREADS[umx][14], __ENGINE_HIGHRANGE_SPREADS[umx][14], __ENGINE_LOWRANGE_SPREADS[umx][15], __ENGINE_HIGHRANGE_SPREADS[umx][15]);
+					strcat(szInfoReq, szTemp);				
+				#endif
+											
+				// Are we running diagnostics on the engines too?
+				#if defined(__ENGINE_BY_ENGINE_DIAGNOSTICS)
+					unsigned char i_engine = 0;
+					for (i_engine = 0; i_engine < 16; i_engine++)
+					{
+						// Reset Watchdog
+						WATCHDOG_RESET;						
+						bFailedEngine = FALSE;
+						
+						// STATIC RULE - Engine 0 not used
+						#if defined(DO_NOT_USE_ENGINE_ZERO)
+							if (i_engine == 0) continue; // Do not start engine 0
+						#endif
+						
+						// Is engine ok?
+						if (!IS_PROCESSOR_OK(umx, i_engine)) continue;
+												
+						// OK Proceed...
+						uL1 = MACRO_GetTickCountRet;
+						job_packet jp;
+						ASIC_ReadComplete(umx,i_engine);
+						ASIC_job_issue_to_specified_engine(umx, i_engine, &jp, FALSE, TRUE, 0x0, 0xFFFFFFFF);
+						ASIC_job_start_processing(umx, i_engine, TRUE);
+						xL2 = MACRO_GetTickCountRet;
+						while (TRUE)
+						{
+							 __MCU_ASIC_Activate_CS();
+						     if (ASIC_has_engine_finished_processing(umx, i_engine) == TRUE) break;
+							 __MCU_ASIC_Deactivate_CS();
+							 
+							 WATCHDOG_RESET;
+							 if (MACRO_GetTickCountRet - xL2 > 25000000)
+							 {
+								 bFailedEngine = TRUE;
+								 break;
+							 }
+						}							 
+						uL2 = MACRO_GetTickCountRet;
+						uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
+						if (bFailedEngine)
+						{
+							sprintf(szTemp,"\t[ENGINE %d] FAILED! us\n", i_engine, (unsigned int)uLRes);
+							strcat(szInfoReq, szTemp);
+						}						
+						else
+						{
+							sprintf(szTemp,"\t[ENGINE %d] Single-job takes: %u us\n", i_engine, (unsigned int)uLRes);
+							strcat(szInfoReq, szTemp);
+							sprintf(szTemp,"\t[ENGINE %d] Job submission takes: %u us\n", i_engine, (unsigned int)xL2 - uL1);
+							strcat(szInfoReq, szTemp);
+						}
+						
+					}
+				#endif
+
+			}
+			
+		#endif
+		
+		// Turn it back on...
+		MCU_MainLED_Set();
+	#endif
+	
+	
 	// FAN Process latency
+	/*
 	uL1 = MACRO_GetTickCountRet;
-	FAN_SUBSYS_IntelligentFanSystem_Spin();
+	job_packet jp;
+	ASIC_job_issue(&jp, 0x0, 0xFFFFFFFF, FALSE, 0);
+	while (ASIC_is_processing()) { WATCHDOG_RESET; }
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
-	sprintf(szTemp,"FAN_SUBSYS_Intelligent Spin roundtime: %u us\n", (unsigned int)uLRes);
+	sprintf(szTemp,"Turn around time: %u us\n", (unsigned int)uLRes);
 	strcat(szInfoReq, szTemp);	
-
+	*/
+	
 	// Atomic Full-Asm Special CPLD Write latency
-	uL1 = MACRO_GetTickCountRet;
+	/*uL1 = MACRO_GetTickCountRet;
 	MACRO_XLINK_send_packet(0,"ABCD",4,1,1);
 	uL2 = MACRO_GetTickCountRet;
 	uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
@@ -187,21 +311,21 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	/*#define FIFO_ADDRESS_TO_READ 0x80
 	#define EXA_CHIP CHIP_TO_TEST
 			
-	iStats[0]  = __ASIC_ReadEngine(EXA_CHIP,1, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,1,FIFO_ADDRESS_TO_READ+1)  << 16);
-	iStats[1]  = __ASIC_ReadEngine(EXA_CHIP,2, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,2,FIFO_ADDRESS_TO_READ+1)  << 16);
-	iStats[2]  = __ASIC_ReadEngine(EXA_CHIP,3, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,3,FIFO_ADDRESS_TO_READ+1)  << 16);
-	iStats[3]  = __ASIC_ReadEngine(EXA_CHIP,4, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,4,FIFO_ADDRESS_TO_READ+1)  << 16);
-	iStats[4]  = __ASIC_ReadEngine(EXA_CHIP,5, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,5,FIFO_ADDRESS_TO_READ+1)  << 16);
-	iStats[5]  = __ASIC_ReadEngine(EXA_CHIP,6, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,6,FIFO_ADDRESS_TO_READ+1)  << 16);
-	iStats[6]  = __ASIC_ReadEngine(EXA_CHIP,7, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,7,FIFO_ADDRESS_TO_READ+1)  << 16);
-	iStats[7]  = __ASIC_ReadEngine(EXA_CHIP,8, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,8,FIFO_ADDRESS_TO_READ+1)  << 16);
-	iStats[8]  = __ASIC_ReadEngine(EXA_CHIP,9, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,9,FIFO_ADDRESS_TO_READ+1)  << 16);
-	iStats[9]  = __ASIC_ReadEngine(EXA_CHIP,10,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,10,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[10] = __ASIC_ReadEngine(EXA_CHIP,11,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,11,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[11] = __ASIC_ReadEngine(EXA_CHIP,12,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,12,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[12] = __ASIC_ReadEngine(EXA_CHIP,13,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,13,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[13] = __ASIC_ReadEngine(EXA_CHIP,14,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,14,FIFO_ADDRESS_TO_READ+1) << 16);
-	iStats[14] = __ASIC_ReadEngine(EXA_CHIP,15,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,15,FIFO_ADDRESS_TO_READ+1) << 16);
+	iStats[0]    = __ASIC_ReadEngine(EXA_CHIP,1, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,1,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[1]    = __ASIC_ReadEngine(EXA_CHIP,2, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,2,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[2]    = __ASIC_ReadEngine(EXA_CHIP,3, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,3,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[3]    = __ASIC_ReadEngine(EXA_CHIP,4, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,4,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[4]    = __ASIC_ReadEngine(EXA_CHIP,5, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,5,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[5]    = __ASIC_ReadEngine(EXA_CHIP,6, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,6,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[6]    = __ASIC_ReadEngine(EXA_CHIP,7, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,7,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[7]    = __ASIC_ReadEngine(EXA_CHIP,8, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,8,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[8]    = __ASIC_ReadEngine(EXA_CHIP,9, FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,9,FIFO_ADDRESS_TO_READ+1)  << 16);
+	iStats[9]    = __ASIC_ReadEngine(EXA_CHIP,10,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,10,FIFO_ADDRESS_TO_READ+1) << 16);
+	iStats[10]   = __ASIC_ReadEngine(EXA_CHIP,11,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,11,FIFO_ADDRESS_TO_READ+1) << 16);
+	iStats[11]   = __ASIC_ReadEngine(EXA_CHIP,12,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,12,FIFO_ADDRESS_TO_READ+1) << 16);
+	iStats[12]   = __ASIC_ReadEngine(EXA_CHIP,13,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,13,FIFO_ADDRESS_TO_READ+1) << 16);
+	iStats[13]   = __ASIC_ReadEngine(EXA_CHIP,14,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,14,FIFO_ADDRESS_TO_READ+1) << 16);
+	iStats[14]   = __ASIC_ReadEngine(EXA_CHIP,15,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(EXA_CHIP,15,FIFO_ADDRESS_TO_READ+1) << 16);
 	//iStats[15] = __ASIC_ReadEngine(CHIP_TO_TEST,16,FIFO_ADDRESS_TO_READ+0)   | (__ASIC_ReadEngine(CHIP_TO_TEST,16,FIFO_ADDRESS_TO_READ+1) << 16);
 	*/
 		
@@ -383,7 +507,19 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	strcat(szInfoReq, szTemp);
 	
 	// Add Engine freuqnecy
-	sprintf(szTemp,"FREQUENCY: 280MHz\n");
+	
+	#if defined(ASICS_OPERATE_AT_261MHZ)
+		sprintf(szTemp,"FREQUENCY: 261MHz\n");
+	#elif defined(ASICS_OPERATING_AT_280MHZ)
+		sprintf(szTemp,"FREQUENCY: 280MHz\n");
+	#elif defined(ASICS_OPERATING_AT_272MHZ)
+		sprintf(szTemp,"FREQUENCY: 272MHz\n");
+	#elif defined(ASICS_OPERATING_AT_227MHZ)
+		sprintf(szTemp,"FREQUENCY: 227MHz\n");
+	#else
+		sprintf(szTemp,"FREQUENCY: [UNKNOWN]\n");
+	#endif
+	
 	strcat(szInfoReq, szTemp);
 		
 	// Add Chain Status
@@ -978,6 +1114,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	}	
 	
 	/*
+	
 	int iDigestValues[8] = {0,0,0,0,0,0,0,0};
 		
 	UL32 iTickVal = GetTickCount();
@@ -1594,6 +1731,9 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	// Also, we clear the results buffer
 	JobPipe__pipe_set_buf_job_results_count(0);
 	
+	// Also Flush jobs into engines
+	Flush_buffer_into_engines();
+	
 	// Return the result...
 	return res;
 }
@@ -1728,6 +1868,74 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	// Return our result...
 	return res;
 }
+
+PROTOCOL_RESULT Protocol_handle_job_single_stage(char* szStream)
+{
+	// Our result
+	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
+
+	// Send data to ASIC and wait for response...
+	// BTW, our actual timeout is 16 seconds... (1GH/s)
+	// Also, we do expect a packet which is 64 Bytes data, 16 Bytes Midstate, 16 Bytes difficulty (totaling 96 Bytes)
+	
+	// Are we at high-temperature, waiting to cool down?
+	if (GLOBAL_CRITICAL_TEMPERATURE == TRUE)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:HIGH TEMPERATURE RECOVERY\n");  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:HIGH TEMPERATURE RECOVERY\n",
+										sizeof("ERR:HIGH TEMPERATURE RECOVERY\n"),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
+		}
+		
+		return PROTOCOL_FAILED;
+	}
+
+	// Since XLINK will save the first character received, we have to advance the pointer
+	char* sz_buf = (szStream + 3); // We should have the job here...
+	
+	// All is ok, send data to ASIC for processing, and respond with OK
+	pjob_packet p_job = (pjob_packet)(sz_buf);
+	
+	// Check signature
+	if (p_job->signature != 0xAA)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:SIGNATURE<\n");  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			XLINK_SLAVE_respond_string("ERR:SIGNATURE<\n");
+		}
+		return PROTOCOL_FAILED;
+	}
+
+	// We have all what we need, send it to ASIC-COMM interface
+	ASIC_job_issue(p_job, 0, 0x0FFFFFFFF, FALSE, 0);
+
+	// Send our OK
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string("OK\n");  // Send it to USB
+	}
+	else // We're a slave... send it by XLINK
+	{
+		XLINK_SLAVE_respond_string("OK\n");
+	}
+	
+	// Return our result...
+	return res;
+}
+
+
 
 PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 {
@@ -2265,130 +2473,136 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 		// (We take element 0, and push all the arrays back...)
 		if (ASIC_is_processing() == TRUE)
 		{
-			// Ok, since ASICs are processing, at this point we can start loading the next job in queue.
-			// If the previous job is already loaded, then there isn't much we can do
-			if (JobPipe__pipe_ok_to_pop() == FALSE)
-			{
-				// There is nothing to load, just return...
-				return;
-			}
-		
-			// Have we loaded something already and it has finished? If so, nothing to do as well
-			if (JobPipe__get_interleaved_loading_progress_finished() == TRUE)
-			{
-				// Since the job is already loaded, there is nothing to do...
-				return;
-			}
-		
-			// Now we reach here, it means there is a job available for loading, which has not been 100% loaded.
-			// Try to load one engine at a time...
-			job_packet jp;
-			char iRes = JobPipe__pipe_preview_next_job(&jp);
-		
-			// TODO: Take further action
-			if (iRes == PIPE_JOB_BUFFER_EMPTY)
-			{
-				// This is a SERIOUS PROBLEM, it shouldn't be the case... (since we've already executed JobPipe__pipe_ok_to_pop)
-			}
-	
-			// Ok, we have the JOB. We start looping...
-			char iChipToProceed = JobPipe__get_interleaved_loading_progress_chip();
-			char iTotalChipsInstalled = ASIC_get_chip_count();
-			char iEngineToProceed = JobPipe__get_interleaved_loading_progress_engine();
-			char iChipHover = 0;
-			char iEngineHover = 0;
-		
-			unsigned int iProcessorCount = ASIC_get_processor_count();
-			unsigned int iRangeSlice = (0xFFFFFFFF / iProcessorCount);
-			unsigned int iRemainder  =  0xFFFFFFFF - (iRangeSlice * iProcessorCount); // This is reserved for the last engine in the last chip
-		
-			// Initial value is set here... (These are static, as they are only used in this function)
-			static unsigned int iLowerRange = 0;
-			static unsigned int iUpperRange = 0;
-		
-			// Did we perform any writes? If not, it means we're finished
-			char bDidWeWriteAnyEngines = FALSE;
-			char bEngineWasNotFinishedSoWeAborted = FALSE;
-		
-			// We reset lower-range and upper-range if we're dealing with chip-0 and engine-0
-			if ((iChipToProceed == 0) && (iEngineToProceed == 0)) { iLowerRange = 0; iUpperRange = 0 + iRangeSlice; }
-		
-			// Ok, we continue until we get the good chip
-			for (iChipHover = iChipToProceed; iChipHover < iTotalChipsInstalled; iChipHover++)		
-			{
-				// We reach continue to the end...
-				if (!CHIP_EXISTS(iChipHover)) continue;
-			
-				// Hover the engines...
-				for (iEngineHover = iEngineToProceed; iEngineHover < 16; iEngineHover++)
+			#if defined (__INTERLEAVED_JOB_LOADING)
+				// Ok, since ASICs are processing, at this point we can start loading the next job in queue.
+				// If the previous job is already loaded, then there isn't much we can do
+				if (JobPipe__pipe_ok_to_pop() == FALSE)
 				{
-					// Is this processor ok?
-					if (!IS_PROCESSOR_OK(iChipHover, iEngineHover)) continue;
-				
-					// Is it engine 0 and we're restricted?
-					#if defined(DO_NOT_USE_ENGINE_ZERO)
-						if (iEngineHover == 0) continue;
-					#endif
-				
-					// Is this engine finished? If yes then we'll write data to it. IF NOT THEN JUST FORGET IT! We abort this part altogether
-					if (ASIC_has_engine_finished_processing(iChipHover, iEngineHover) == FALSE)
-					{
-						bEngineWasNotFinishedSoWeAborted = TRUE;
-						break;
-					}
-				
-					// Ok, now do Job-Issue to this engine on this chip
-					ASIC_job_issue_to_specified_engine(iChipHover, iEngineHover, &jp, FALSE, FALSE, iLowerRange, iUpperRange);
-				
-					// Increment 
-					iLowerRange += iRangeSlice;
-					iUpperRange += iRangeSlice;
-				
-					// Ok, Set the next engine to be processed...
-					if (iEngineHover == 15)
-					{
-						JobPipe__set_interleaved_loading_progress_chip(iChipHover+1);
-						JobPipe__set_interleaved_loading_progress_engine(0);
-					}
-					else
-					{
-						JobPipe__set_interleaved_loading_progress_chip(iChipHover);
-						JobPipe__set_interleaved_loading_progress_engine(iEngineHover+1);					
-					}
-				
-					// Set the flag
-					bDidWeWriteAnyEngines = TRUE;
-				
-					// Exit the loop
-					break;			
+					// There is nothing to load, just return...
+					return;
 				}
+		
+				// Have we loaded something already and it has finished? If so, nothing to do as well
+				if (JobPipe__get_interleaved_loading_progress_finished() == TRUE)
+				{
+					// Since the job is already loaded, there is nothing to do...
+					return;
+				}
+		
+				// Now we reach here, it means there is a job available for loading, which has not been 100% loaded.
+				// Try to load one engine at a time...
+				job_packet jp;
+				char iRes = JobPipe__pipe_preview_next_job(&jp);
+		
+				// TODO: Take further action
+				if (iRes == PIPE_JOB_BUFFER_EMPTY)
+				{
+					// This is a SERIOUS PROBLEM, it shouldn't be the case... (since we've already executed JobPipe__pipe_ok_to_pop)
+				}
+	
+				// Ok, we have the JOB. We start looping...
+				char iChipToProceed = JobPipe__get_interleaved_loading_progress_chip();
+				char iTotalChipsInstalled = ASIC_get_chip_count();
+				char iEngineToProceed = JobPipe__get_interleaved_loading_progress_engine();
+				char iChipHover = 0;
+				char iEngineHover = 0;
+		
+				unsigned int iProcessorCount = ASIC_get_processor_count();
+				unsigned int iRangeSlice = (0xFFFFFFFF / iProcessorCount);
+				unsigned int iRemainder  =  0xFFFFFFFF - (iRangeSlice * iProcessorCount); // This is reserved for the last engine in the last chip
+		
+				// Initial value is set here... (These are static, as they are only used in this function)
+				static unsigned int iLowerRange = 0;
+				static unsigned int iUpperRange = 0;
+		
+				// Did we perform any writes? If not, it means we're finished
+				char bDidWeWriteAnyEngines = FALSE;
+				char bEngineWasNotFinishedSoWeAborted = FALSE;
+		
+				// We reset lower-range and upper-range if we're dealing with chip-0 and engine-0
+				if ((iChipToProceed == 0) && (iEngineToProceed == 0)) { iLowerRange = 0; iUpperRange = 0 + iRangeSlice; }
+		
+				// Ok, we continue until we get the good chip
+				for (iChipHover = iChipToProceed; iChipHover < iTotalChipsInstalled; iChipHover++)		
+				{
+					// We reach continue to the end...
+					if (!CHIP_EXISTS(iChipHover)) continue;
 			
-				// Did we perform any writes? If so, we're done
-				if (bDidWeWriteAnyEngines == TRUE) break;
-			
-				// Was the designated engine busy? If so, we exit
-				if (bEngineWasNotFinishedSoWeAborted == TRUE) break;
-			}
+					// Hover the engines...
+					for (iEngineHover = iEngineToProceed; iEngineHover < 16; iEngineHover++)
+					{
+						// Is this processor ok?
+						if (!IS_PROCESSOR_OK(iChipHover, iEngineHover)) continue;
 				
-			// Did we write any engines? If NOT then we're finished
-			if ((bDidWeWriteAnyEngines == FALSE) && (bEngineWasNotFinishedSoWeAborted == FALSE))
-			{
-				// Set/Reset related settings
-				JobPipe__set_interleaved_loading_progress_finished(TRUE);
-				JobPipe__set_interleaved_loading_progress_chip(0);
-				JobPipe__set_interleaved_loading_progress_engine(0);			
+						// Is it engine 0 and we're restricted?
+						#if defined(DO_NOT_USE_ENGINE_ZERO)
+							if (iEngineHover == 0) continue;
+						#endif
+				
+						// Is this engine finished? If yes then we'll write data to it. IF NOT THEN JUST FORGET IT! We abort this part altogether
+						if (ASIC_has_engine_finished_processing(iChipHover, iEngineHover) == FALSE)
+						{
+							bEngineWasNotFinishedSoWeAborted = TRUE;
+							break;
+						}
+				
+						// Ok, now do Job-Issue to this engine on this chip
+						ASIC_job_issue_to_specified_engine(iChipHover, iEngineHover, &jp, FALSE, FALSE, iLowerRange, iUpperRange);
+				
+						// Increment 
+						iLowerRange += iRangeSlice;
+						iUpperRange += iRangeSlice;
+				
+						// Ok, Set the next engine to be processed...
+						if (iEngineHover == 15)
+						{
+							JobPipe__set_interleaved_loading_progress_chip(iChipHover+1);
+							JobPipe__set_interleaved_loading_progress_engine(0);
+						}
+						else
+						{
+							JobPipe__set_interleaved_loading_progress_chip(iChipHover);
+							JobPipe__set_interleaved_loading_progress_engine(iEngineHover+1);					
+						}
+				
+						// Set the flag
+						bDidWeWriteAnyEngines = TRUE;
+				
+						// Exit the loop
+						break;			
+					}
 			
-				// Also clear the bounds
-				iLowerRange = 0;
-				iUpperRange = 0;
-			}
-			else
-			{
-				// We're not finished
-				JobPipe__set_interleaved_loading_progress_finished(FALSE);			
-			}
+					// Did we perform any writes? If so, we're done
+					if (bDidWeWriteAnyEngines == TRUE) break;
 			
-			return; // We won't do anything, since there isn't anything we can do
+					// Was the designated engine busy? If so, we exit
+					if (bEngineWasNotFinishedSoWeAborted == TRUE) break;
+				}
+				
+				// Did we write any engines? If NOT then we're finished
+				if ((bDidWeWriteAnyEngines == FALSE) && (bEngineWasNotFinishedSoWeAborted == FALSE))
+				{
+					// Set/Reset related settings
+					JobPipe__set_interleaved_loading_progress_finished(TRUE);
+					JobPipe__set_interleaved_loading_progress_chip(0);
+					JobPipe__set_interleaved_loading_progress_engine(0);			
+			
+					// Also clear the bounds
+					iLowerRange = 0;
+					iUpperRange = 0;
+				}
+				else
+				{
+					// We're not finished
+					JobPipe__set_interleaved_loading_progress_finished(FALSE);			
+				}
+				
+				return; // We won't do anything, since there isn't anything we can do
+			
+			#else
+				// No interleaved job loading, just return...
+				return; // We won't do anything, since there isn't anything we can do
+			#endif 
 		}		 
 	
 		// Now if we're not processing, we MAY need to save the results if the previous job was from the pipe
@@ -2410,7 +2624,7 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 			unsigned int  i_found_nonce_list[16];
 			volatile int i_found_nonce_count;
 			char i_result_index_to_put = 0;
-			ASIC_get_job_status(i_found_nonce_list, &i_found_nonce_count);
+			ASIC_get_job_status(i_found_nonce_list, &i_found_nonce_count, FALSE, 0);
 
 			// Set the correct index
 			i_result_index_to_put = (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH) ?  (__buf_job_results_count) : (PIPE_MAX_BUFFER_DEPTH - 1);
@@ -2423,8 +2637,6 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 
 			// Increase the result count (if possible)
 			if (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH) __buf_job_results_count++;
-
-			// We return, since there is nothing left to do
 		}
 	
 		// Ok, now we have recovered any potential results that could've been useful to us
@@ -2435,12 +2647,14 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 			// Last job was not from pipe...
 			_prev_job_was_from_pipe = FALSE;
 		
-			// Reset interleaved settings as well...
-			JobPipe__set_interleaved_loading_progress_finished(FALSE);
-			JobPipe__set_was_last_job_loaded_in_engines(FALSE);
-			JobPipe__set_interleaved_loading_progress_chip(0); // Reset them
-			JobPipe__set_interleaved_loading_progress_engine(0); // Reset them
-		
+			#if defined(__INTERLEAVED_JOB_LOADING)
+				// Reset interleaved settings as well...
+				JobPipe__set_interleaved_loading_progress_finished(FALSE);
+				JobPipe__set_was_last_job_loaded_in_engines(FALSE);
+				JobPipe__set_interleaved_loading_progress_chip(0); // Reset them
+				JobPipe__set_interleaved_loading_progress_engine(0); // Reset them
+			#endif
+			
 			// Exit the function. Nothing is left to do here...
 			return;
 		}
@@ -2457,49 +2671,75 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 
 		// ***********************************************************
 		// We have something to pop, get it...
-		if (JobPipe__get_interleaved_loading_progress_finished() == TRUE)
-		{
-			// We start the engines...
-			char iEngineHover = 0;
-			char iChipHover = 0;
 		
-			for (iChipHover = 0; iChipHover < TOTAL_CHIPS_INSTALLED; iChipHover++)
+		#if defined(__INTERLEAVED_JOB_LOADING)
+		
+			if (JobPipe__get_interleaved_loading_progress_finished() == TRUE)
 			{
-				if (!CHIP_EXISTS(iChipHover)) continue;
-			
-				for (iEngineHover = 0; iEngineHover < 16; iEngineHover++)
+				// We start the engines...
+				char iEngineHover = 0;
+				char iChipHover = 0;
+		
+				for (iChipHover = 0; iChipHover < TOTAL_CHIPS_INSTALLED; iChipHover++)
 				{
-					if (!IS_PROCESSOR_OK(iChipHover, iEngineHover))	continue;
+					if (!CHIP_EXISTS(iChipHover)) continue;
+			
+					for (iEngineHover = 0; iEngineHover < 16; iEngineHover++)
+					{
+						if (!IS_PROCESSOR_OK(iChipHover, iEngineHover))	continue;
 				
-					// Start engine
-					ASIC_job_start_processing(iChipHover, iEngineHover, FALSE);
+						// Start engine
+						ASIC_job_start_processing(iChipHover, iEngineHover, FALSE);
+					}
 				}
+		
+				// Also POP the previous job, since it's already been fully transferred
+				job_packet jpx_dummy;
+				JobPipe__pipe_pop_job(&jpx_dummy);
+		
+				// Before we issue the job, we must put the correct information
+				memcpy((void*)__inprocess_midstate, 	(void*)jpx_dummy.midstate, 	 32);
+				memcpy((void*)__inprocess_blockdata, 	(void*)jpx_dummy.block_data, 12);
+		
+				// Ok, now no job is loaded in interleaved mode since the old was is now being processed
+				JobPipe__set_interleaved_loading_progress_finished(FALSE);
+				JobPipe__set_interleaved_loading_progress_chip(0);
+				JobPipe__set_interleaved_loading_progress_engine(0);
 			}
+			else
+			{
+				// We have to issue a new job...
+				job_packet job_from_pipe;
+				if (JobPipe__pipe_pop_job(&job_from_pipe) == PIPE_JOB_BUFFER_EMPTY)
+				{
+					// This is odd!!! THIS SHOULD NEVER HAPPEN, however we do set things here by default...
+					_prev_job_was_from_pipe = FALSE; // Obviously, this must be cleared...
+					JobPipe__set_interleaved_loading_progress_finished(FALSE);
+					JobPipe__set_interleaved_loading_progress_chip(0);
+					JobPipe__set_interleaved_loading_progress_engine(0);
+					return;
+				}
+
+				// Before we issue the job, we must put the correct information
+				memcpy((void*)__inprocess_midstate, 	(void*)job_from_pipe.midstate, 	 32);
+				memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 12);
+
+				// Send it to processing...
+				ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, FALSE, 0);	
 		
-			// Also POP the previous job, since it's already been fully transferred
-			job_packet jpx_dummy;
-			JobPipe__pipe_pop_job(&jpx_dummy);
-		
-			// Before we issue the job, we must put the correct information
-			memcpy((void*)__inprocess_midstate, 	(void*)jpx_dummy.midstate, 	 32);
-			memcpy((void*)__inprocess_blockdata, 	(void*)jpx_dummy.block_data, 12);
-		
-			// Ok, now no job is loaded in interleaved mode since the old was is now being processed
-			JobPipe__set_interleaved_loading_progress_finished(FALSE);
-			JobPipe__set_interleaved_loading_progress_chip(0);
-			JobPipe__set_interleaved_loading_progress_engine(0);
-		}
-		else
-		{
+				// DEBUG... Wait 150ms
+				// volatile unsigned int iWaitVal = MACRO_GetTickCountRet;
+				// while (MACRO_GetTickCountRet - iWaitVal < 150000);
+			}
+			
+		#else
+			// No interleaved job loading
 			// We have to issue a new job...
 			job_packet job_from_pipe;
 			if (JobPipe__pipe_pop_job(&job_from_pipe) == PIPE_JOB_BUFFER_EMPTY)
 			{
 				// This is odd!!! THIS SHOULD NEVER HAPPEN, however we do set things here by default...
 				_prev_job_was_from_pipe = FALSE; // Obviously, this must be cleared...
-				JobPipe__set_interleaved_loading_progress_finished(FALSE);
-				JobPipe__set_interleaved_loading_progress_chip(0);
-				JobPipe__set_interleaved_loading_progress_engine(0);
 				return;
 			}
 
@@ -2508,12 +2748,10 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 			memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 12);
 
 			// Send it to processing...
-			ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF);	
+			ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, FALSE, 0);		
+		#endif 
 		
-			// DEBUG... Wait 150ms
-			// volatile unsigned int iWaitVal = MACRO_GetTickCountRet;
-			// while (MACRO_GetTickCountRet - iWaitVal < 150000);
-		}
+		
 	
 		// The job is coming from the PIPE...
 		// Set we simply have to set the flag here
@@ -2521,7 +2759,7 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 	}
 	
 	// NOTE: Not Implemented
-	void Flush_buffer_into_single_chip(char iChip)
+	char Flush_buffer_into_single_chip(char iChip)
 	{
 		// FUNCTION NOT IMPLEMENTED HERE IN SINGLE-JOB-PER-BOARD MODE
 	}
@@ -2640,9 +2878,18 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 		}
 
 		// Before we issue the job, we must put the correct information
-		memcpy((void*)__inprocess_SCQ_midstate[iChip], 	(void*)job_from_pipe.midstate, 	 32);
-		memcpy((void*)__inprocess_SCQ_blockdata[iChip], (void*)job_from_pipe.block_data, 12);
-	
+		if (iChip == 7)
+		{
+			memcpy((void*)__inprocess_SCQ_midstate[iChip], 	(void*)job_from_pipe.midstate, 	 32);
+			memcpy((void*)__inprocess_SCQ_blockdata[iChip], (void*)job_from_pipe.block_data, 12);
+		}
+		else
+		{
+			memcpy((void*)__inprocess_SCQ_blockdata[iChip], (void*)job_from_pipe.block_data, 12);			
+			memcpy((void*)__inprocess_SCQ_midstate[iChip], 	(void*)job_from_pipe.midstate, 	 32);
+		}
+		
+		
 		// Send it to processing...
 		ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, TRUE, iChip);
 		
@@ -2692,13 +2939,14 @@ void blink_fast()
 	Delay_1();
 	MCU_MainLED_Reset();
 	Delay_1();
+	MCU_MainLED_Set();
 }
 
 int Delay_1()
 {
 	volatile int x;
 	volatile int z;
-	for (x = 0; x < 450; x++) z++;
+	for (x = 0; x < 950; x++) z++;
 	return z;
 }
 

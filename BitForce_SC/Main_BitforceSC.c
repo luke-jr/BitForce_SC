@@ -91,6 +91,17 @@ int main(void)
 	// Initialize FAN subsystem
 	FAN_SUBSYS_Initialize();
 	
+	// Initialize Global Activity Chip LEDs
+	GLOBAL_ChipActivityLEDCounter[0] = 0;
+	GLOBAL_ChipActivityLEDCounter[1] = 0;
+	GLOBAL_ChipActivityLEDCounter[2] = 0;
+	GLOBAL_ChipActivityLEDCounter[3] = 0;
+	GLOBAL_ChipActivityLEDCounter[4] = 0;
+	GLOBAL_ChipActivityLEDCounter[5] = 0;
+	GLOBAL_ChipActivityLEDCounter[6] = 0;
+	GLOBAL_ChipActivityLEDCounter[7] = 0;
+
+	
 	// Perform an ASIC GET CHIP COUNT
 	init_ASIC();
 	//MCU_SC_Initialize();
@@ -167,6 +178,7 @@ int main(void)
 	global_vals[5] = 0;
 
 	GLOBAL_BLINK_REQUEST = 0;
+	GLOBAL_PULSE_BLINK_REQUEST = 0;
 	
 	// ASIC Submit Jobs
 	/*while (TRUE)
@@ -263,6 +275,7 @@ void MCU_Main_Loop()
 			intercepted_command_length = 0;
 			unsigned int iExpectedPacketLength = 0;
 			unsigned int bInterceptingChainForwardReq = FALSE;
+			unsigned char bSingleStageJobIssueCommand = FALSE;
 
 			// Read all the data that has arrived
 			while (USB_inbound_USB_data() && i_count < 1024)
@@ -270,9 +283,14 @@ void MCU_Main_Loop()
 				// Read byte
 				sz_cmd[i_count] = USB_read_byte();
 				
+				// Are we a single-cycle job issue?
+				bSingleStageJobIssueCommand = ((sz_cmd[0] == 'S') && (sz_cmd[1] == 48)) ? TRUE : FALSE;
+				
 				// Are we expecting 
 				bInterceptingChainForwardReq = (sz_cmd[0] == 64) ? TRUE : FALSE;
-				if (bInterceptingChainForwardReq) {
+				
+				if (bInterceptingChainForwardReq) 
+				{
 					 intercepted_command_length = (i_count + 1) - 3; // First three characters are @XY (X = Packet Size, Y = Forware Number)
 					 if (i_count > 1) iExpectedPacketLength = sz_cmd[1] & 0x0FF;
 				}	
@@ -281,13 +299,19 @@ void MCU_Main_Loop()
 				i_count++;
 				
 				// Check if 3-byte packet is done
-				if ((i_count == 3) && (bInterceptingChainForwardReq == FALSE))
+				if ((i_count == 3) && (bInterceptingChainForwardReq == FALSE) && (bSingleStageJobIssueCommand == FALSE))
 				{
-					 bEOSDetected = TRUE;
-					 break;
+					bEOSDetected = TRUE;
+					break;
 				}					 
 				
 				if (bInterceptingChainForwardReq && (intercepted_command_length == iExpectedPacketLength))
+				{
+					bEOSDetected = TRUE;
+					break;
+				}
+				
+				if ((bSingleStageJobIssueCommand == TRUE) && (i_count == 48))
 				{
 					bEOSDetected = TRUE;
 					break;
@@ -320,7 +344,9 @@ void MCU_Main_Loop()
 					continue;
 				}
 				else 
+				{
 					continue; // We'll continue...			
+				}					
 			}
 		}
 		else 
@@ -365,6 +391,9 @@ void MCU_Main_Loop()
 			// Check 
 			if (bTimeoutDetectedOnXLINK) continue;			
 		}		
+		
+		// Are we a single-stage job-issue command?
+		char bSingleStageJobIssueCommand = ((sz_cmd[0] == 'S') && (sz_cmd[1] == 48)) ? TRUE : FALSE; 
 
 		// Check number of bytes received so far.
 		// If they are 3, we may have a command here (4 for the AMUX Read)...
@@ -374,40 +403,43 @@ void MCU_Main_Loop()
 			i_count = 0;
 
 			// Check for packet integrity
-			if ((sz_cmd[0] != 'Z' || sz_cmd[2] != 'X') && (sz_cmd[0] != '@')) // @XX means forward to XX (X must be between '0' and '9')
+			if (((sz_cmd[0] != 'Z' || sz_cmd[2] != 'X') && (sz_cmd[0] != '@')) && (bSingleStageJobIssueCommand == FALSE)) // @XX means forward to XX (X must be between '0' and '9')
 			{
 				continue;
 			}
 			else
 			{
 				// We have a command. Check for validity
-				if (sz_cmd[0] != '@' &&
-					sz_cmd[1] != PROTOCOL_REQ_INFO_REQUEST &&
-					sz_cmd[1] != PROTOCOL_REQ_HANDLE_JOB &&
-					sz_cmd[1] != PROTOCOL_REQ_ID &&
-					sz_cmd[1] != PROTOCOL_REQ_GET_FIRMWARE_VERSION &&
-					sz_cmd[1] != PROTOCOL_REQ_BLINK &&
-					sz_cmd[1] != PROTOCOL_REQ_TEMPERATURE &&
-					sz_cmd[1] != PROTOCOL_REQ_BUF_PUSH_JOB_PACK &&
-					sz_cmd[1] != PROTOCOL_REQ_BUF_PUSH_JOB &&
-					sz_cmd[1] != PROTOCOL_REQ_BUF_STATUS &&
-					sz_cmd[1] != PROTOCOL_REQ_BUF_FLUSH &&
-					sz_cmd[1] != PROTOCOL_REQ_GET_VOLTAGES &&
-					sz_cmd[1] != PROTOCOL_REQ_GET_CHAIN_LENGTH &&
-					sz_cmd[1] != PROTOCOL_REQ_SET_FREQ_FACTOR &&
-					sz_cmd[1] != PROTOCOL_REQ_GET_FREQ_FACTOR &&
-					sz_cmd[1] != PROTOCOL_REQ_SET_XLINK_ADDRESS	&&
-					sz_cmd[1] != PROTOCOL_REQ_XLINK_ALLOW_PASS &&
-					sz_cmd[1] != PROTOCOL_REQ_XLINK_DENY_PASS &&
-					sz_cmd[1] != PROTOCOL_REQ_PRESENCE_DETECTION &&
-					sz_cmd[1] != PROTOCOL_REQ_ECHO &&
-					sz_cmd[1] != PROTOCOL_REQ_TEST_COMMAND &&
-					sz_cmd[1] != PROTOCOL_REQ_SAVE_STRING &&
-					sz_cmd[1] != PROTOCOL_REQ_LOAD_STRING &&
-					sz_cmd[1] != PROTOCOL_REQ_GET_STATUS)
+				if ((sz_cmd[0] != '@') &&
+					(bSingleStageJobIssueCommand == FALSE) && 
+					(sz_cmd[1] != PROTOCOL_REQ_INFO_REQUEST) &&
+					(sz_cmd[1] != PROTOCOL_REQ_HANDLE_JOB) &&
+					(sz_cmd[1] != PROTOCOL_REQ_ID) &&
+					(sz_cmd[1] != PROTOCOL_REQ_GET_FIRMWARE_VERSION) &&
+					(sz_cmd[1] != PROTOCOL_REQ_BLINK) &&
+					(sz_cmd[1] != PROTOCOL_REQ_TEMPERATURE) &&
+					(sz_cmd[1] != PROTOCOL_REQ_BUF_PUSH_JOB_PACK) &&
+					(sz_cmd[1] != PROTOCOL_REQ_BUF_PUSH_JOB) &&
+					(sz_cmd[1] != PROTOCOL_REQ_BUF_STATUS) &&
+					(sz_cmd[1] != PROTOCOL_REQ_BUF_FLUSH) &&
+					(sz_cmd[1] != PROTOCOL_REQ_GET_VOLTAGES) &&
+					(sz_cmd[1] != PROTOCOL_REQ_GET_CHAIN_LENGTH) &&
+					(sz_cmd[1] != PROTOCOL_REQ_SET_FREQ_FACTOR) &&
+					(sz_cmd[1] != PROTOCOL_REQ_GET_FREQ_FACTOR) &&
+					(sz_cmd[1] != PROTOCOL_REQ_SET_XLINK_ADDRESS)	&&
+					(sz_cmd[1] != PROTOCOL_REQ_XLINK_ALLOW_PASS) &&
+					(sz_cmd[1] != PROTOCOL_REQ_XLINK_DENY_PASS) &&
+					(sz_cmd[1] != PROTOCOL_REQ_PRESENCE_DETECTION) &&
+					(sz_cmd[1] != PROTOCOL_REQ_ECHO) &&
+					(sz_cmd[1] != PROTOCOL_REQ_TEST_COMMAND) &&
+					(sz_cmd[1] != PROTOCOL_REQ_SAVE_STRING) &&
+					(sz_cmd[1] != PROTOCOL_REQ_LOAD_STRING) &&
+					(sz_cmd[1] != PROTOCOL_REQ_GET_STATUS))
 				{					
 					if (XLINK_ARE_WE_MASTER)
+					{
 						USB_send_string("ERR:UNKNOWN COMMAND\n");
+					}						
 					else
 					{
 						XLINK_SLAVE_respond_transact("ERR:UNKNOWN COMMAND\n", 
@@ -432,34 +464,42 @@ void MCU_Main_Loop()
 				else
 				{
 					// We have a valid command, go call its procedure...
+					if (bSingleStageJobIssueCommand)
+					{
+						Protocol_handle_job_single_stage(sz_cmd);
+					}
+					else
+					{
+						// Job-Issuing commands
+						if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB)			Protocol_PIPE_BUF_PUSH();
+						if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB_PACK)    Protocol_PIPE_BUF_PUSH_PACK();
+						if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB)			Protocol_handle_job();
 					
-					// Job-Issuing commands
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB)			Protocol_PIPE_BUF_PUSH();
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_PUSH_JOB_PACK)    Protocol_PIPE_BUF_PUSH_PACK();
-					if (sz_cmd[1] == PROTOCOL_REQ_HANDLE_JOB)			Protocol_handle_job();
+						// Load String / Save String
+						if (sz_cmd[1] == PROTOCOL_REQ_SAVE_STRING)			Protocol_save_string();
+						if (sz_cmd[1] == PROTOCOL_REQ_LOAD_STRING)			Protocol_load_string();
 					
-					// Load String / Save String
-					if (sz_cmd[1] == PROTOCOL_REQ_SAVE_STRING)			Protocol_save_string();
-					if (sz_cmd[1] == PROTOCOL_REQ_LOAD_STRING)			Protocol_load_string();
+						// The rest of the commands
+						if (sz_cmd[1] == PROTOCOL_REQ_BUF_FLUSH)			Protocol_PIPE_BUF_FLUSH();
+						if (sz_cmd[1] == PROTOCOL_REQ_BUF_STATUS)			Protocol_PIPE_BUF_STATUS();
+						if (sz_cmd[1] == PROTOCOL_REQ_INFO_REQUEST)			Protocol_info_request();
+						if (sz_cmd[1] == PROTOCOL_REQ_ID)					Protocol_id();
+						if (sz_cmd[1] == PROTOCOL_REQ_BLINK)				Protocol_Blink();
+						if (sz_cmd[1] == PROTOCOL_REQ_TEMPERATURE)			Protocol_temperature();
+						if (sz_cmd[1] == PROTOCOL_REQ_GET_STATUS)			Protocol_get_status();
+						if (sz_cmd[1] == PROTOCOL_REQ_GET_VOLTAGES)			Protocol_get_voltages();
+						if (sz_cmd[1] == PROTOCOL_REQ_GET_FIRMWARE_VERSION)	Protocol_get_firmware_version();
+						if (sz_cmd[1] == PROTOCOL_REQ_SET_FREQ_FACTOR)		Protocol_set_freq_factor();
+						if (sz_cmd[1] == PROTOCOL_REQ_GET_FREQ_FACTOR)		Protocol_get_freq_factor();
+						if (sz_cmd[1] == PROTOCOL_REQ_SET_XLINK_ADDRESS)	Protocol_set_xlink_address();
+						if (sz_cmd[1] == PROTOCOL_REQ_XLINK_ALLOW_PASS)		Protocol_xlink_allow_pass();
+						if (sz_cmd[1] == PROTOCOL_REQ_XLINK_DENY_PASS)		Protocol_xlink_deny_pass();
+						if (sz_cmd[1] == PROTOCOL_REQ_ECHO)					Protocol_Echo();
+						if (sz_cmd[1] == PROTOCOL_REQ_TEST_COMMAND)			Protocol_Test_Command();
+						if (sz_cmd[1] == PROTOCOL_REQ_PRESENCE_DETECTION)   Protocol_xlink_presence_detection();
+					}
 					
-					// The rest of the commands
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_FLUSH)			Protocol_PIPE_BUF_FLUSH();
-					if (sz_cmd[1] == PROTOCOL_REQ_BUF_STATUS)			Protocol_PIPE_BUF_STATUS();
-					if (sz_cmd[1] == PROTOCOL_REQ_INFO_REQUEST)			Protocol_info_request();
-					if (sz_cmd[1] == PROTOCOL_REQ_ID)					Protocol_id();
-					if (sz_cmd[1] == PROTOCOL_REQ_BLINK)				Protocol_Blink();
-					if (sz_cmd[1] == PROTOCOL_REQ_TEMPERATURE)			Protocol_temperature();
-					if (sz_cmd[1] == PROTOCOL_REQ_GET_STATUS)			Protocol_get_status();
-					if (sz_cmd[1] == PROTOCOL_REQ_GET_VOLTAGES)			Protocol_get_voltages();
-					if (sz_cmd[1] == PROTOCOL_REQ_GET_FIRMWARE_VERSION)	Protocol_get_firmware_version();
-					if (sz_cmd[1] == PROTOCOL_REQ_SET_FREQ_FACTOR)		Protocol_set_freq_factor();
-					if (sz_cmd[1] == PROTOCOL_REQ_GET_FREQ_FACTOR)		Protocol_get_freq_factor();
-					if (sz_cmd[1] == PROTOCOL_REQ_SET_XLINK_ADDRESS)	Protocol_set_xlink_address();
-					if (sz_cmd[1] == PROTOCOL_REQ_XLINK_ALLOW_PASS)		Protocol_xlink_allow_pass();
-					if (sz_cmd[1] == PROTOCOL_REQ_XLINK_DENY_PASS)		Protocol_xlink_deny_pass();
-					if (sz_cmd[1] == PROTOCOL_REQ_ECHO)					Protocol_Echo();
-					if (sz_cmd[1] == PROTOCOL_REQ_TEST_COMMAND)			Protocol_Test_Command();
-					if (sz_cmd[1] == PROTOCOL_REQ_PRESENCE_DETECTION)   Protocol_xlink_presence_detection();
+					
 				}	
 				
 				// Once we reach here, our procedure has run and we're back to standby...

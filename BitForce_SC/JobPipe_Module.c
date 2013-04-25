@@ -47,7 +47,9 @@ void init_pipe_job_system()
 void JobPipe__pipe_flush_buffer()
 {
 	// simply reset its counter;
-	__buf_job_results_count = 0;
+	#if defined(FLUSH_CLEAR_RESULTS_BUFFER)
+		__buf_job_results_count = 0; // NOTE: CHANGED ON REQUEUST, DO NOT LOOSE JOB RESULTS!
+	#endif
 	__total_jobs_in_buffer	= 0;
 	
 	// Interleaved reset...

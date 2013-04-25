@@ -85,6 +85,9 @@ PROTOCOL_RESULT Protocol_temperature	 (void);
 PROTOCOL_RESULT Protocol_chain_forward   (char iTarget, char* sz_cmd, unsigned int iCmdLen);
 PROTOCOL_RESULT Protocol_fan_set		 (char iValue);
 
+// Exceptional High-Speed Single-Stage operation
+PROTOCOL_RESULT Protocol_handle_job_single_stage(char* szStream);
+
 // Load string / Save string
 PROTOCOL_RESULT Protocol_save_string(void);
 PROTOCOL_RESULT Protocol_load_string(void);

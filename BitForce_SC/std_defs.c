@@ -13,9 +13,16 @@
 // Set our initial value for the critical temperature
 extern volatile char GLOBAL_CRITICAL_TEMPERATURE = FALSE;
 
-
 volatile void Sleep(unsigned int iSleepPeriod)
 {
 	volatile unsigned int iActualCounter = MACRO_GetTickCountRet;
 	while (MACRO_GetTickCountRet - iActualCounter < iSleepPeriod) WATCHDOG_RESET;
+}
+
+void System_Request_Pulse_Blink()
+{
+	if (GLOBAL_PULSE_BLINK_REQUEST == 0) 
+	{
+		GLOBAL_PULSE_BLINK_REQUEST = MACRO_GetTickCountRet;
+	}		
 }

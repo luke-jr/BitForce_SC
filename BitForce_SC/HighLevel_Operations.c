@@ -101,5 +101,57 @@ volatile void HighLevel_Operations_Spin()
 		}			
 	}
 	
+	// Blink Chip LEDs if needed
+	{
+		volatile unsigned char index_hover = 0;
+		
+		for (index_hover = 0; index_hover < 8; index_hover++)
+		{
+			if (CHIP_EXISTS(index_hover))
+			{
+				if (GLOBAL_ChipActivityLEDCounter[index_hover] != 0) 
+				{
+					MCU_LED_Reset(index_hover+1);  // LEDs are 1based
+					GLOBAL_ChipActivityLEDCounter[index_hover]--; 
+				} 
+				else 
+				{ 
+					MCU_LED_Set(index_hover+1);   // LEDs are 1based
+				}
+			}				
+		}			
+	}
+	
+	// Should we Pulse?
+	{
+		if (GLOBAL_PULSE_BLINK_REQUEST != 0)
+		{
+			// Ok, we turn the LED OFF if 200ms if left until the Pulse Request Expires
+			// First, is GlobalPulseRequest already expired?
+			unsigned int iDiffVal = MACRO_GetTickCountRet - GLOBAL_PULSE_BLINK_REQUEST;
+			
+			// if iDiffVal > 1,000,000 it means it's over, and we'll reset it...			
+			// if iDiffVal <   900,000 we'll keep the LED ON
+			// if iDiffVal >   900,000 we'll keep the LED OFF
+			if (iDiffVal > 1000000)
+			{
+				// Turn the LED on and Reset the GLOBAL_PULSE_BLINK_REQUEST
+				MCU_MainLED_Set();				
+				GLOBAL_PULSE_BLINK_REQUEST = 0;
+			}
+			else
+			{
+				if (iDiffVal < 900000)
+				{
+					MCU_MainLED_Set(); // We leave it on...
+				}	
+				else
+				{
+					MCU_MainLED_Reset(); // We'll turn it off...					
+				}
+			}		
+		}
+	}
+	
 }
 
