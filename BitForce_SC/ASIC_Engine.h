@@ -129,6 +129,7 @@ int			 ASIC_get_chip_processor_count(char iChip);
 int  		 ASIC_get_processor_count(void);
 char		 ASIC_has_engine_finished_processing(char iChip, char iEngine);
 char		 ASIC_diagnose_processor(char iEngine, char iProcessor);
+int			 ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnOperatingFrequency);
 int			 ASIC_are_all_engines_done(unsigned int iChip);
 void		 ASIC_reset_engine(char iChip, char iEngine);
 int			 ASIC_does_chip_exist(unsigned int iChipIndex);
@@ -139,7 +140,7 @@ void		 ASIC_Bootup_Chips(void);
 void		 ASIC_ReadComplete(char iChip, char iEngine);
 void		 ASIC_WriteComplete(char iChip, char iEngine);
 int			 ASIC_GetFrequencyFactor(void);
-void		 ASIC_SetFrequencyFactor(int iFreqFactor);
+void		 ASIC_SetFrequencyFactor(char iChip, int iFreqFactor);
 
 void		 __ASIC_WriteEngine(char iChip, char iEngine, unsigned int iAddress, unsigned int iData16Bit);
 unsigned int __ASIC_ReadEngine (char iChip, char iEngine, unsigned int iAddress);

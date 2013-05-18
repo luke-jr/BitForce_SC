@@ -131,9 +131,65 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	volatile UL32 uLRes = 0;    
 	
 	// Atomic Full-Asm Special CPLD Write latency
-	unsigned int iLM[16];
+	unsigned int  iLM[16];
 	unsigned char ilmCounter = 0;
-	unsigned int iNonceCount;
+	unsigned int  iNonceCount;
+	
+	#if defined(__CHIP_FREQUENCY_DETECT_AND_REPORT)
+				
+		for (char umx = 0; umx < TOTAL_CHIPS_INSTALLED; umx++)
+		{		
+			// Reset watchdog
+			WATCHDOG_RESET;
+				
+			// Good engines number
+			char iGoodEnginesIndex = 0xFF;
+				
+			// Check chip existance
+			if (!CHIP_EXISTS(umx)) continue;
+				
+			// Report speed of this processor
+			#if !defined(__LIVE_FREQ_DETECTION)
+			
+				// Report what we had detected before
+				sprintf(szTemp,"PROCESSOR %d: %d MHz\n", umx, GLOBAL_CHIP_FREQUENCY_INFO[umx]);
+				strcat(szInfoReq, szTemp);
+			#else
+			
+				// Now detect a good engine
+				for (char umz = 0; umz < 16; umz++)
+				{
+					// Should we ignore engine zero?
+					#if defined(DO_NOT_USE_ENGINE_ZERO)
+						if (umz == 0) continue;
+					#endif
+				
+					// Is this engine ok?
+					if (!IS_PROCESSOR_OK(umx, umz)) continue;
+				
+					// Is it a good engine?
+					iGoodEnginesIndex = umz;
+					break;
+				}
+			
+				// Did we find any good engines?
+				if (iGoodEnginesIndex == 0xFF)
+				{
+					sprintf(szTemp,"PROCESSOR %d: NO GOOD ENGINES!\n", umx);
+					strcat(szInfoReq, szTemp);
+				}
+				else
+				{
+					// We have a good engine, test it
+					int iDetectedFreq = 0;
+					iDetectedFreq = ASIC_tune_chip_to_frequency(umx, iGoodEnginesIndex, TRUE);
+					sprintf(szTemp,"PROCESSOR %d: %d MHz\n", umx, (iDetectedFreq / 1000000));
+					strcat(szInfoReq, szTemp);
+				}
+			#endif 
+		}
+	
+	#endif
 	
 	
 	#if defined(__CHIP_DIAGNOSTICS_VERBOSE)
@@ -507,19 +563,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	strcat(szInfoReq, szTemp);
 	
 	// Add Engine freuqnecy
-	
-	#if defined(ASICS_OPERATE_AT_261MHZ)
-		sprintf(szTemp,"FREQUENCY: 261MHz\n");
-	#elif defined(ASICS_OPERATING_AT_280MHZ)
-		sprintf(szTemp,"FREQUENCY: 280MHz\n");
-	#elif defined(ASICS_OPERATING_AT_272MHZ)
-		sprintf(szTemp,"FREQUENCY: 272MHz\n");
-	#elif defined(ASICS_OPERATING_AT_227MHZ)
-		sprintf(szTemp,"FREQUENCY: 227MHz\n");
-	#else
-		sprintf(szTemp,"FREQUENCY: [UNKNOWN]\n");
-	#endif
-	
+	sprintf(szTemp,"FREQUENCY: %d MHz\n", __ASIC_FREQUENCY_VALUES[__ASIC_FREQUENCY_ACTUAL_INDEX]);
 	strcat(szInfoReq, szTemp);
 		
 	// Add Chain Status
@@ -2284,10 +2328,11 @@ PROTOCOL_RESULT  Protocol_set_freq_factor()
 	}		
 	
 	// Get the Frequency word 
-	int iFreqFactor = (sz_buf[0]) | (sz_buf[1] << 8) | (sz_buf[2] << 16) | (sz_buf[3] << 24);
-	
+	volatile int iFreqFactor = (sz_buf[0]) | (sz_buf[1] << 8) | (sz_buf[2] << 16) | (sz_buf[3] << 24);
+	iFreqFactor &= 0x0FFFF; // Only 16 bits counts
+		
 	// Do whatever we want with this iFreqFactor
-	ASIC_SetFrequencyFactor(iFreqFactor);
+	ASIC_SetFrequencyFactor(0xFF, iFreqFactor); // 0xFF for chip address means ALL CHIPS!
 	
 	// Say we're ok
 	if (XLINK_ARE_WE_MASTER)

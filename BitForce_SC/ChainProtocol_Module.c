@@ -1399,7 +1399,7 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	volatile unsigned int   iActualTickcount = MACRO_GetTickCountRet;
+	volatile unsigned int iActualTickcount = MACRO_GetTickCountRet;
 	volatile unsigned int iTotalSent = 0;
 	volatile unsigned int iBytesToSend = 0;
 	volatile char iBC = 1;	 // BitCorrector is ONE, since the previous part has already set it to one!
@@ -1674,7 +1674,6 @@ RETRY_POINT_2:
 			}
 		}
 		
-
 		// Before doing anything, clear the CPLD
 		MACRO_XLINK_clear_RX;	
 		

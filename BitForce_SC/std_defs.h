@@ -14,78 +14,99 @@
 // #define __COMPILING_FOR_PIC32__
 
 /*************** Operating Frequency ******************/
-// #define __OPERATING_FREQUENCY_16MHz__
+//#define __OPERATING_FREQUENCY_16MHz__
 //#define __OPERATING_FREQUENCY_32MHz__ 
-// #define __OPERATING_FREQUENCY_48MHz__
+//#define __OPERATING_FREQUENCY_48MHz__
 #define __OPERATING_FREQUENCY_64MHz__
 
 /*************** Product Model *********************/
 // #define __PRODUCT_MODEL_JALAPENO__
-// #define __PRODUCT_MODEL_LITTLE_SINGLE__
-#define __PRODUCT_MODEL_SINGLE__
+#define    __PRODUCT_MODEL_LITTLE_SINGLE__
+// #define __PRODUCT_MODEL_SINGLE__
 // #define __PRODUCT_MODEL_MINIRIG__
-
 
 /*************** Features modifying the code behaviour *****************/
 // Some useful macros
+
+/////////////////////////////////////////////////////////////////////////
 // This means DO NOT USE ENGINE 0. It's needed for the actual Version
 #define DO_NOT_USE_ENGINE_ZERO				1
 
-// DO NOT SET THIS MACRO
-// If set, basically all the chips will go to IDLE state
-// #define DISABLE_CLOCK_TO_ALL_ENGINES		1
+/////////////////////////////////////////////////////////////////////////
+// -- DO NOT SET THIS MACRO
+// -- If set, basically all the chips will go to IDLE state
+//#define DISABLE_CLOCK_TO_ALL_ENGINES		1
 
-// This macro forces the Queue Operator to send one job to each chip.
-// Once activated, device will process parallel jobs at nearly the same speed.
-// This also impacts the ZOX response, where the processor that got the job done will be added to the response list
+/////////////////////////////////////////////////////////////////////////
+// -- This macro forces the Queue Operator to send one job to each chip.
+// -- Once activated, device will process parallel jobs at nearly the same speed.
+// -- This also impacts the ZOX response, where the processor that got the job done will be added to the response list
 //#define QUEUE_OPERATE_ONE_JOB_PER_CHIP	1
 
-// This macro enforces the queue to use one engine per board ( verses one engine per chip )
-// It will also modify the results queue and no processing chip identifier will exist any longer
-#define QUEUE_OPERATE_ONE_JOB_PER_BOARD		1
+/////////////////////////////////////////////////////////////////////////
+// -- This macro enforces the queue to use one engine per board ( verses one engine per chip )
+// -- It will also modify the results queue and no processing chip identifier will exist any longer
+#define  QUEUE_OPERATE_ONE_JOB_PER_BOARD		1
 
 /********* TOTAL CHIPS INSTALLED ON BOARD **********/
+/////////////////////////////////////////////////////////////////////////
 #define	 TOTAL_CHIPS_INSTALLED	8
 
 /********* Pulse Reuqest *************/
+/////////////////////////////////////////////////////////////////////////
 // Pulse the main LED as long as we're processing jobs...
 #define  ENABLE_JOB_PULSING_SYSTEM	1
 
-// ********************** Chip diagnostics verbose
-// This option will provide detailed information when PROTOCOL_REQ_INFO_REQ
-// regarding chips behavior
-//#define	__CHIP_DIAGNOSTICS_VERBOSE			1
-// Also this option enables chip by chip diagnostics
-//#define __CHIP_BY_CHIP_DIAGNOSTICS			1
-//#define __ENGINE_BY_ENGINE_DIAGNOSTICS		1
-//#define __EXPORT_ENGINE_RANGE_SPREADS		1
+/***** Chip diagnostics verbose ******/
+/////////////////////////////////////////////////////////////////////////
+// -- This option will provide detailed information when PROTOCOL_REQ_INFO_REQ
+// -- regarding chips behavior
+// #define	__CHIP_DIAGNOSTICS_VERBOSE		1
+//
+// -- Also this option enables chip by chip diagnostics
+// #define __CHIP_BY_CHIP_DIAGNOSTICS		1
+// #define __ENGINE_BY_ENGINE_DIAGNOSTICS	1
+// #define __EXPORT_ENGINE_RANGE_SPREADS	1
 
 #if defined(__EXPORT_ENGINE_RANGE_SPREADS)
 	volatile unsigned int __ENGINE_LOWRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
 	volatile unsigned int __ENGINE_HIGHRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
 #endif
 
+/////////////////////////////////////////////////////////////////////////
+// Detect frequency of each chip
+#define __CHIP_FREQUENCY_DETECT_AND_REPORT 1 
+#define __LIVE_FREQ_DETECTION 1				 // If set, it'll force the report to be a live detection instead of initial results found
+
+/////////////////////////////////////////////////////////////////////////
+// This MACRO disables the kernel from trying to increase frequency on ASICS
+// on startup if their actual frequency is less than what it should be...
+#define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
+
+/////////////////////////////////////////////////////////////////////////
 // Interleaved job loading enabled?
 // #define __INTERLEAVED_JOB_LOADING
 
+/////////////////////////////////////////////////////////////////////////
 // Enabling this macro will force the results buffer to be cleared when 
 // QUEUE_FLUSH Command is issued
 // #define FLUSH_CLEAR_RESULTS_BUFFER			1
 
+/////////////////////////////////////////////////////////////////////////
 // FAN SUBSYSTEM: FAN REMAIN AT FULL SPEED
 #define FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED		1
 
-// ASIC Operation speed
-//#define ASICS_OPERATE_AT_261MHZ			1
-//#define ASICS_OPERATE_AT_250MHZ			1
-//#define ASICS_OPERATE_AT_242MHZ			1
-//#define ASICS_OPERATE_AT_236MHZ			1
-//#define ASICS_OPERATE_AT_228MHZ			1
-//#define ASICS_OPERATE_AT_264MHZ				1
-//#define ASICS_OPERATE_AT_280MHZ			1
-#define ASICS_OPERATE_AT_170MHZ			1
+/////////////////////////////////////////////////////////////////////////
+// ASIC Frequency settings
+// ACTUAL VALUES WOULD BE :: const unsigned int __ASIC_FREQUENCY_WORDS [10] = {0x0, 0xFFFF, 0xFFFD, 0xFFF5, 0xFFD5, 0xFF55, 0xFD55, 0xF555, 0xD555, 0x5555};
+extern const unsigned int __ASIC_FREQUENCY_WORDS[10];  // Values here are known...
+extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure frequency for each word...
+#define __ASIC_FREQUENCY_ACTUAL_INDEX   0 // 
+#define __MAXIMUM_FREQUENCY_INDEX       9
 
-// If this is defined, the chip 7 will no longer be used
+
+/////////////////////////////////////////////////////////////////////////
+// If this is defined, the chip will no longer be used
 // #define DECOMISSION_CHIP_15				1
 // #define DECOMISSION_CHIP_14				1
 // #define DECOMISSION_CHIP_13				1
@@ -102,7 +123,6 @@
 // #define DECOMISSION_CHIP_2				1
 // #define DECOMISSION_CHIP_1				1
 // #define DECOMISSION_CHIP_0				1
-
 
 
 /*************** Used for debugging ****************/
@@ -188,6 +208,9 @@ typedef struct _tag_string_storage
 // Other variables
 int XLINK_ARE_WE_MASTER;
 int global_vals[6];
+
+// Contains information about frequency of all the chips installed
+extern unsigned int GLOBAL_CHIP_FREQUENCY_INFO[TOTAL_CHIPS_INSTALLED];
 
 // This should be by default zero
 int GLOBAL_BLINK_REQUEST;

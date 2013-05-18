@@ -100,19 +100,9 @@ int main(void)
 	GLOBAL_ChipActivityLEDCounter[5] = 0;
 	GLOBAL_ChipActivityLEDCounter[6] = 0;
 	GLOBAL_ChipActivityLEDCounter[7] = 0;
-
 	
 	// Perform an ASIC GET CHIP COUNT
 	init_ASIC();
-	//MCU_SC_Initialize();
-	//initEngines(0);
-	//initEngines(1);
-	//initEngines(2);
-	//initEngines(3);
-	//initEngines(4);
-	//initEngines(5);
-	//initEngines(6);
-	//initEngines(7);
 	ASIC_get_chip_count();
 	
 	// Now set the side-led's accordingly
@@ -457,7 +447,7 @@ void MCU_Main_Loop()
 				if ((sz_cmd[0] == '@') && (XLINK_ARE_WE_MASTER))
 				{
 					// Forward command to the device in chain...
-					Protocol_chain_forward((char )sz_cmd[2], 
+					Protocol_chain_forward((char)sz_cmd[2], 
 										   (char*)(sz_cmd+3), 
 										   intercepted_command_length); // Length is always 3	
 				}					

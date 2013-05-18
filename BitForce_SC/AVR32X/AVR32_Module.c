@@ -734,26 +734,46 @@ volatile void __AVR32_SC_Initialize()
 	AVR32_SPI0_CR 	= (1 << 0); // SPIEN = 1
 	AVR32_SPI0_MR   = (0b01 | (1<<4)); // MSTR = 1, The rest have their default value... 
 	// NOTE: SPI FREQ REDUCED, PLEASE CORRECT FOR PRODUCTION
-	AVR32_SPI0_CSR0   = (0b010) | (0b0100 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
-	//AVR32_SPI0_CSR0 = (0b010) | (0b0111 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
-	//AVR32_SPI0_CSR0 = (0b010) | (0b0111 << 8) | (0b01000 << 4); // NPCHA = 0, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)
+	AVR32_SPI0_CSR0   = (0b010) | (0b0100 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)	
 	
-	////////////////// Activate SC_CHIP_DONE
-	AVR32_GPIO.port[1].oderc = (AVR32_SC_CHIP_DONE0)  |  (AVR32_SC_CHIP_DONE1)  |  (AVR32_SC_CHIP_DONE2) | (AVR32_SC_CHIP_DONE3) |
-							   (AVR32_SC_CHIP_DONE4)  |  (AVR32_SC_CHIP_DONE5)  |  (AVR32_SC_CHIP_DONE6) | (AVR32_SC_CHIP_DONE7) ;
-	NOP_OPERATION;
-	NOP_OPERATION;
+	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	// Now, if we are a full-single or a mini-rig, we need to activate second SPI as well
+	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
+		// Set SPI1 GPIO settings (Function-A)
+		AVR32_GPIO.port[0].gperc = (AVR32_SPI1_PIN1)  |  (AVR32_SPI1_PIN2)  |  (AVR32_SPI1_PIN3);// SPI0_PIN_MISO;
+		AVR32_GPIO.port[0].pmr1c = (AVR32_SPI1_PIN1)  |  (AVR32_SPI1_PIN2)  |  (AVR32_SPI1_PIN3);// SPI0_PIN_MOSI;
+		AVR32_GPIO.port[0].pmr0c = (AVR32_SPI1_PIN1)  |  (AVR32_SPI1_PIN2)  |  (AVR32_SPI1_PIN3);// SPI0_PIN_SCK;
+		AVR32_GPIO.port[0].gpers = AVR32_SPI1_PIN_NPCS;
+		AVR32_GPIO.port[0].oders = AVR32_SPI1_PIN_NPCS;
+		AVR32_GPIO.port[0].ovrs  = AVR32_SPI1_PIN_NPCS;
+		// Activate SPI1
+		AVR32_SPI1_CR 	= (1 << 0); // SPIEN = 1
+		AVR32_SPI1_MR   = (0b01 | (1<<4)); // MSTR = 1, The rest have their default value...
+		// NOTE: SPI FREQ REDUCED, PLEASE CORRECT FOR PRODUCTION
+		AVR32_SPI1_CSR0   = (0b010) | (0b0100 << 8) | (0b01000 << 4); // NPCHA = 1, CPOL = 0 (SPI MODE 0), SCBR = 100 (Clk/4=16MHz), BITS = 1000 (16 Bit mode)			
+	#endif	
 	
-	AVR32_GPIO.port[1].gpers = (AVR32_SC_CHIP_DONE0)  |  (AVR32_SC_CHIP_DONE1)  |  (AVR32_SC_CHIP_DONE2) | (AVR32_SC_CHIP_DONE3) |
-							   (AVR32_SC_CHIP_DONE4)  |  (AVR32_SC_CHIP_DONE5)  |  (AVR32_SC_CHIP_DONE6) | (AVR32_SC_CHIP_DONE7) ;
-							   
-	NOP_OPERATION;
-	NOP_OPERATION;
+	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%		
+	// Only Jalapeno and Little-Single support DONE pins
+	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+		// Activate SC_CHIP_DONE
+		AVR32_GPIO.port[1].oderc = (AVR32_SC_CHIP_DONE0)  |  (AVR32_SC_CHIP_DONE1)  |  (AVR32_SC_CHIP_DONE2) | (AVR32_SC_CHIP_DONE3) |
+								   (AVR32_SC_CHIP_DONE4)  |  (AVR32_SC_CHIP_DONE5)  |  (AVR32_SC_CHIP_DONE6) | (AVR32_SC_CHIP_DONE7) ;
+		NOP_OPERATION;
+		NOP_OPERATION;
+		AVR32_GPIO.port[1].gpers = (AVR32_SC_CHIP_DONE0)  |  (AVR32_SC_CHIP_DONE1)  |  (AVR32_SC_CHIP_DONE2) | (AVR32_SC_CHIP_DONE3) |
+								   (AVR32_SC_CHIP_DONE4)  |  (AVR32_SC_CHIP_DONE5)  |  (AVR32_SC_CHIP_DONE6) | (AVR32_SC_CHIP_DONE7) ;
+		NOP_OPERATION;
+		NOP_OPERATION;
+	#endif
 }
 
 volatile inline void __AVR32_ASIC_Activate_CS()
 {
 	AVR32_GPIO.port[0].ovrc   = AVR32_SPI0_PIN_NPCS;
+
 	NOP_OPERATION;
 	NOP_OPERATION;
 	NOP_OPERATION;
@@ -777,6 +797,37 @@ volatile inline void __AVR32_ASIC_Deactivate_CS()
 	NOP_OPERATION;
 	NOP_OPERATION;
 	NOP_OPERATION;
+}
+
+volatile inline void __AVR32_SPI1_SendWord(unsigned short data)
+{
+	// Put data in register and wait until its sent
+	AVR32_SPI0_TDR = (data & 0x0FFFF);
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	while ((AVR32_SPI1_SR & (1 << 9)) == 0);
+}
+
+volatile unsigned short __AVR32_SPI1_ReadWord()
+{
+	__AVR32_SPI1_SendWord(0x0FFFF); // FF stands for no-care
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	NOP_OPERATION;
+	return (AVR32_SPI1_RDR & 0x0FFFF);
 }
 
 volatile inline void __AVR32_SPI0_SendWord(unsigned short data)
@@ -846,57 +897,163 @@ volatile inline unsigned int __AVR32_SC_GetDone  (char iChip)
 			MACRO__AVR32_SPI0_SendWord(0x0FFFF); \ 
 			x = (AVR32_SPI0_RDR & 0x0FFFF); \
 		}		
+		
+		
+// For 16 chip model, using SPI1
+#define MACRO__AVR32_SPI1_SendWord(x) \
+		{ \
+			AVR32_SPI1_TDR = (x & 0x0FFFF); \
+			while ((AVR32_SPI1_SR & (1 << 9)) == 0); \
+		}
+
+#define MACRO__AVR32_SPI1_SendWord_Express(x) \
+		{ \
+			AVR32_SPI1_TDR = (x & 0x0FFFF); \
+			while ((AVR32_SPI1_SR & (1 << 1)) == 0); \
+		}
+
+#define MACRO__AVR32_SPI1_ReadWord(x) \
+		{ \
+			MACRO__AVR32_SPI1_SendWord(0x0FFFF); \
+			x = (AVR32_SPI1_RDR & 0x0FFFF); \
+		}		
+		
 
 inline unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs)
 {
 	unsigned int iCommand = 0;
-	
-	// Generate the command
-	iCommand = (ASIC_SPI_RW_COMMAND) |  // RW COMMAND (1 = Read)
-			   (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
-			   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
-		       (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
-		
+			
 	// Send it via SPI
-	__AVR32_SPI0_SendWord(iCommand);
-	return (__AVR32_SPI0_ReadWord() & 0x0FFFF);
-	//int iRetVal = 0;
-	//MACRO__AVR32_SPI0_SendWord_Express(iCommand);
-	//MACRO__AVR32_SPI0_ReadWord(iRetVal);
-	//return iRetVal;
+	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__) 
 	
+		if (iChip < 8)	
+		{
+			// Generate the command
+			iCommand = (ASIC_SPI_RW_COMMAND) |  // RW COMMAND (1 = Read)
+						(((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+						(((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+						(((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+						
+			__AVR32_SPI0_SendWord(iCommand);
+			return (__AVR32_SPI0_ReadWord() & 0x0FFFF);						
+		}
+		else
+		{
+			// Generate the command
+			iCommand = (ASIC_SPI_RW_COMMAND) |  // RW COMMAND (1 = Read)
+						(((unsigned int)((iChip-8)   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+						(((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+						(((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+						
+			// We're on an 16 chip model
+			__AVR32_SPI1_SendWord(iCommand);
+			return (__AVR32_SPI1_ReadWord() & 0x0FFFF);						
+		}
+	
+		
+	#else 
+		// Generate the command
+		iCommand = (ASIC_SPI_RW_COMMAND) |  // RW COMMAND (1 = Read)
+					(((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+					(((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+					(((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+		
+		// We're on an 8 chip model
+		__AVR32_SPI0_SendWord(iCommand);
+		return (__AVR32_SPI0_ReadWord() & 0x0FFFF);		
+	#endif
 }
 
 inline void __AVR32_SC_WriteData_Express(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
 {
 	unsigned int iCommand = 0;
 	
-	// Generate the command
-	// RW COMMAND (0 = WRITE)
-	iCommand = (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
-	(((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
-	(((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
+		// 16 Chip model
+		
+		// Generate the command
+		if (iChip < 8)
+		{
+			// RW COMMAND (0 = WRITE)
+			iCommand = (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+					   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+					   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+		
+			// Send it via SPI
+			MACRO__AVR32_SPI0_SendWord_Express(iCommand);
+			MACRO__AVR32_SPI0_SendWord_Express(iData & 0x0FFFF);			
+		}
+		else
+		{
+			// RW COMMAND (0 = WRITE)
+			iCommand = (((unsigned int)((iChip - 8)   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+					   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+					   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+			
+			// Send it via SPI
+			MACRO__AVR32_SPI1_SendWord_Express(iCommand);
+			MACRO__AVR32_SPI1_SendWord_Express(iData & 0x0FFFF);			
+		}
 	
-	// Send it via SPI
-	MACRO__AVR32_SPI0_SendWord_Express(iCommand);
-	MACRO__AVR32_SPI0_SendWord_Express(iData & 0x0FFFF);
+	#else
+		// 8 Chip model
+		
+		// Generate the command
+		// RW COMMAND (0 = WRITE)
+		iCommand = (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+		(((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+		(((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+	
+		// Send it via SPI
+		MACRO__AVR32_SPI0_SendWord_Express(iCommand);
+		MACRO__AVR32_SPI0_SendWord_Express(iData & 0x0FFFF);	
+	#endif
+	
+
 }
 
 inline void __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
 {
 	unsigned int iCommand = 0;
 	
-	// Generate the command
-	// RW COMMAND (0 = WRITE)
-	iCommand = (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
-			   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
-			   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
+		// 16 Chip model
+		// Generate the command
+		if (iChip < 8)
+		{
+			// RW COMMAND (0 = WRITE)
+			iCommand = (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+					   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+					   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+		
+			// Send it via SPI
+			__AVR32_SPI0_SendWord(iCommand);
+			__AVR32_SPI0_SendWord(iData & 0xFFFF);			
+		}
+		else
+		{
+			// RW COMMAND (0 = WRITE)
+			iCommand = (((unsigned int)((iChip - 8)   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+					   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+					   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
+			
+			// Send it via SPI
+			__AVR32_SPI1_SendWord(iCommand);
+			__AVR32_SPI1_SendWord(iData & 0xFFFF);			
+		}	
+	#else
+		// Generate the command
+		// RW COMMAND (0 = WRITE)
+		iCommand = (((unsigned int)(iChip   & 0x0FF) << 12 ) &  0b0111000000000000) | // Chip address
+				   (((unsigned int)(iEngine & 0x0FF) << 8  ) &  0b0000111100000000) |
+				   (((unsigned int)(iAdrs   & 0x0FF)       ) &  0b0000000011111111); // Memory Address
 							  							  
-	// Send it via SPI
-	//MACRO__AVR32_SPI0_SendWord_Express(iCommand);
-	//MACRO__AVR32_SPI0_SendWord_Express(iData & 0x0FFFF);	
-	__AVR32_SPI0_SendWord(iCommand);
-	__AVR32_SPI0_SendWord(iData & 0xFFFF);
+		// Send it via SPI
+		__AVR32_SPI0_SendWord(iCommand);
+		__AVR32_SPI0_SendWord(iData & 0xFFFF);		
+	#endif	
+	
+
 }
 
 ////////////////////////////////////////////////////
@@ -922,70 +1079,79 @@ void	__AVR32_MainLED_Reset()
 	AVR32_GPIO.port[0].ovrc  =  __AVR32_MAIN_LED_PIN;
 }
 
-//////////////////////////////////////////////////
+///////////////////////////////////////////////////////
 // LEDs
-//////////////////////////////////////////////////
+// (Works only with JALAPENO and LittleSingle models)
+///////////////////////////////////////////////////////
 void	__AVR32_LED_Initialize()
 {
-	// Enable GPIOs on Port A
-	NOP_OPERATION;
-	AVR32_GPIO.port[1].gpers =  __AVR32_ENGINE_LED1 | __AVR32_ENGINE_LED2 |	__AVR32_ENGINE_LED3 | __AVR32_ENGINE_LED4 |
-								__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8 ;
-	NOP_OPERATION;
-	AVR32_GPIO.port[1].oders =  __AVR32_ENGINE_LED1 | __AVR32_ENGINE_LED2 | __AVR32_ENGINE_LED3 | __AVR32_ENGINE_LED4 |
-								__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8 ;
-	NOP_OPERATION;								
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+		// Enable GPIOs on Port A
+		NOP_OPERATION;
+		AVR32_GPIO.port[1].gpers =  __AVR32_ENGINE_LED1 | __AVR32_ENGINE_LED2 |	__AVR32_ENGINE_LED3 | __AVR32_ENGINE_LED4 |
+									__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8 ;
+		NOP_OPERATION;
+		AVR32_GPIO.port[1].oders =  __AVR32_ENGINE_LED1 | __AVR32_ENGINE_LED2 | __AVR32_ENGINE_LED3 | __AVR32_ENGINE_LED4 |
+									__AVR32_ENGINE_LED5 | __AVR32_ENGINE_LED6 |	__AVR32_ENGINE_LED7 | __AVR32_ENGINE_LED8 ;
+		NOP_OPERATION;			
+	#endif					
 }
 
 void	__AVR32_LED_SetAccess()
 {
-	// return
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+		// return
+	#endif
 }
 
 void	__AVR32_LED_Set  (char iLed)
 {
-	if (iLed == 1)
-		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED1;
-	else if (iLed == 2)
-		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED2;
-	else if (iLed == 3)
-		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED3;
-	else if (iLed == 4)
-		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED4;
-	else if (iLed == 5)
-		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED5;
-	else if (iLed == 6)
-		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED6;
-	else if (iLed == 7)
-		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED7;
-	else if (iLed == 8)
-		AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED8;
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+		if (iLed == 1)
+			AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED1;
+		else if (iLed == 2)
+			AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED2;
+		else if (iLed == 3)
+			AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED3;
+		else if (iLed == 4)
+			AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED4;
+		else if (iLed == 5)
+			AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED5;
+		else if (iLed == 6)
+			AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED6;
+		else if (iLed == 7)
+			AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED7;
+		else if (iLed == 8)
+			AVR32_GPIO.port[1].ovrs = __AVR32_ENGINE_LED8;
 		
-	// IO Sync Delay
-	NOP_OPERATION;
+		// IO Sync Delay
+		NOP_OPERATION;		
+	#endif
 }
 
 void	__AVR32_LED_Reset(char iLed)
 {
-	if (iLed == 1)
-		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED1;
-	else if (iLed == 2)
-		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED2;
-	else if (iLed == 3)
-		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED3;
-	else if (iLed == 4)
-		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED4;
-	else if (iLed == 5)
-		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED5;
-	else if (iLed == 6)
-		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED6;
-	else if (iLed == 7)
-		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED7;
-	else if (iLed == 8)
-		AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED8;
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)	
+		if (iLed == 1)
+			AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED1;
+		else if (iLed == 2)
+			AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED2;
+		else if (iLed == 3)
+			AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED3;
+		else if (iLed == 4)
+			AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED4;
+		else if (iLed == 5)
+			AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED5;
+		else if (iLed == 6)
+			AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED6;
+		else if (iLed == 7)
+			AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED7;
+		else if (iLed == 8)
+			AVR32_GPIO.port[1].ovrc = __AVR32_ENGINE_LED8;
 		
-	// IO Sync Delay
-	NOP_OPERATION;
+		// IO Sync Delay
+		NOP_OPERATION;
+	#endif
 }
 
 /////////////////////////////////////////////
@@ -1034,7 +1200,6 @@ void __AVR32_Timer_Initialize()
 	AVR32_TC.channel[0].CCR.swtrg = 1;	
 	
 	// Wait for BUSY to clear
-	
 	// Now proceed
 	/*
 	AVR32_RTC.IER.topi = 1;	
@@ -1058,7 +1223,7 @@ void __AVR32_Timer_Initialize()
 	irq_initialize_vectors();
 	
 	// Register the TC interrupt handler
-	//irq_register_handler(__avr32_tmr0_interrupt, AVR32_RTC_IRQ, 0);
+	// irq_register_handler(__avr32_tmr0_interrupt, AVR32_RTC_IRQ, 0);
 	irq_register_handler(__avr32_tmr0_interrupt, AVR32_TC_IRQ0, 0);
 			
     // Enable all interrupts now...
@@ -1117,24 +1282,72 @@ int __AVR32_Timer_GetValue()
 	iMXVal |= (iSpeed & 0b00010) ? __AVR32_FAN_CTRL1 : 0;
 	iMXVal |= (iSpeed & 0b00100) ? __AVR32_FAN_CTRL2 : 0;
 	iMXVal |= (iSpeed & 0b01000) ? __AVR32_FAN_CTRL3 : 0;
-	
 	iFinalVal |= iMXVal;
 	
 	AVR32_GPIO.port[1].ovr = iFinalVal;
 }
 
 
+/////////////////////////////////////////////////
+// A2D MUX Controller
+// (Works only with MiniRig and Single models)
+/////////////////////////////////////////////////
+void __AVR32_A2D_MUX_Initialize()
+{
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+		// Not valid
+	#else
+		// Enable GPIOs on Port B
+		AVR32_GPIO.port[1].gpers =  __AVR32_ADX_MUX0 |	__AVR32_ADX_MUX1 |	__AVR32_ADX_MUX2 |	__AVR32_ADX_MUX3;
+		AVR32_GPIO.port[1].oders =  __AVR32_ADX_MUX0 |	__AVR32_ADX_MUX1 |	__AVR32_ADX_MUX2 |	__AVR32_ADX_MUX3;
+		AVR32_GPIO.port[1].ovrc  =  __AVR32_ADX_MUX0 |	__AVR32_ADX_MUX1 |	__AVR32_ADX_MUX2 |	__AVR32_ADX_MUX3;	
+	#endif
+}
+
+void __AVR32_A2D_MUX_SetAccess()
+{
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+		// Not valid
+	#else
+		// Nothing to do
+	#endif	
+}
+
+void __AVR32_A2D_MUX_SelectChannel(int iChannel)
+{
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+		// Not valid
+	#else
+		// Extract first 4 bits
+		iChannel = iChannel & 0xF;
+		
+		// Right shift it to reach __AVR32_ADX_MUX0
+		iChannel <<= __AVR32_ADX_MUX0;
+		
+		// Set correct output
+		AVR32_GPIO.port[1].ovr = (AVR32_GPIO.port[1].ovr & ~(__AVR32_ADX_MUX0 |	__AVR32_ADX_MUX1 |	__AVR32_ADX_MUX2 |	__AVR32_ADX_MUX3)) | iChannel;
+	#endif	
+}
+
+int	__AVR32_A2D_MUX_Convert()
+{
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+		// Not valid	
+	#else
+		__AVR32_A2D_GetPWR_MAIN(); // A2D MUX OUTPUT is connected to PWR_MAIN for the LITTLE-SINGLE and JALAPENO 
+	#endif	
+}
+
 
 /////////////////////////////////////////////////
 // Flash programming
 /////////////////////////////////////////////////
-
-void	__avr32_flash_writeRegister(uint16_t offset, int32_t value);
-int32_t __avr32_flash_readRegister(uint16_t offset);
-void	__avr32_flash_writeUserData(char* szStream);
-void	__avr32_flash_readUserData(char* szStream);
-void    __avr32_flash_eraseUserData(void);
-void	__avr32_flash_waitForFlashReady(void);
+void		__avr32_flash_writeRegister(uint16_t offset, int32_t value);
+int32_t		__avr32_flash_readRegister(uint16_t offset);
+void		__avr32_flash_writeUserData(char* szStream);
+void		__avr32_flash_readUserData(char* szStream);
+void		__avr32_flash_eraseUserData(void);
+void		__avr32_flash_waitForFlashReady(void);
 
 //
 // Write to Flash Controller register with an offset and value provided

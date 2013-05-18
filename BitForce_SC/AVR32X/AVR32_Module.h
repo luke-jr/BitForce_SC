@@ -73,7 +73,6 @@
 #define AVR32_A2D_CHANNEL_STATUS_REGISTER			(*((volatile unsigned int*)AVR32_A2D_CHANNEL_STATUS_REGISTER_ADRS))
 #define AVR32_A2D_STATUS_REGISTER					(*((volatile unsigned int*)AVR32_A2D_STATUS_REGISTER_ADRS))
 
-
 #define AVR32_A2D_CDR0								(*((volatile unsigned int*)AVR32_A2D_CDR0_ADRS))
 #define AVR32_A2D_CDR1								(*((volatile unsigned int*)AVR32_A2D_CDR1_ADRS))
 #define AVR32_A2D_CDR2								(*((volatile unsigned int*)AVR32_A2D_CDR2_ADRS))
@@ -101,6 +100,11 @@
 #define __AVR32_FAN_CTRL1	 (1<<21)
 #define __AVR32_FAN_CTRL2	 (1<<22)
 #define __AVR32_FAN_CTRL3	 (1<<23)
+
+#define __AVR32_ADX_MUX0	 (1<<24)
+#define __AVR32_ADX_MUX1	 (1<<25)
+#define __AVR32_ADX_MUX2	 (1<<26)
+#define __AVR32_ADX_MUX3	 (1<<27)
 
 // Definitions
 #define __AVR32_USB_AD0		 (1<<0)	// PORT A
@@ -146,6 +150,12 @@
 #define AVR32_SPI0_PIN2		 (1 << 12) // PORT A
 #define AVR32_SPI0_PIN3		 (1 << 11) // PORT A
 #define AVR32_SPI0_PIN_NPCS	 (1 << 10) // PORT A
+
+// SC Chip interface for 16 chip version
+#define AVR32_SPI1_PIN1		 (1 << 17) // PORT A
+#define AVR32_SPI1_PIN2		 (1 << 16) // PORT A
+#define AVR32_SPI1_PIN3		 (1 << 15) // PORT A
+#define AVR32_SPI1_PIN_NPCS	 (1 << 14) // PORT A
 							 
 #define AVR32_SC_CHIP_DONE0	 (1 << 12) // PORT B
 #define AVR32_SC_CHIP_DONE1	 (1 << 13) // PORT B
@@ -155,7 +165,7 @@
 #define AVR32_SC_CHIP_DONE5	 (1 << 17) // PORT B
 #define AVR32_SC_CHIP_DONE6	 (1 << 18) // PORT B
 #define AVR32_SC_CHIP_DONE7	 (1 << 19) // PORT B
-							 
+
 // MAIN LED					 
 #define __AVR32_MAIN_LED_PIN (1<<18)    // Port A
 
@@ -168,8 +178,6 @@
 #define __AVR32_ENGINE_LED6  (1<<29)   // PORT B
 #define __AVR32_ENGINE_LED7  (1<<30)   // PORT B
 #define __AVR32_ENGINE_LED8  (1<<31)   // PORT B
-
-
 
 //////////////////////////////////////////////
 // FUNCTIONS
@@ -202,29 +210,29 @@ void	__AVR32_USB_FlushOutputData(void);
 ////////////////////////////////////////////
 // CHAIN Functions
 ////////////////////////////////////////////
-void			__AVR32_CPLD_Initialize(void);
-void			__AVR32_CPLD_SetAccess(void);
-void			__AVR32_CPLD_Write (char iAdrs, char iData);
-unsigned int	__AVR32_CPLD_Read (char iAdrs);
-void			__AVR32_CPLD_BurstTxWrite(char* iData, char iAddress);
-void			__AVR32_CPLD_BurstRxRead(char* iData, char iAddress);
-void			__AVR32_CPLD_StartTX(char iTxControlValue);
+void		 __AVR32_CPLD_Initialize(void);
+void		 __AVR32_CPLD_SetAccess(void);
+void		 __AVR32_CPLD_Write (char iAdrs, char iData);
+unsigned int __AVR32_CPLD_Read (char iAdrs);
+void		 __AVR32_CPLD_BurstTxWrite(char* iData, char iAddress);
+void		 __AVR32_CPLD_BurstRxRead(char* iData, char iAddress);
+void		 __AVR32_CPLD_StartTX(char iTxControlValue);
 
 //////////////////////////////////////////////
 // SC Chips
 //////////////////////////////////////////////
-void	__AVR32_SC_Initialize(void);
-void	__AVR32_SC_SetAccess(void);
+void __AVR32_SC_Initialize(void);
+void __AVR32_SC_SetAccess(void);
 unsigned int __AVR32_SC_GetDone  (char iChip);
 unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs);
 void __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData);
 void __AVR32_SC_WriteData_Express(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData);
-
 void __AVR32_ASIC_Activate_CS(void); 
 void __AVR32_ASIC_Deactivate_CS(void);
-
 void __AVR32_SPI0_SendWord(unsigned short data);
+void __AVR32_SPI1_SendWord(unsigned short data);
 unsigned short __AVR32_SPI0_ReadWord(void);
+unsigned short __AVR32_SPI1_ReadWord(void);
 
 ////////////////////////////////////////////////////
 // Main LED
@@ -235,6 +243,7 @@ void	__AVR32_MainLED_Reset(void);
 
 //////////////////////////////////////////////////
 // LEDs
+// (Works only with JALAPENO and Little Singles)
 //////////////////////////////////////////////////
 void	__AVR32_LED_Initialize(void);
 void	__AVR32_LED_SetAccess(void);
@@ -257,6 +266,14 @@ void	__AVR32_FAN_Initialize(void);
 void	__AVR32_FAN_SetAccess(void);
 void	__AVR32_FAN_SetSpeed(char iSpeed);
 
+/////////////////////////////////////////////////
+// A2D MUX Controller 
+// (Works only with MiniRig and Single models)
+/////////////////////////////////////////////////
+void	__AVR32_A2D_MUX_Initialize(void);
+void	__AVR32_A2D_MUX_SetAccess(void);
+void	__AVR32_A2D_MUX_SelectChannel(int iChannel);
+int		__AVR32_A2D_MUX_Convert(void);
 
 /////////////////////////////////////////////////
 // Flash programming
@@ -264,6 +281,5 @@ void	__AVR32_FAN_SetSpeed(char iSpeed);
 void	__AVR32_Flash_Initialize(void);
 void	__AVR32_Flash_WriteUserPage(char* szData);
 void	__AVR32_Flash_ReadUserPage (char* szData);
-
 
 #endif /* AVR32_MODULE_H_ */

@@ -6,7 +6,7 @@
  */ 
 
 #include "USBProtocol_Module.h"
-#include "Generic_Module.h"
+#include "AVR32X/AVR32_Module.h"
 #include "string.h"
 #include "std_defs.h"
 #include <avr32/io.h>
@@ -17,8 +17,8 @@
 void init_USB()
 {
 	// Initialize appropriate IO for USB Communication
-	MCU_USB_SetAccess();
-	MCU_USB_Initialize();	
+	__AVR32_USB_SetAccess();
+	__AVR32_USB_Initialize();	
 }
 
 
@@ -167,61 +167,61 @@ void USB_send_string(const char* data)
 
 char USB_write_data (const char* data, unsigned int length)
 {
-	MCU_USB_SetAccess();
-	MCU_USB_WriteData(data, length);
-	MCU_USB_FlushOutputData();
+	__AVR32_USB_SetAccess();
+	__AVR32_USB_WriteData(data, length);
+	__AVR32_USB_FlushOutputData();
 	return length; // We've written these many bytes
 }
 
 void USB_send_immediate(void)
 {
-	MCU_USB_SetAccess();
-	MCU_USB_FlushOutputData();
+	__AVR32_USB_SetAccess();
+	__AVR32_USB_FlushOutputData();
 }
 
 char USB_inbound_USB_data(void)
 {
 	// Set access
-	MCU_USB_SetAccess();
-	volatile char uInf = MCU_USB_GetInformation();
+	__AVR32_USB_SetAccess();
+	volatile char uInf = __AVR32_USB_GetInformation();
 	return ((uInf & 0b01) == (0b01)) ? TRUE : FALSE;
 }
 
 void USB_flush_USB_data(void)
 {
-	MCU_USB_SetAccess();
-	MCU_USB_FlushInputData();
+	__AVR32_USB_SetAccess();
+	__AVR32_USB_FlushInputData();
 }
 
 char USB_outbound_space(void)
 {
-	MCU_USB_SetAccess();
-	volatile char uInf = MCU_USB_GetInformation();
+	__AVR32_USB_SetAccess();
+	volatile char uInf = __AVR32_USB_GetInformation();
 	return ((uInf & 0b010) == (0b010)) ? TRUE : FALSE;	
 }
 
 char USB_read_byte(void)
 {
 	// Set access to USB
-	MCU_USB_SetAccess();
+	__AVR32_USB_SetAccess();
 	
 	// Read a byte
 	volatile char uiData = 0;
 	volatile char uiDataRetCount = 0;
-	uiDataRetCount = MCU_USB_GetData(&uiData, 1);
+	uiDataRetCount = __AVR32_USB_GetData(&uiData, 1);
 	return uiData;
 }
 
 char USB_read_status(void)
 {
-	MCU_USB_SetAccess();
-	return (char)(MCU_USB_GetInformation());
+	__AVR32_USB_SetAccess();
+	return (char)(__AVR32_USB_GetInformation());
 }
 
 char USB_write_byte(char data)
 {
-	MCU_USB_SetAccess();
-	MCU_USB_WriteData(&data,1);
+	__AVR32_USB_SetAccess();
+	__AVR32_USB_WriteData(&data,1);
 	return 1; // By default, since only 1 character is read
 }
 

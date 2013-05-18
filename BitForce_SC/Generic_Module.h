@@ -24,10 +24,9 @@ volatile int MCU_A2D_GetPWR_MAIN();
 void	MCU_USB_Initialize();
 void	MCU_USB_SetAccess();
 
-char MCU_USB_WriteData(char* iData, unsigned int iCount);
-
-char MCU_USB_GetData(char* iData, unsigned int iMaxCount);
-char MCU_USB_GetInformation();
+char	MCU_USB_WriteData(char* iData, unsigned int iCount);
+char	MCU_USB_GetData(char* iData, unsigned int iMaxCount);
+char	MCU_USB_GetInformation();
 
 void	MCU_USB_FlushInputData();
 void	MCU_USB_FlushOutputData();
@@ -36,7 +35,7 @@ void	MCU_USB_FlushOutputData();
 void	MCU_CPLD_Initialize();
 void	MCU_CPLD_SetAccess();
 void	MCU_CPLD_Write(char iAdrs, char iData);
-char   MCU_CPLD_Read(char iAdrs);
+char    MCU_CPLD_Read(char iAdrs);
 
 // SC Chips
 void	MCU_SC_Initialize();

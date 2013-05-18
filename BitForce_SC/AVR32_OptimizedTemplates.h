@@ -61,16 +61,16 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \
-		NOP_OPERATION \		
+		NOP_OPERATION \	
 		AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_OE; \
 		NOP_OPERATION \
 		volatile int iRetVal = (AVR32_GPIO.port[1].pvr); \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE; \
 		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \
-		ret_value = iRetVal; \ 
+		ret_value = iRetVal; \
 		NOP_OPERATION \
 		})
 
@@ -89,7 +89,7 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		MACRO_SET_OUTPUT(value) \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
@@ -105,7 +105,7 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[1].ovrc =  __AVR32_CPLD_OE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].oders = __AVR32_CPLD_BUS_ALL; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_ADRS; \
 		NOP_OPERATION \
 		MACRO_SET_OUTPUT(address_begin) \
@@ -119,7 +119,7 @@ unsigned int OPTO_GetTickCountRet(void);
 		CPLD_activate_address_increase; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = 0x0FF; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = szdata[0]; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
@@ -127,7 +127,7 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = 0x0FF; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = szdata[1]; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
@@ -135,7 +135,7 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = 0x0FF; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = szdata[2]; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
@@ -143,7 +143,7 @@ unsigned int OPTO_GetTickCountRet(void);
 		AVR32_GPIO.port[0].ovrc = __AVR32_CPLD_STROBE; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = 0x0FF; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = szdata[3]; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
@@ -169,12 +169,12 @@ unsigned int OPTO_GetTickCountRet(void);
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_ADRS; \
 		NOP_OPERATION \
-		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \	
+		AVR32_GPIO.port[1].oderc = __AVR32_CPLD_BUS_ALL; \
 		NOP_OPERATION \
 		AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_OE; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		CPLD_activate_address_increase; \
-		NOP_OPERATION \		
+		NOP_OPERATION \
 		iData[0] = (AVR32_GPIO.port[1].pvr); \
 		NOP_OPERATION \
 		AVR32_GPIO.port[0].ovrs = __AVR32_CPLD_STROBE; \
