@@ -16,19 +16,19 @@
 #include "FAN_Subsystem.h"
 
 // Now to our codes
-
 volatile void FAN_SUBSYS_Initialize(void)
 {
 	// Initialize state to 0
-	FAN_SUBSYS_SetFanState(FAN_STATE_AUTO);		
+	__AVR32_FAN_Initialize();
+	FAN_SUBSYS_SetFanState(FAN_STATE_AUTO);			
+	GLOBAL_CRITICAL_TEMPERATURE = FALSE;
 }
 
-#define FAN_CONTROL_BYTE_VERY_SLOW			(FAN_CTRL3)
-#define FAN_CONTROL_BYTE_SLOW				(FAN_CTRL2)
-#define FAN_CONTROL_BYTE_MEDIUM				(FAN_CTRL2 | FAN_CTRL3)
-#define FAN_CONTROL_BYTE_FAST				(FAN_CTRL0)
-#define FAN_CONTROL_BYTE_VERY_FAST			(FAN_CTRL0 | FAN_CTRL1)
-
+#define FAN_CONTROL_BYTE_VERY_SLOW			(0b0010)
+#define FAN_CONTROL_BYTE_SLOW				(0b0100)
+#define FAN_CONTROL_BYTE_MEDIUM				(0b1000)
+#define FAN_CONTROL_BYTE_FAST				(0b0001)
+#define FAN_CONTROL_BYTE_VERY_FAST			(0b1111)
 #define FAN_CONTROL_BYTE_REMAIN_FULL_SPEED	(FAN_CTRL0 | FAN_CTRL1 | FAN_CTRL2 | FAN_CTRL3)	// Turn all mosfets off...
 
 #define FAN_CTRL0	 0b00001
@@ -39,12 +39,40 @@ volatile void FAN_SUBSYS_Initialize(void)
 volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 {
 	// We execute this function every 50th call
+	/*
 	static volatile char __attempt = 0;
 	
 	if (__attempt++ < 10) return;
 	
 	// It is the 50th call
 	__attempt = 0;
+	*/
+	
+	// Check temperature
+	volatile int iTemp1 = __AVR32_A2D_GetTemp1();
+	volatile int iTemp2 = __AVR32_A2D_GetTemp2();
+	volatile int iTempAveraged = (iTemp1 > iTemp2) ? iTemp1 : iTemp2; // (iTemp2 + iTemp1) / 2;
+	
+	if (iTempAveraged > 90)
+	{
+		// Holy jesus! We're in a critical situation...
+		GLOBAL_CRITICAL_TEMPERATURE = TRUE;
+	}
+	else
+	{
+		if (GLOBAL_CRITICAL_TEMPERATURE == TRUE)
+		{
+			if (iTempAveraged < 82) // Hysterysis
+			{ 
+				GLOBAL_CRITICAL_TEMPERATURE = FALSE;
+			}
+		}
+		else
+		{
+			// If we're here, it means we're not critical anymore
+			GLOBAL_CRITICAL_TEMPERATURE = FALSE;			
+		}
+	}	
 	
 	// Do we remain at full speed? If so, get it done and return
 	#if defined(FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED)
@@ -52,24 +80,8 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 		return;
 	#endif
 	
-	// Check temperature
-	volatile int iTemp1 = __AVR32_A2D_GetTemp1();
-	volatile int iTemp2 = __AVR32_A2D_GetTemp2();
-	volatile int iTempAveraged = (iTemp2 + iTemp1) / 2;
-	
-	if (iTempAveraged > 100)
-	{
-		// Holy jesus! We're in a critical situation...
-		GLOBAL_CRITICAL_TEMPERATURE = TRUE;
-	}
-	else
-	{
-		// If we're here, it means we're not critical anymore
-		GLOBAL_CRITICAL_TEMPERATURE = FALSE;
-	}	
-	
 	// Are we close to the critical temperature? Override FAN if necessary
-	if (iTempAveraged > 90)
+	if (iTempAveraged > 70)
 	{
 		// Override fan, set it to maximum
 		__AVR32_FAN_SetSpeed(FAN_CONTROL_BYTE_VERY_FAST);
@@ -112,15 +124,25 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 	
 	// We're in AUTO mode... There are rules to respect form here...
 	if (iTempAveraged <= 30)
+	{
 		__AVR32_FAN_SetSpeed(FAN_CONTROL_BYTE_VERY_SLOW);
-	else if ((iTempAveraged > 30) && (iTempAveraged <= 40))
+	}		
+	else if ((iTempAveraged > 35) && (iTempAveraged <= 42))
+	{
 		__AVR32_FAN_SetSpeed(FAN_CONTROL_BYTE_SLOW);
-	else if ((iTempAveraged > 40) && (iTempAveraged <= 50))
+	}		
+	else if ((iTempAveraged > 45) && (iTempAveraged <= 53))
+	{
 		__AVR32_FAN_SetSpeed(FAN_CONTROL_BYTE_MEDIUM);	
-	else if ((iTempAveraged > 50) && (iTempAveraged <= 60))
+	}		
+	else if ((iTempAveraged > 57) && (iTempAveraged <= 67))
+	{
 		__AVR32_FAN_SetSpeed(FAN_CONTROL_BYTE_FAST);		
-	else 
+	}		
+	else if (iTempAveraged > 70)
+	{	
 		__AVR32_FAN_SetSpeed(FAN_CONTROL_BYTE_VERY_FAST);		
+	}		
 		
 	// Ok, We're done...
 }

@@ -103,6 +103,8 @@
 #define ASIC_SPI_WRITE_CONTROL_DIV2_BIT				0b00100000000000000
 #define ASIC_SPI_WRITE_CONTROL_DIV4_BIT				0b00010000000000000
 #define ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT	0b00000100000000000
+#define ASIC_SPI_WRITE_WRITE_RESET_BIT				0b00001000000000000
+
 #define ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT		0b00000010000000000
 #define ASIC_SPI_WRITE_OSC_CTRL6_BIT				0b00000000000100000
 #define ASIC_SPI_WRITE_OSC_CTRL5_BIT				0b00000000000010000
@@ -129,6 +131,7 @@ int			 ASIC_get_chip_processor_count(char iChip);
 int  		 ASIC_get_processor_count(void);
 char		 ASIC_has_engine_finished_processing(char iChip, char iEngine);
 char		 ASIC_diagnose_processor(char iEngine, char iProcessor);
+void		 ASIC_calculate_engines_nonce_range(void);
 int			 ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnOperatingFrequency);
 int			 ASIC_are_all_engines_done(unsigned int iChip);
 void		 ASIC_reset_engine(char iChip, char iEngine);

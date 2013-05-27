@@ -22,8 +22,17 @@
 /*************** Product Model *********************/
 // #define __PRODUCT_MODEL_JALAPENO__
 #define    __PRODUCT_MODEL_LITTLE_SINGLE__
-// #define __PRODUCT_MODEL_SINGLE__
+//#define __PRODUCT_MODEL_SINGLE__
 // #define __PRODUCT_MODEL_MINIRIG__
+
+/********* TOTAL CHIPS INSTALLED ON BOARD **********/
+/////////////////////////////////////////////////////////////////////////
+
+#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+	#define	 TOTAL_CHIPS_INSTALLED	8
+#else
+	#define	 TOTAL_CHIPS_INSTALLED	16
+#endif
 
 /*************** Features modifying the code behaviour *****************/
 // Some useful macros
@@ -41,16 +50,12 @@
 // -- This macro forces the Queue Operator to send one job to each chip.
 // -- Once activated, device will process parallel jobs at nearly the same speed.
 // -- This also impacts the ZOX response, where the processor that got the job done will be added to the response list
-//#define QUEUE_OPERATE_ONE_JOB_PER_CHIP	1
+#define QUEUE_OPERATE_ONE_JOB_PER_CHIP	1
 
 /////////////////////////////////////////////////////////////////////////
 // -- This macro enforces the queue to use one engine per board ( verses one engine per chip )
 // -- It will also modify the results queue and no processing chip identifier will exist any longer
-#define  QUEUE_OPERATE_ONE_JOB_PER_BOARD		1
-
-/********* TOTAL CHIPS INSTALLED ON BOARD **********/
-/////////////////////////////////////////////////////////////////////////
-#define	 TOTAL_CHIPS_INSTALLED	8
+//#define  QUEUE_OPERATE_ONE_JOB_PER_BOARD		1
 
 /********* Pulse Reuqest *************/
 /////////////////////////////////////////////////////////////////////////
@@ -81,11 +86,31 @@
 /////////////////////////////////////////////////////////////////////////
 // This MACRO disables the kernel from trying to increase frequency on ASICS
 // on startup if their actual frequency is less than what it should be...
-#define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
+// #define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
 
 /////////////////////////////////////////////////////////////////////////
 // Interleaved job loading enabled?
 // #define __INTERLEAVED_JOB_LOADING
+
+/////////////////////////////////////////////////////////////////////////
+// Engine activity supervision
+// Enabling this feature will force the MCU to decommission the malfunctioning
+// engines detected on runtime
+#define __ENGINE_ACTIVITY_SUPERVISION	1
+#define ENGINE_MAXIMUM_BUSY_TIME		4000000  
+
+
+/////////////////////////////////////////////////////////////////////////
+// Activate job-load balancing
+#define __ACTIVATE_JOB_LOAD_BALANCING	1
+
+/////////////////////////////////////////////////////////////////////////
+// Report the mining speed by testing it...
+#define __REPORT_TEST_MINING_SPEED		1
+
+/////////////////////////////////////////////////////////////////////////
+// Report balancing 
+// #define __REPORT_BALANCING_SPREADS	1
 
 /////////////////////////////////////////////////////////////////////////
 // Enabling this macro will force the results buffer to be cleared when 
@@ -101,7 +126,7 @@
 // ACTUAL VALUES WOULD BE :: const unsigned int __ASIC_FREQUENCY_WORDS [10] = {0x0, 0xFFFF, 0xFFFD, 0xFFF5, 0xFFD5, 0xFF55, 0xFD55, 0xF555, 0xD555, 0x5555};
 extern const unsigned int __ASIC_FREQUENCY_WORDS[10];  // Values here are known...
 extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure frequency for each word...
-#define __ASIC_FREQUENCY_ACTUAL_INDEX   0 // 
+#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 
 #define __MAXIMUM_FREQUENCY_INDEX       9
 
 
@@ -210,7 +235,14 @@ int XLINK_ARE_WE_MASTER;
 int global_vals[6];
 
 // Contains information about frequency of all the chips installed
-extern unsigned int GLOBAL_CHIP_FREQUENCY_INFO[TOTAL_CHIPS_INSTALLED];
+extern unsigned int  GLOBAL_CHIP_FREQUENCY_INFO[TOTAL_CHIPS_INSTALLED];
+extern unsigned char GLOBAL_CHIP_PROCESSOR_COUNT[TOTAL_CHIPS_INSTALLED];
+unsigned int GLOBAL_CHIP_PROCESSOR_ENGINE_LOWBOUND[TOTAL_CHIPS_INSTALLED][16]; // Calculated on initialization
+unsigned int GLOBAL_CHIP_PROCESSOR_ENGINE_HIGHBOUND[TOTAL_CHIPS_INSTALLED][16]; // Calculated on initialization
+
+// Monitoring Authority arrays
+unsigned char GLOBAL_ENGINE_PROCESSING_STATUS[TOTAL_CHIPS_INSTALLED][16]; // If 1, the engine is processing
+unsigned int  GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[TOTAL_CHIPS_INSTALLED][16]; // When did this engine start processing?
 
 // This should be by default zero
 int GLOBAL_BLINK_REQUEST;
@@ -220,7 +252,7 @@ int  GLOBAL_PULSE_BLINK_REQUEST;
 void System_Request_Pulse_Blink(void);
 
 // Critical Temperature Warning - Abort Jobs!
-volatile static char GLOBAL_CRITICAL_TEMPERATURE;
+volatile char GLOBAL_CRITICAL_TEMPERATURE;
 
 // This is the main bit mask
 volatile unsigned int GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK;
@@ -234,8 +266,9 @@ volatile unsigned int GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK;
 // Basic boolean definition
 #define TRUE	1
 #define FALSE	0
-#define CHIP_EXISTS(x)					 ((__chip_existence_map[x] != 0))
-#define IS_PROCESSOR_OK(xchip, yengine)  ((__chip_existence_map[xchip] & (1 << yengine)) != 0)
+#define CHIP_EXISTS(x)						   ((__chip_existence_map[x] != 0))
+#define IS_PROCESSOR_OK(xchip, yengine)		   ((__chip_existence_map[xchip] & (1 << yengine)) != 0)
+#define DECOMMISSION_PROCESSOR(xchip, yengine) (__chip_existence_map[xchip] &= ~(1<<yengine))
 
 unsigned int __chip_existence_map[TOTAL_CHIPS_INSTALLED]; // Bit 0 to Bit 16 in each word says if the engine is OK or not...
 	

@@ -52,7 +52,7 @@ volatile void HighLevel_Operations_Spin()
 		static volatile UL32 iInitialTimeHolder = 0;
 		volatile UL32 iActualTickHolder = MACRO_GetTickCountRet;
 		
-		if (iActualTickHolder - iInitialTimeHolder > 500000) // 0,500,000 us = 0.5sec
+		if (iActualTickHolder - iInitialTimeHolder > 5000000) // 5,000,000 us = 5sec
 		{
 			iInitialTimeHolder = iActualTickHolder;
 			
@@ -152,6 +152,64 @@ volatile void HighLevel_Operations_Spin()
 			}		
 		}
 	}
+	
+	
+	// Engine monitoring Authority
+	#if defined(__ENGINE_ACTIVITY_SUPERVISION)
+	{
+		// We perform this run every 200th attempt
+		static int iActualAttempt = 0;
+		iActualAttempt++;
+		
+		if (iActualAttempt == 200)	
+		{
+			// Reset
+			iActualAttempt = 0;
+			
+			// If anything was modified, we have to recalculate nonce-range
+			char bWasAnyEngineModified = FALSE;
+			
+			// Now we check the array. Is any active engine taking ENGINE_MAXIMUM_BUSY_TIME to complete? If so, cut it off
+			for (char xChip = 0; xChip < TOTAL_CHIPS_INSTALLED; xChip++)
+			{
+				// Does the chip exist?
+				if (!CHIP_EXISTS(xChip)) continue;
+				
+				// Now check the engines
+				for (char yEngine = 0; yEngine < 16; yEngine++)
+				{
+					#if defined(DO_NOT_USE_ENGINE_ZERO)
+						if (yEngine == 0) continue;
+					#endif
+					
+					// Is engine in use?
+					if (!IS_PROCESSOR_OK(xChip, yEngine)) continue; 
+					
+					// Ok, now check the information. If this engine
+					// is active mining and it has been running for more than ENGINE_MAXIMUM_BUSY_TIME then cut it off
+					if (GLOBAL_ENGINE_PROCESSING_STATUS[xChip][yEngine] == FALSE) continue; // No need to check, as this engine is IDLE
+					
+					// Check operating time
+					if ((unsigned int)(MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[xChip][yEngine]) > ENGINE_MAXIMUM_BUSY_TIME)
+					{
+						// Deactivate it
+						DECOMMISSION_PROCESSOR(xChip, yEngine);
+						bWasAnyEngineModified = TRUE;
+					}
+					
+				}
+			}
+			
+			// Did we deactivate any engine? If so, we need to recalculate nonce-range for engines (Only if we are NOT running one engine per chip
+			#if !defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+				if (bWasAnyEngineModified == TRUE)
+				{
+					ASIC_calculate_engines_nonce_range();
+				}
+			#endif
+		}
+	}
+	#endif
 	
 }
 

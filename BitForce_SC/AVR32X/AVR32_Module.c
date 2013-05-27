@@ -45,7 +45,11 @@ void __AVR32_LowLevelInitialize()
 		// ********* Enable PLL0
 		// Value for PLL0 is 00011111    00000111    0000010   -----------00000101----------
 		//                   PLLCNT=31   PLLMUL=7+1  PLLDIV=2   PLLOPT=001, PLLOSC=0, PLLEN=1
-		AVR32_PLL0 = 0b00011111000001110000001000000101; // PLL0 at 32MHz
+		#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
+			AVR32_PLL0 = 0b00011111000010100000001000000101; // PLL0 at 64MHz
+		#else
+			AVR32_PLL0 = 0b00011111000001110000001000000101; // PLL0 at 64MHz
+		#endif		 	   
 		
 		// Set wait-state to 1
 		AVR32_FLASHC_MAIN = ((1 << 8) | (1 << 6)) | 0x00000000;
@@ -741,9 +745,9 @@ volatile void __AVR32_SC_Initialize()
 	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
 		// Set SPI1 GPIO settings (Function-A)
-		AVR32_GPIO.port[0].gperc = (AVR32_SPI1_PIN1)  |  (AVR32_SPI1_PIN2)  |  (AVR32_SPI1_PIN3);// SPI0_PIN_MISO;
-		AVR32_GPIO.port[0].pmr1c = (AVR32_SPI1_PIN1)  |  (AVR32_SPI1_PIN2)  |  (AVR32_SPI1_PIN3);// SPI0_PIN_MOSI;
-		AVR32_GPIO.port[0].pmr0c = (AVR32_SPI1_PIN1)  |  (AVR32_SPI1_PIN2)  |  (AVR32_SPI1_PIN3);// SPI0_PIN_SCK;
+		AVR32_GPIO.port[0].gperc = (AVR32_SPI1_PIN1)  |  (AVR32_SPI1_PIN2)  |  (AVR32_SPI1_PIN3);// SPI1_PIN_MISO;
+		AVR32_GPIO.port[0].pmr1c = (AVR32_SPI1_PIN1)  |  (AVR32_SPI1_PIN2)  |  (AVR32_SPI1_PIN3);// SPI1_PIN_MOSI;
+		AVR32_GPIO.port[0].pmr0s = (AVR32_SPI1_PIN1)  |  (AVR32_SPI1_PIN2)  |  (AVR32_SPI1_PIN3);// SPI1_PIN_SCK;
 		AVR32_GPIO.port[0].gpers = AVR32_SPI1_PIN_NPCS;
 		AVR32_GPIO.port[0].oders = AVR32_SPI1_PIN_NPCS;
 		AVR32_GPIO.port[0].ovrs  = AVR32_SPI1_PIN_NPCS;
@@ -773,7 +777,9 @@ volatile void __AVR32_SC_Initialize()
 volatile inline void __AVR32_ASIC_Activate_CS()
 {
 	AVR32_GPIO.port[0].ovrc   = AVR32_SPI0_PIN_NPCS;
-
+	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
+		AVR32_GPIO.port[0].ovrc   = AVR32_SPI1_PIN_NPCS;
+	#endif
 	NOP_OPERATION;
 	NOP_OPERATION;
 	NOP_OPERATION;
@@ -788,6 +794,9 @@ volatile inline void __AVR32_ASIC_Activate_CS()
 volatile inline void __AVR32_ASIC_Deactivate_CS()
 {
 	AVR32_GPIO.port[0].ovrs   = AVR32_SPI0_PIN_NPCS;
+	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
+		AVR32_GPIO.port[0].ovrs   = AVR32_SPI1_PIN_NPCS;
+	#endif
 	NOP_OPERATION;
 	NOP_OPERATION;
 	NOP_OPERATION;
@@ -802,7 +811,7 @@ volatile inline void __AVR32_ASIC_Deactivate_CS()
 volatile inline void __AVR32_SPI1_SendWord(unsigned short data)
 {
 	// Put data in register and wait until its sent
-	AVR32_SPI0_TDR = (data & 0x0FFFF);
+	AVR32_SPI1_TDR = (data & 0x0FFFF);
 	NOP_OPERATION;
 	NOP_OPERATION;
 	NOP_OPERATION;
@@ -1271,12 +1280,11 @@ int __AVR32_Timer_GetValue()
 
  void __AVR32_FAN_SetSpeed(char iSpeed)
 {
-	volatile unsigned int ovr_value = AVR32_GPIO.port[1].ovr;
+	volatile unsigned int ovr_value;
 	ovr_value = ~( __AVR32_FAN_CTRL3 | __AVR32_FAN_CTRL2 | __AVR32_FAN_CTRL1 | __AVR32_FAN_CTRL0);
 	
 	volatile unsigned int iFinalVal = AVR32_GPIO.port[1].ovr & ovr_value;
 	volatile unsigned int iMXVal = 0;
-	iSpeed ^= 0x0F; // XOR it with 16
 	
 	iMXVal |= (iSpeed & 0b00001) ? __AVR32_FAN_CTRL0 : 0;
 	iMXVal |= (iSpeed & 0b00010) ? __AVR32_FAN_CTRL1 : 0;

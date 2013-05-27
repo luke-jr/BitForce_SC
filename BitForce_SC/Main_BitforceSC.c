@@ -52,6 +52,18 @@ void MCU_Main_Loop(void);
 /////////////////////////////////////////////////////////
 /// PROTOCOL
 /////////////////////////////////////////////////////////
+#define FAN_CONTROL_BYTE_VERY_SLOW			(FAN_CTRL3)
+#define FAN_CONTROL_BYTE_SLOW				(FAN_CTRL2)
+#define FAN_CONTROL_BYTE_MEDIUM				(FAN_CTRL2 | FAN_CTRL3)
+#define FAN_CONTROL_BYTE_FAST				(FAN_CTRL0)
+#define FAN_CONTROL_BYTE_VERY_FAST			(FAN_CTRL0 | FAN_CTRL1)
+
+#define FAN_CONTROL_BYTE_REMAIN_FULL_SPEED	(FAN_CTRL0 | FAN_CTRL1 | FAN_CTRL2 | FAN_CTRL3)	// Turn all mosfets off...
+
+#define FAN_CTRL0	 0b00001
+#define FAN_CTRL1	 0b00010
+#define FAN_CTRL2	 0b00100
+#define FAN_CTRL3	 0b01000
 
 
 /*!
@@ -170,16 +182,10 @@ int main(void)
 	GLOBAL_BLINK_REQUEST = 0;
 	GLOBAL_PULSE_BLINK_REQUEST = 0;
 	
-	// ASIC Submit Jobs
-	/*while (TRUE)
-	{
-		job_packet jp;
-		ASIC_job_issue(&jp,0, 0xFFFFFFFF);
-		while (ASIC_is_processing())
-		{
-			WATCHDOG_RESET;
-		}
-	}*/
+	// Clear ASIC Results... This will make sure the diagnostic nonces are cleared
+	unsigned int iNonceValues[16];
+	unsigned int iNonceCount;
+	ASIC_get_job_status(iNonceValues, &iNonceCount, FALSE, 0);
 	
 	// Go to our protocol main loop
 	MCU_Main_Loop();
