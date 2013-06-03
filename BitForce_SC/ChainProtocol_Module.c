@@ -2,7 +2,7 @@
  * ChainProtocol_Module.c
  *
  * Created: 08/10/2012 21:40:04
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 // Include standard definitions
@@ -1039,6 +1039,7 @@ RETRY_POINT_1:
 				continue;
 			}
 		}
+		
 		
 		// Reset retry count
 		iTotalRetryCount = 0;

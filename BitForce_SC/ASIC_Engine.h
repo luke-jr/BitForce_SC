@@ -2,7 +2,7 @@
  * ASIC_Engine.h
  *
  * Created: 20/11/2012 23:17:01
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #ifndef ASIC_ENGINE_H_
@@ -123,8 +123,18 @@ void    init_ASIC(void);
 
 // Maximum 32 nonces supported
 int			 ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, const char iCheckOnlyOneChip, const char iChipToCheck);
+int			 ASIC_get_job_status_from_engine(unsigned int *iNonceList, unsigned int *iNonceCount, const char iChip, const char iEngine);
 void		 ASIC_job_issue(void* pJobPacket, unsigned int _LowRange,unsigned int _HighRange, const char bIssueToSingleChip, const char iChipToIssue);
-void		 ASIC_job_issue_to_specified_engine(char  iChip, char  iEngine,	void* pJobPacket, char bLoadStaticData, char  bResetBeforStart, unsigned int _LowRange, unsigned int _HighRange);
+
+void		 ASIC_job_issue_to_specified_engine(char  iChip, 
+												char  iEngine,	
+												void* pJobPacket, 
+												char  bLoadStaticData, 
+												char  bResetBeforStart, 
+												char  bIgniteEngine, 
+												unsigned int _LowRange, 
+												unsigned int _HighRange);
+												
 void		 ASIC_job_start_processing(char iChip, char iEngine, char bForcedStart);
 int  		 ASIC_get_chip_count(void);
 int			 ASIC_get_chip_processor_count(char iChip);
@@ -138,6 +148,7 @@ void		 ASIC_reset_engine(char iChip, char iEngine);
 int			 ASIC_does_chip_exist(unsigned int iChipIndex);
 int			 ASIC_is_processing(void);
 int			 ASIC_is_chip_processing(char iChip); // Chip based function
+int			 ASIC_is_engine_processing(char iChip, char iEngine); // Engine based function
 void		 ASIC_set_clock_mask(char iChip, unsigned int iClockMaskValue);
 void		 ASIC_Bootup_Chips(void);
 void		 ASIC_ReadComplete(char iChip, char iEngine);

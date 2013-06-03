@@ -2,7 +2,7 @@
  * ChainProtocol_Module.h
  *
  * Created: 08/10/2012 21:39:56
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 #ifndef CHAINPROTOCOL_MODULE_H_
 #define CHAINPROTOCOL_MODULE_H_

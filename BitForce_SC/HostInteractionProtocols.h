@@ -115,7 +115,7 @@ PROTOCOL_RESULT Protocol_xlink_deny_pass(void);
 PROTOCOL_RESULT Protocol_xlink_presence_detection(void);
 
 // Flush the P2P job into engine
-void Flush_buffer_into_engines(void);
+void PipeKernel_Spin(void);
 char Flush_buffer_into_single_chip(char iChip);
 
 

@@ -5,7 +5,7 @@
  *
  *
  *  Created on: Nov 8, 2011
- *      Author: root (nasser)
+ *  Author: NASSER GHOSEIRI
  */
 
 /* BUG FIX LOG
@@ -113,9 +113,11 @@ int main(void)
 	GLOBAL_ChipActivityLEDCounter[6] = 0;
 	GLOBAL_ChipActivityLEDCounter[7] = 0;
 	
+	// Reset the total number of engines detected on startup
+	GLOBAL_TotalEnginesDetectedOnStartup = 0;
+	
 	// Perform an ASIC GET CHIP COUNT
 	init_ASIC();
-	ASIC_get_chip_count();
 	
 	// Now set the side-led's accordingly
 	if (ASIC_does_chip_exist(0) == TRUE) MCU_LED_Set(1);
@@ -236,7 +238,7 @@ void MCU_Main_Loop()
 	while (1)
 	{
 		// HighLevel Functions Spin
-		HighLevel_Operations_Spin();
+		Microkernel_Spin();
 
 		//////////////////////////////////////////
 		// If we are master, we'll listen to the USB

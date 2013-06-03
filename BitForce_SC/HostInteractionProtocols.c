@@ -2,7 +2,7 @@
  * OperationProtocols.c
  *
  * Created: 06/01/2013 17:25:01
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 #include "std_defs.h"
 #include "MCU_Initialization.h"
@@ -20,10 +20,7 @@
 #include <string.h>
 #include <stdio.h>
 
-// Information about the result we're holding
-extern buf_job_result_packet __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
-extern char __buf_job_results_count;  // Total of results in our __buf_job_results
-static char _prev_job_was_from_pipe = FALSE;
+// Declared somewhere else
 
 PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned int iCmdLen)
 {
@@ -135,6 +132,17 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	unsigned char ilmCounter = 0;
 	unsigned int  iNonceCount;
 	
+	
+	unsigned int iTMTX = MACRO_GetTickCountRet;
+	JobPipe__test_buffer_shifter();
+	unsigned int iTMTX2 = MACRO_GetTickCountRet - iTMTX;
+	sprintf(szTemp,"JobPipe__test_buffer_shifter takes %d us\n", iTMTX2);
+	strcat(szInfoReq,szTemp);
+	
+	// Display mark1, mark2 and diff
+	sprintf(szTemp,"Mark1: %d, Mark2: %d, Diff: %d\n", iMark1, iMark2, (unsigned int)(iMark2 - iMark1));
+	strcat(szInfoReq, szTemp);
+	
 	#if defined(__REPORT_TEST_MINING_SPEED)
 		// Our job-packet by default (Expected nonce is 8D9CB675 - Hence counter range is 8D9C670 to 8D9C67A)
 		static job_packet jp;
@@ -177,15 +185,90 @@ PROTOCOL_RESULT Protocol_info_request(void)
 		// Total time in microseconds is in UL_TOTALTIME
 		float fTotalSpeed = ((4.2969 * 1000000) / (UL_TOTALTIME));
 		float fTotalSpeedPostJob = ((4.2969 * 1000000) / (MACRO_GetTickCountRet - UL_TIMEZERO));
-		sprintf(szTemp,"MINIG SPEED: %.2f GH/s\n", fTotalSpeed);
+		sprintf(szTemp,"RAW MINIG SPEED: %.2f GH/s\n", fTotalSpeed);
 		strcat(szInfoReq, szTemp);		
 		sprintf(szTemp,"JOB SUBMISSION: %d us\n", UL_TIMESTART - UL_TIMEZERO);
 		strcat(szInfoReq, szTemp);		
-		sprintf(szTemp,"EFFECTIVE SPEED: %.2f GH/s\n", fTotalSpeedPostJob);
-		strcat(szInfoReq, szTemp);				
+		sprintf(szTemp,"ZDX(SX) Mining Speed: %.2f GH/s\n", fTotalSpeedPostJob);
+		strcat(szInfoReq, szTemp);		
+		
+		// Do we test pipe?
+		#if defined(__TEST_PIPE_PERFORMANCE)
+		
+			JobPipe__pipe_set_buf_job_results_count(0);
+			JobPipe__pipe_push_job(&jp);
+			JobPipe__pipe_push_job(&jp);
+			JobPipe__pipe_push_job(&jp);
+
+			volatile unsigned int iActualTPP_Count = 0;		
+			char	 bTimeoutDetected = FALSE;
+			volatile unsigned int iActualTime = MACRO_GetTickCountRet;	
+			
+			volatile unsigned int iMicroKernelT1;
+			volatile unsigned int iMicroKernelT2;
+			volatile unsigned int iMicroKernelTMAX = 0;
+			volatile unsigned char iPA = 0;
+								
+			while (JobPipe__pipe_get_buf_job_results_count() < 3)
+			{
+				// Do we have timeout?
+				volatile unsigned int iVMR = MACRO_GetTickCountRet + 2;
+				iVMR -= iActualTime;
+				if ( iVMR >= 2000000)
+				{
+					bTimeoutDetected = TRUE;
+					break;
+				}
+				
+				// Proceed
+				WATCHDOG_RESET;
+				iMicroKernelT1 = MACRO_GetTickCountRet;
+				Microkernel_Spin();
+				iMicroKernelT2 = MACRO_GetTickCountRet - iMicroKernelT1 + 1;
+				
+				if (iMicroKernelT2 > iMicroKernelTMAX) 
+				{
+					iMicroKernelTMAX = iMicroKernelT2;
+					iPA = JobPipe__pipe_get_buf_job_results_count();
+				}					
+				
+				// If job count is one then set the thing
+				if (JobPipe__pipe_get_buf_job_results_count() == 1)
+				{
+					if (iActualTPP_Count == 0)
+					{
+						iActualTPP_Count = MACRO_GetTickCountRet;
+					}						
+				}
+				else if (JobPipe__pipe_get_buf_job_results_count() == 2)
+				{
+					iActualTPP_Count = MACRO_GetTickCountRet - iActualTPP_Count;
+					break;
+				}
+			}
+			
+			sprintf(szTemp,"MicroKernel TMAX: %dus , iPA: %d\n", iMicroKernelT2,iPA);
+			strcat(szInfoReq, szTemp);
+		
+			if (bTimeoutDetected == TRUE)
+			{
+				sprintf(szTemp,"TIMEOUT DETECTED @ %dus!\n", MACRO_GetTickCountRet - iActualTime );
+				strcat(szInfoReq, szTemp);				
+			}
+			else
+			{
+				unsigned int iTotalPipeTimeItTook = iActualTPP_Count;
+				float fTotalPipeSpeed = ((4.2949 * 1000000) / (iTotalPipeTimeItTook));
+				sprintf(szTemp,"PIPE Mining Speed: %.2f GH/s\n", fTotalPipeSpeed);
+				strcat(szInfoReq, szTemp);				
+			}
+
+		#endif 
+				
 	#endif
 	
 	
+		
 	
 	#if defined(__CHIP_FREQUENCY_DETECT_AND_REPORT)
 		for (char umx = 0; umx < TOTAL_CHIPS_INSTALLED; umx++)
@@ -267,25 +350,6 @@ PROTOCOL_RESULT Protocol_info_request(void)
 		// Turn LED OFF
 		MCU_MainLED_Reset();
 				
-		uL1 = MACRO_GetTickCountRet;
-		job_packet jpz;
-		ASIC_job_issue(&jpz, 0x0, 0xFFFFFFFF, FALSE, 0);
-		xL2 = MACRO_GetTickCountRet - uL1;
-		while (ASIC_is_processing()) 
-		{ 
-			WATCHDOG_RESET;
-		}
-		//Protocol_get_status();
-		//Flush_buffer_into_engines();
-		uL2 = MACRO_GetTickCountRet;
-		uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
-		sprintf(szTemp,"Single-job takes: %u us\n", (unsigned int)uLRes);
-		strcat(szInfoReq, szTemp);
-		sprintf(szTemp,"Job submission takes: %u us\n", (unsigned int)xL2);
-		strcat(szInfoReq, szTemp);
-		sprintf(szTemp,"Device Speed: %u GH/s\n", (4294967 / (uLRes / 1000)));
-		strcat(szInfoReq, szTemp);	
-
 		// Working...
 		volatile char bFailedEngine = FALSE;
 		
@@ -297,24 +361,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 			for (umx = 0; umx < TOTAL_CHIPS_INSTALLED; umx++)
 			{
 				if (!CHIP_EXISTS(umx)) continue;
-				
-				// Test the chip and provide info
-				uL1 = MACRO_GetTickCountRet;
-				job_packet jpze;
-				ASIC_job_issue(&jpze, 0x0, 0xFFFFFFFF, TRUE, umx);
-				xL2 = MACRO_GetTickCountRet;
-				while (ASIC_are_all_engines_done(umx) == FALSE) WATCHDOG_RESET;
-				uL2 = MACRO_GetTickCountRet;
-				uLRes = (UL32)((UL32)uL2 - (UL32)uL1);
-				sprintf(szTemp,"[CHIP %d] Single-job takes: %u us\n", umx, (unsigned int)uLRes);
-				strcat(szInfoReq, szTemp);
-				sprintf(szTemp,"[CHIP %d] Estimated Frequency: %u MHz\n", umx, ((4294967 / (uLRes / 1000)) / ASIC_get_chip_processor_count(umx)));
-				strcat(szInfoReq, szTemp);
-				sprintf(szTemp,"[CHIP %d] Functional Engines: %u \n", umx, ASIC_get_chip_processor_count(umx));
-				strcat(szInfoReq, szTemp);
-				sprintf(szTemp,"[CHIP %d] Job submission takes: %u us\n", umx, (unsigned int)xL2 - uL1);
-				strcat(szInfoReq, szTemp);
-				
+
 				// Show spreads?
 				#if defined(__EXPORT_ENGINE_RANGE_SPREADS)
 					sprintf(szTemp,"[CHIP %d] Spreads: %08X-%08X, %08X-%08X, %08X-%08X, %08X-%08X\n", umx, __ENGINE_LOWRANGE_SPREADS[umx][0], __ENGINE_HIGHRANGE_SPREADS[umx][0], __ENGINE_LOWRANGE_SPREADS[umx][1], __ENGINE_HIGHRANGE_SPREADS[umx][1], __ENGINE_LOWRANGE_SPREADS[umx][2], __ENGINE_HIGHRANGE_SPREADS[umx][2], __ENGINE_LOWRANGE_SPREADS[umx][3], __ENGINE_HIGHRANGE_SPREADS[umx][3]);
@@ -326,6 +373,10 @@ PROTOCOL_RESULT Protocol_info_request(void)
 					sprintf(szTemp,"[CHIP %d] Spreads: %08X-%08X, %08X-%08X, %08X-%08X, %08X-%08X\n", umx, __ENGINE_LOWRANGE_SPREADS[umx][12], __ENGINE_HIGHRANGE_SPREADS[umx][12], __ENGINE_LOWRANGE_SPREADS[umx][13], __ENGINE_HIGHRANGE_SPREADS[umx][13], __ENGINE_LOWRANGE_SPREADS[umx][14], __ENGINE_HIGHRANGE_SPREADS[umx][14], __ENGINE_LOWRANGE_SPREADS[umx][15], __ENGINE_HIGHRANGE_SPREADS[umx][15]);
 					strcat(szInfoReq, szTemp);				
 				#endif
+				
+				// Announce
+				sprintf(szTemp,"[CHIP %d] Entry:\n", umx);
+				strcat(szInfoReq, szTemp);
 											
 				// Are we running diagnostics on the engines too?
 				#if defined(__ENGINE_BY_ENGINE_DIAGNOSTICS)
@@ -348,8 +399,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 						uL1 = MACRO_GetTickCountRet;
 						job_packet jp;
 						ASIC_ReadComplete(umx,i_engine);
-						ASIC_job_issue_to_specified_engine(umx, i_engine, &jp, FALSE, TRUE, 0x0, 0xFFFFFFFF);
-						ASIC_job_start_processing(umx, i_engine, TRUE);
+						ASIC_job_issue_to_specified_engine(umx, i_engine, &jp, FALSE, TRUE, TRUE, 0x0, 0x10000);
 						xL2 = MACRO_GetTickCountRet;
 						while (TRUE)
 						{
@@ -358,7 +408,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 							 __MCU_ASIC_Deactivate_CS();
 							 
 							 WATCHDOG_RESET;
-							 if (MACRO_GetTickCountRet - xL2 > 25000000)
+							 if (MACRO_GetTickCountRet - xL2 > 250000)
 							 {
 								 bFailedEngine = TRUE;
 								 break;
@@ -373,10 +423,8 @@ PROTOCOL_RESULT Protocol_info_request(void)
 						}						
 						else
 						{
-							sprintf(szTemp,"\t[ENGINE %d] Single-job takes: %u us\n", i_engine, (unsigned int)uLRes);
-							strcat(szInfoReq, szTemp);
-							sprintf(szTemp,"\t[ENGINE %d] Job submission takes: %u us\n", i_engine, (unsigned int)xL2 - uL1);
-							strcat(szInfoReq, szTemp);
+							sprintf(szTemp,"\t[ENGINE %d] Single-job takes: %u us, Submission: %d\n", i_engine, (unsigned int)uLRes,(unsigned int)xL2 - uL1);
+							strcat(szInfoReq, szTemp);							
 						}
 						
 					}
@@ -1051,7 +1099,7 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 	// We've received the ZX command, can we take this job now?
 	if (!JobPipe__pipe_ok_to_push())
 	{
-		Flush_buffer_into_engines(); // Function is called before we return
+		PipeKernel_Spin(); // Function is called before we return
 		
 		if (XLINK_ARE_WE_MASTER)
 		{
@@ -1197,7 +1245,7 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH()
 	// Respond with 'ERR:SIGNATURE' if not matched
 
 	// Before we return, we must call this function to get buffer loop going...
-	Flush_buffer_into_engines();
+	PipeKernel_Spin();
 
 	// Job was pushed into buffer, let the host know
 	if (XLINK_ARE_WE_MASTER)
@@ -1457,6 +1505,9 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 
 	// Increase the number of BUF-P2P jobs ever received
 	__total_buf_pipe_jobs_ever_received++;
+	
+	// Set Mark1
+	if (iMark1 == 0) iMark1 = MACRO_GetTickCountRet;
 
 	// Return our result
 	return res;
@@ -1521,12 +1572,14 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	char found_nonce_count;
 
 	// How many results?
-	sprintf(sz_temp,"INPROCESS:%d\n", (_prev_job_was_from_pipe == TRUE) ? 1 : 0);
+	sprintf(sz_temp,"INPROCESS:%d\n", (PipeKernel_WasPreviousJobFromPipe() == TRUE) ? 1 : 0);
 	strcat(sz_rep, sz_temp);
 		
 	sprintf(sz_temp,"COUNT:%d\n", JobPipe__pipe_get_buf_job_results_count());
 	strcat(sz_rep, sz_temp);
-	
+
+	// How many jobs to take? The smallest between 15 and "total results in buffer"
+	char iTotalResultsToTake = 0;	
 	
 	// Ok, return the last result as well
 	if (JobPipe__pipe_get_buf_job_results_count() == 0)
@@ -1535,8 +1588,18 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	}
 	else
 	{
+		if (JobPipe__pipe_get_buf_job_results_count() <= MAX_RESULTS_TO_SEND_AT_A_TIME_FROM_BUFFER)
+		{
+			iTotalResultsToTake = JobPipe__pipe_get_buf_job_results_count();
+		}
+		else
+		{
+			iTotalResultsToTake = MAX_RESULTS_TO_SEND_AT_A_TIME_FROM_BUFFER;
+		}
+		
+		
 		// Now post them one by one
-		for (i_cnt = 0; i_cnt < JobPipe__pipe_get_buf_job_results_count(); i_cnt++)
+		for (i_cnt = 0; i_cnt < iTotalResultsToTake; i_cnt++)
 		{
 			// Get our job
 			pbuf_job_result_packet pjob_res = (pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt));
@@ -1613,10 +1676,10 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	}		
 
 	// Also, we clear the results buffer
-	JobPipe__pipe_set_buf_job_results_count(0);
+	JobPipe__pipe_skip_buf_job_results(iTotalResultsToTake);
 	
 	// Also Flush jobs into engines
-	Flush_buffer_into_engines();
+	PipeKernel_Spin();
 	
 	// Return the result...
 	return res;
@@ -1971,6 +2034,9 @@ PROTOCOL_RESULT Protocol_get_status()
 	}		
 	else if (stat == ASIC_JOB_NONCE_FOUND)
 	{
+		// Job-Finish timestamp
+		GLOBAL_LastJobResultProduced = MACRO_GetTickCountRet;
+				
 		// Report the found NONCEs
 		strcpy(sz_report, "NONCE-FOUND:");
 
@@ -1996,6 +2062,9 @@ PROTOCOL_RESULT Protocol_get_status()
 	}
 	else if (stat == ASIC_JOB_NONCE_NO_NONCE)
 	{
+		// Job-Finish timestamp
+		GLOBAL_LastJobResultProduced = MACRO_GetTickCountRet;
+		
 		// Send it to host
 		if (XLINK_ARE_WE_MASTER)
 		{
@@ -2342,440 +2411,6 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 	// We have our frequency factor sent, exit
 	return result;	
 }
-
-// =============================================================
-// Buffer Management ===========================================
-// =============================================================
-
-#if !defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
-
-	void Flush_buffer_into_engines()
-	{
-		// Our flag which tells us where the previous job
-		// was a P2P job processed or not :)
-
-		// Take the job from buffer and put it here...
-		// (We take element 0, and push all the arrays back...)
-		if (ASIC_is_processing() == TRUE)
-		{
-			#if defined (__INTERLEAVED_JOB_LOADING)
-				// Ok, since ASICs are processing, at this point we can start loading the next job in queue.
-				// If the previous job is already loaded, then there isn't much we can do
-				if (JobPipe__pipe_ok_to_pop() == FALSE)
-				{
-					// There is nothing to load, just return...
-					return;
-				}
-		
-				// Have we loaded something already and it has finished? If so, nothing to do as well
-				if (JobPipe__get_interleaved_loading_progress_finished() == TRUE)
-				{
-					// Since the job is already loaded, there is nothing to do...
-					return;
-				}
-		
-				// Now we reach here, it means there is a job available for loading, which has not been 100% loaded.
-				// Try to load one engine at a time...
-				job_packet jp;
-				char iRes = JobPipe__pipe_preview_next_job(&jp);
-		
-				// TODO: Take further action
-				if (iRes == PIPE_JOB_BUFFER_EMPTY)
-				{
-					// This is a SERIOUS PROBLEM, it shouldn't be the case... (since we've already executed JobPipe__pipe_ok_to_pop)
-				}
-	
-				// Ok, we have the JOB. We start looping...
-				char iChipToProceed = JobPipe__get_interleaved_loading_progress_chip();
-				char iEngineToProceed = JobPipe__get_interleaved_loading_progress_engine();
-				char iChipHover = 0;
-				char iEngineHover = 0;
-		
-				// Did we perform any writes? If not, it means we're finished
-				char bDidWeWriteAnyEngines = FALSE;
-				char bEngineWasNotFinishedSoWeAborted = FALSE;
-		
-				// Ok, we continue until we get the good chip
-				for (iChipHover = iChipToProceed; iChipHover < TOTAL_CHIPS_INSTALLED; iChipHover++)		
-				{
-					// We reach continue to the end...
-					if (!CHIP_EXISTS(iChipHover)) continue;
-			
-					// Hover the engines...
-					for (iEngineHover = iEngineToProceed; iEngineHover < 16; iEngineHover++)
-					{
-						// Is this processor ok?
-						if (!IS_PROCESSOR_OK(iChipHover, iEngineHover)) continue;
-				
-						// Is it engine 0 and we're restricted?
-						#if defined(DO_NOT_USE_ENGINE_ZERO)
-							if (iEngineHover == 0) continue;
-						#endif
-				
-						// Is this engine finished? If yes then we'll write data to it. IF NOT THEN JUST FORGET IT! We abort this part altogether
-						/*
-						if (ASIC_has_engine_finished_processing(iChipHover, iEngineHover) == FALSE)
-						{
-							bEngineWasNotFinishedSoWeAborted = TRUE;
-							break;
-						}
-						*/
-				
-						// Ok, now do Job-Issue to this engine on this chip
-						ASIC_job_issue_to_specified_engine (iChipHover,
-															iEngineHover,
-															&jp,
-															FALSE,
-															FALSE,
-															GLOBAL_CHIP_PROCESSOR_ENGINE_LOWBOUND[iChipHover][iEngineHover],
-															GLOBAL_CHIP_PROCESSOR_ENGINE_HIGHBOUND[iChipHover][iEngineHover]);				
-
-						// Ok, Set the next engine to be processed...
-						if (iEngineHover == 15)
-						{
-							JobPipe__set_interleaved_loading_progress_chip(iChipHover+1);
-							JobPipe__set_interleaved_loading_progress_engine(0);
-						}
-						else
-						{
-							JobPipe__set_interleaved_loading_progress_chip(iChipHover);
-							JobPipe__set_interleaved_loading_progress_engine(iEngineHover+1);					
-						}
-				
-						// Set the flag
-						bDidWeWriteAnyEngines = TRUE;
-				
-						// Exit the loop
-						break;			
-					}
-			
-					// Did we perform any writes? If so, we're done
-					if (bDidWeWriteAnyEngines == TRUE) break;
-			
-					// Was the designated engine busy? If so, we exit
-					if (bEngineWasNotFinishedSoWeAborted == TRUE) break;
-				}
-				
-				// Did we write any engines? If NOT then we're finished
-				if ((bDidWeWriteAnyEngines == FALSE) && (bEngineWasNotFinishedSoWeAborted == FALSE))
-				{
-					// Set/Reset related settings
-					JobPipe__set_interleaved_loading_progress_finished(TRUE);
-					JobPipe__set_interleaved_loading_progress_chip(0);
-					JobPipe__set_interleaved_loading_progress_engine(0);			
-			
-				}
-				else
-				{
-					// We're not finished
-					JobPipe__set_interleaved_loading_progress_finished(FALSE);			
-				}
-				
-				return; // We won't do anything, since there isn't anything we can do
-			
-			#else
-				// No interleaved job loading, just return...
-				return; // We won't do anything, since there isn't anything we can do
-			#endif 
-		}		 
-	
-		// Now if we're not processing, we MAY need to save the results if the previous job was from the pipe
-		if (_prev_job_was_from_pipe == TRUE)
-		{
-			// Verify the result counter is correct
-			if (__buf_job_results_count == PIPE_MAX_BUFFER_DEPTH)
-			{
-				// Then move all items one-index back (resulting in loss of the job-result at index 0)
-				for (char pIndex = 0; pIndex < PIPE_MAX_BUFFER_DEPTH - 1; pIndex += 1) // PIPE_MAX_BUFFER_DEPTH - 1 because we don't touch the last item in queue
-				{
-					memcpy((void*)__buf_job_results[pIndex].midstate, 	(void*)__buf_job_results[pIndex+1].midstate, 	32);
-					memcpy((void*)__buf_job_results[pIndex].block_data, (void*)__buf_job_results[pIndex+1].block_data, 	12);
-					memcpy((void*)__buf_job_results[pIndex].nonce_list,	(void*)__buf_job_results[pIndex+1].nonce_list,  8*sizeof(UL32)); // 8 nonces maximum
-				}
-			}
-
-			// Read the result and put it here...
-			unsigned int  i_found_nonce_list[16];
-			volatile int i_found_nonce_count;
-			char i_result_index_to_put = 0;
-			ASIC_get_job_status(i_found_nonce_list, &i_found_nonce_count, FALSE, 0);
-
-			// Set the correct index
-			i_result_index_to_put = (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH) ?  (__buf_job_results_count) : (PIPE_MAX_BUFFER_DEPTH - 1);
-
-			// Copy data...
-			memcpy((void*)__buf_job_results[i_result_index_to_put].midstate, 	(void*)__inprocess_midstate, 		32);
-			memcpy((void*)__buf_job_results[i_result_index_to_put].block_data, 	(void*)__inprocess_blockdata, 		12);
-			memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_list,	(void*)	 i_found_nonce_list, 		8*sizeof(int));
-			__buf_job_results[i_result_index_to_put].i_nonce_count = i_found_nonce_count;
-
-			// Increase the result count (if possible)
-			if (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH) __buf_job_results_count++;
-		}
-	
-		// Ok, now we have recovered any potential results that could've been useful to us
-		// Now, Are there any jobs in our pipe system? If so, we need to start processing on that right away and set _prev_job_from_pipe.
-		// If not, we just clear _prev_job_from_pipe and exit
-		if (JobPipe__pipe_ok_to_pop() == FALSE)
-		{
-			// Last job was not from pipe...
-			_prev_job_was_from_pipe = FALSE;
-		
-			#if defined(__INTERLEAVED_JOB_LOADING)
-				// Reset interleaved settings as well...
-				JobPipe__set_interleaved_loading_progress_finished(FALSE);
-				JobPipe__set_was_last_job_loaded_in_engines(FALSE);
-				JobPipe__set_interleaved_loading_progress_chip(0); // Reset them
-				JobPipe__set_interleaved_loading_progress_engine(0); // Reset them
-			#endif
-			
-			// Exit the function. Nothing is left to do here...
-			return;
-		}
-
-		// Ok so there are jobs that require processing. Suck them in and start processing
-		// At this stage, we have know the ASICS have finished processing. We also know that there is a job to be sent
-		// to the device for processing. However, we need to make a decision:
-		//
-		// 1) This job was interleaved-loaded into chips while they were processing. In this case just start the engines
-		//
-		// 2) No job was interleaved-loaded into chips. In this case, issue a full job. After that, ALSO perform a single interleaved-load action 
-		//    if there are any more jobs to be loaded.
-		//
-
-		// ***********************************************************
-		// We have something to pop, get it...
-		#if defined(__INTERLEAVED_JOB_LOADING)
-		
-			if (JobPipe__get_interleaved_loading_progress_finished() == TRUE)
-			{
-				// We start the engines...
-				char iEngineHover = 0;
-				char iChipHover = 0;
-		
-				for (iChipHover = 0; iChipHover < TOTAL_CHIPS_INSTALLED; iChipHover++)
-				{
-					if (!CHIP_EXISTS(iChipHover)) continue;
-			
-					for (iEngineHover = 0; iEngineHover < 16; iEngineHover++)
-					{
-						if (!IS_PROCESSOR_OK(iChipHover, iEngineHover))	continue;
-				
-						// Start engine
-						ASIC_job_start_processing(iChipHover, iEngineHover, FALSE);
-					}
-				}
-		
-				// Also POP the previous job, since it's already been fully transferred
-				job_packet jpx_dummy;
-				JobPipe__pipe_pop_job(&jpx_dummy);
-		
-				// Before we issue the job, we must put the correct information
-				memcpy((void*)__inprocess_midstate, 	(void*)jpx_dummy.midstate, 	 32);
-				memcpy((void*)__inprocess_blockdata, 	(void*)jpx_dummy.block_data, 12);
-		
-				// Ok, now no job is loaded in interleaved mode since the old was is now being processed
-				JobPipe__set_interleaved_loading_progress_finished(FALSE);
-				JobPipe__set_interleaved_loading_progress_chip(0);
-				JobPipe__set_interleaved_loading_progress_engine(0);
-			}
-			else
-			{
-				// We have to issue a new job...
-				job_packet job_from_pipe;
-				if (JobPipe__pipe_pop_job(&job_from_pipe) == PIPE_JOB_BUFFER_EMPTY)
-				{
-					// This is odd!!! THIS SHOULD NEVER HAPPEN, however we do set things here by default...
-					_prev_job_was_from_pipe = FALSE; // Obviously, this must be cleared...
-					JobPipe__set_interleaved_loading_progress_finished(FALSE);
-					JobPipe__set_interleaved_loading_progress_chip(0);
-					JobPipe__set_interleaved_loading_progress_engine(0);
-					return;
-				}
-
-				// Before we issue the job, we must put the correct information
-				memcpy((void*)__inprocess_midstate, 	(void*)job_from_pipe.midstate, 	 32);
-				memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 12);
-
-				// Send it to processing...
-				ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, FALSE, 0);	
-			}
-			
-		#else
-			// No interleaved job loading
-			// We have to issue a new job...
-			job_packet job_from_pipe;
-			if (JobPipe__pipe_pop_job(&job_from_pipe) == PIPE_JOB_BUFFER_EMPTY)
-			{
-				// This is odd!!! THIS SHOULD NEVER HAPPEN, however we do set things here by default...
-				_prev_job_was_from_pipe = FALSE; // Obviously, this must be cleared...
-				return;
-			}
-
-			// Before we issue the job, we must put the correct information
-			memcpy((void*)__inprocess_midstate, 	(void*)job_from_pipe.midstate, 	 32);
-			memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 12);
-
-			// Send it to processing...
-			ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, FALSE, 0);		
-		#endif 
-	
-		// The job is coming from the PIPE...
-		// Set we simply have to set the flag here
-		_prev_job_was_from_pipe = TRUE;
-	}
-	
-	// NOTE: Not Implemented
-	char Flush_buffer_into_single_chip(char iChip)
-	{
-		// FUNCTION NOT IMPLEMENTED HERE IN SINGLE-JOB-PER-BOARD MODE
-	}
-	
-#else
-
-	#define SINGLE_CHIP_QUEUE__TOOK_JOB_TO_PROCESS	1
-	#define SINGLE_CHIP_QUEUE__NO_JOB_TO_TAKE		2
-	#define SINGLE_CHIP_QUEUE__CHIP_BUSY			3
-	
-	void Flush_buffer_into_engines()
-	{
-		// Run the process for all available chips on board
-		char iTotalChips = ASIC_get_chip_count();
-		char iTotalTookJob = 0;
-		char iTotalNoJobsAvailable = 0;
-		char iTotalProcessing = 0;
-		char iRetStat = 0;
-		char iHover = 0;
-	
-		for (iHover = 0; iHover < TOTAL_CHIPS_INSTALLED; iHover++)
-		{
-			if (!CHIP_EXISTS(iHover)) continue;
-			iRetStat = Flush_buffer_into_single_chip(iHover);
-			iTotalTookJob += (iRetStat == SINGLE_CHIP_QUEUE__TOOK_JOB_TO_PROCESS) ? 1 : 0;
-			iTotalNoJobsAvailable += (iRetStat == SINGLE_CHIP_QUEUE__NO_JOB_TO_TAKE) ? 1 : 0;
-			iTotalProcessing += (iRetStat == SINGLE_CHIP_QUEUE__CHIP_BUSY) ? 1 : 0;			
-		}		
-		
-		// If anyone (even only a single chip) took a job, then we can consider that previous job was from pipe
-		if (iTotalTookJob > 0)
-		{
-			// A queue job is being processed...
-			_prev_job_was_from_pipe = TRUE;	
-		}
-		
-		// We can determine if the _prev_job_was_from_queue is TRUE or FALSE
-		if (iTotalNoJobsAvailable == iTotalChips)
-		{
-			// Meaning no job was available. We're done now...
-			_prev_job_was_from_pipe = FALSE;
-		}		
-	}	
-	
-	char Flush_buffer_into_single_chip(char iChip)
-	{
-		// Our flag which tells us where the previous job
-		// was a P2P job processed or not :)
-		// Take the job from buffer and put it here...
-		// (We take element 0, and push all the arrays back...)
-		if (ASIC_is_chip_processing(iChip) == TRUE)
-		{
-			return SINGLE_CHIP_QUEUE__CHIP_BUSY; // We won't do anything, since there isn't anything we can do
-		}
-
-		// Now if we're not processing, we MAY need to save the results if the previous job was from the pipe
-		// This is conditioned on whether this chip was processing a single-job or not...
-		if ((_prev_job_was_from_pipe == TRUE) && (__inprocess_SCQ_chip_processing[iChip] == TRUE)) 
-		{
-			
-			// Verify the result counter is correct
-			if (__buf_job_results_count == PIPE_MAX_BUFFER_DEPTH)
-			{
-				// Then move all items one-index back (resulting in loss of the job-result at index 0)
-				for (char pIndex = 0; pIndex < PIPE_MAX_BUFFER_DEPTH - 1; pIndex += 1) // PIPE_MAX_BUFFER_DEPTH - 1 because we don't touch the last item in queue
-				{
-					__buf_job_results[pIndex].iProcessingChip = __buf_job_results[pIndex+1].iProcessingChip;
-					
-					memcpy((void*)__buf_job_results[pIndex].midstate, 	(void*)__buf_job_results[pIndex+1].midstate, 	32);
-					memcpy((void*)__buf_job_results[pIndex].block_data, (void*)__buf_job_results[pIndex+1].block_data, 	12);
-					memcpy((void*)__buf_job_results[pIndex].nonce_list,	(void*)__buf_job_results[pIndex+1].nonce_list,  8*sizeof(UL32)); // 8 nonces maximum
-					__buf_job_results[pIndex].i_nonce_count = __buf_job_results[pIndex+1].i_nonce_count;
-				}
-			}
-
-			// Read the result and put it here...
-			unsigned int  i_found_nonce_list[16];
-			volatile int i_found_nonce_count;
-			char i_result_index_to_put = 0;
-			ASIC_get_job_status(i_found_nonce_list, &i_found_nonce_count, TRUE, iChip);
-
-			// Set the correct index
-			i_result_index_to_put = (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH) ? (__buf_job_results_count) : (PIPE_MAX_BUFFER_DEPTH - 1);
-
-			// Copy data...
-			memcpy((void*)__buf_job_results[i_result_index_to_put].midstate, 	(void*)__inprocess_SCQ_midstate[iChip],		32);
-			memcpy((void*)__buf_job_results[i_result_index_to_put].block_data, 	(void*)__inprocess_SCQ_blockdata[iChip],	12);
-			memcpy((void*)__buf_job_results[i_result_index_to_put].nonce_list,	(void*)i_found_nonce_list,		8*sizeof(int));
-			__buf_job_results[i_result_index_to_put].iProcessingChip = iChip;
-			__buf_job_results[i_result_index_to_put].i_nonce_count = i_found_nonce_count;
-
-			// Increase the result count (if possible)
-			if (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH)
-			{
-				 __buf_job_results_count++;
-			}				 
-
-			// We return, since there is nothing left to do
-		}
-
-		// Ok, now we have recovered any potential results that could've been useful to us
-		// Now, Are there any jobs in our pipe system? If so, we need to start processing on that right away and set _prev_job_from_pipe.
-		// If not, we just clear _prev_job_from_pipe and exit
-		if (JobPipe__pipe_ok_to_pop() == FALSE)
-		{
-			// Exit the function. Nothing is left to do here...
-			__inprocess_SCQ_chip_processing[iChip] = FALSE;
-			return SINGLE_CHIP_QUEUE__NO_JOB_TO_TAKE;
-		}
-
-		// We have to issue a new job...
-		job_packet job_from_pipe;
-		if (JobPipe__pipe_pop_job(&job_from_pipe) == PIPE_JOB_BUFFER_EMPTY)
-		{
-			// This is odd!!! THIS SHOULD NEVER HAPPEN, however we do set things here by default...
-			__inprocess_SCQ_chip_processing[iChip] = FALSE;
-			return SINGLE_CHIP_QUEUE__NO_JOB_TO_TAKE;
-		}
-
-		// Before we issue the job, we must put the correct information
-		if (iChip == 7)
-		{
-			memcpy((void*)__inprocess_SCQ_midstate[iChip], 	(void*)job_from_pipe.midstate, 	 32);
-			memcpy((void*)__inprocess_SCQ_blockdata[iChip], (void*)job_from_pipe.block_data, 12);
-		}
-		else
-		{
-			memcpy((void*)__inprocess_SCQ_blockdata[iChip], (void*)job_from_pipe.block_data, 12);			
-			memcpy((void*)__inprocess_SCQ_midstate[iChip], 	(void*)job_from_pipe.midstate, 	 32);
-		}
-		
-		
-		// Send it to processing...
-		ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, TRUE, iChip);
-		
-		// This chip is processing now
-		__inprocess_SCQ_chip_processing[iChip] = TRUE;
-		
-		// The engine took a job
-		return SINGLE_CHIP_QUEUE__TOOK_JOB_TO_PROCESS;	
-	}
-
-#endif
-
-// ======================================================================================
-// ======================================================================================
-// ======================================================================================
-
-
 
 
 /////////////////////////////////////////

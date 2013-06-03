@@ -5,7 +5,7 @@
     <ProjectVersion>6.0</ProjectVersion>
     <ToolchainName>com.Atmel.AVRGCC32</ToolchainName>
     <ProjectGuid>{9f8b22bb-744a-4d6f-83b5-780561e4126a}</ProjectGuid>
-    <avrdevice>AT32UC3A1128</avrdevice>
+    <avrdevice>AT32UC3A1256</avrdevice>
     <avrdeviceseries>none</avrdeviceseries>
     <OutputType>Executable</OutputType>
     <Language>C</Language>
@@ -61,7 +61,7 @@
       </OverrideVtorValue>
       <Channel>
         <host>127.0.0.1</host>
-        <port>64916</port>
+        <port>61346</port>
         <ssl>False</ssl>
       </Channel>
       <ToolOptions>
@@ -110,7 +110,6 @@
   <avr32gcc.common.outputfiles.lss>True</avr32gcc.common.outputfiles.lss>
   <avr32gcc.common.outputfiles.eep>True</avr32gcc.common.outputfiles.eep>
   <avr32gcc.common.outputfiles.srec>True</avr32gcc.common.outputfiles.srec>
-  <avr32gcc.compiler.optimization.level>Optimize most (-O3)</avr32gcc.compiler.optimization.level>
   <avr32gcc.compiler.optimization.EnableUnsafeMatchOptimizations>True</avr32gcc.compiler.optimization.EnableUnsafeMatchOptimizations>
   <avr32gcc.compiler.optimization.EnableFastMath>True</avr32gcc.compiler.optimization.EnableFastMath>
   <avr32gcc.compiler.optimization.GeneratePositionIndependentCode>True</avr32gcc.compiler.optimization.GeneratePositionIndependentCode>
@@ -243,6 +242,12 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="PIC32\PIC32_Module.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="PipeProcessingKernel.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="PipeProcessingKernel.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="SHA256_Engine.c">

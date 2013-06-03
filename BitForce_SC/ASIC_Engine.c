@@ -3,7 +3,7 @@
  * ASIC_Engine.c
  *
  * Created: 20/11/2012 23:17:15
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #include "ASIC_Engine.h"
@@ -71,7 +71,8 @@ void init_ASIC(void)
 	#endif
 	
 	// Here we must give 16 clock cycles with CS# inactive, to initialize the ASIC chips
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS(1);
+	__MCU_ASIC_Deactivate_CS(2);
 	
 	// Reset first bank
 	__ASIC_WriteEngine(0,0,0,0);
@@ -91,7 +92,8 @@ void init_ASIC(void)
 	ASIC_Bootup_Chips();
 		
 	// Proceed...
-	ASIC_get_chip_count(); // Also sets the '__chip_existence_map' table in it's first run
+	__internal_global_iChipCount = 0; // Reset
+	ASIC_get_chip_count(); // Also sets the '__chip_existence_map' table in it's first run (and in Recalibrate mode)
 	
 	// Ok now we diagnose the engines
 	char iHoveringChip;
@@ -134,6 +136,71 @@ void init_ASIC(void)
 			}
 		}
 		
+		// Check for Enforced usage!
+		#if defined(ENFORCE_USAGE_CHIP_0)
+			__chip_existence_map[0] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_1)
+			__chip_existence_map[1] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_2)
+			__chip_existence_map[2] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_3)
+			__chip_existence_map[3] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_4)
+			__chip_existence_map[4] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_5)
+			__chip_existence_map[5] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_6)
+			__chip_existence_map[6] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_7)
+			__chip_existence_map[7] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_8)
+			__chip_existence_map[8] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_9)
+			__chip_existence_map[9] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_10)
+			__chip_existence_map[10] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_11)
+			__chip_existence_map[11] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_12)
+			__chip_existence_map[12] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_13)
+			__chip_existence_map[13] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+		
+		#if defined(ENFORCE_USAGE_CHIP_14)
+			__chip_existence_map[14] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif
+																														
+		#if defined(ENFORCE_USAGE_CHIP_15)
+			__chip_existence_map[15] = 0xFFFFFFFE; // ENGINE ZERO NOT USED
+		#endif		
+		
 		// Frequency tune the chips
 		#if !defined(__DO_NOT_TUNE_CHIPS_FREQUENCY)
 			for (iHoveringEngine = 0; iHoveringEngine < 16; iHoveringEngine++)		
@@ -163,13 +230,14 @@ void init_ASIC(void)
 	}	
 	
 	// Also, clear Timestamping for Engine supervision
-	#if defined(__ENGINE_ACTIVITY_SUPERVISION)
+	#if defined(__ENGINE_ENABLE_TIMESTAMPING)
 		for (iHoveringChip = 0; iHoveringChip < TOTAL_CHIPS_INSTALLED; iHoveringChip++)
 		{
 			for (iHoveringEngine = 0; iHoveringEngine < TOTAL_CHIPS_INSTALLED; iHoveringEngine++)
 			{
 				GLOBAL_ENGINE_PROCESSING_STATUS[iHoveringChip][iHoveringEngine] = 0;
 				GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[iHoveringChip][iHoveringEngine] = 0;
+				GLOBAL_ENGINE_PROCESSING_FAILURE_SCORES[iHoveringChip][iHoveringEngine] = 0;
 			}
 		}
 	#endif
@@ -179,18 +247,24 @@ void init_ASIC(void)
 	#if defined(__ACTIVATE_JOB_LOAD_BALANCING)
 		ASIC_calculate_engines_nonce_range();
 	#endif
+	
+	// Also remember how many engines were detected on startup
+	if (GLOBAL_TotalEnginesDetectedOnStartup == 0)
+	{
+		GLOBAL_TotalEnginesDetectedOnStartup = ASIC_get_processor_count();
+	}
 }
 
 // Sets the clock mask for a deisng
 void ASIC_set_clock_mask(char iChip, unsigned int iClockMaskValue)
 {
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	#if defined(DISABLE_CLOCK_TO_ALL_ENGINES)
 		__ASIC_WriteEngine(iChip, 0, ASIC_SPI_CLOCK_OUT_ENABLE, 0);	 // Disable all clocks
 	#else
 		__ASIC_WriteEngine(iChip, 0, ASIC_SPI_CLOCK_OUT_ENABLE, iClockMaskValue);
 	#endif
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 }
 
 // This function checks to see if the processor in this engine is correctly operating. We must find the correct nonce here...
@@ -213,10 +287,10 @@ char ASIC_diagnose_processor(char iChip, char iEngine)
 	unsigned char isProcessorOK = TRUE;
 	
 	// Run 20 Tests and check it every time...
-	for (unsigned char imi = 0; imi < 40; imi++)
+	for (unsigned char imi = 0; imi < __TOTAL_DIAGNOSTICS_RUN; imi++)
 	{
 		// Now send the job to the engine
-		ASIC_job_issue_to_specified_engine(iChip,iEngine,&jp, TRUE, TRUE, 0x8D9CB670, 0x8D9CB67A);
+		ASIC_job_issue_to_specified_engine(iChip,iEngine,&jp, TRUE, TRUE, FALSE, 0x8D9CB670, 0x8D9CB67A);
 		ASIC_job_start_processing(iChip, iEngine, TRUE);
 	
 		// Read back results immediately (with a little delay), it shouldv'e been finished since it takes about 40ns
@@ -237,7 +311,7 @@ char ASIC_diagnose_processor(char iChip, char iEngine)
 		unsigned int iReadbackNonce = 0;
 		unsigned int iReadbackStatus = 0;
 
-		__MCU_ASIC_Activate_CS();
+		__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	
 		iReadbackStatus = __ASIC_ReadEngine(iChip,iEngine, ASIC_SPI_READ_STATUS_REGISTER);
 		if ((iReadbackStatus & ASIC_SPI_READ_STATUS_DONE_BIT) != ASIC_SPI_READ_STATUS_DONE_BIT)
@@ -259,11 +333,11 @@ char ASIC_diagnose_processor(char iChip, char iEngine)
 			break;
 		}
 	
-		__MCU_ASIC_Deactivate_CS();	
+		__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));	
 		
 		// Set the second nonce
 		// Now send the job to the engine
-		ASIC_job_issue_to_specified_engine(iChip,iEngine,&jp, TRUE, TRUE, 0x38E94200, 0x38E94300);
+		ASIC_job_issue_to_specified_engine(iChip,iEngine,&jp, TRUE, TRUE, FALSE, 0x38E94200, 0x38E94300);
 		ASIC_job_start_processing(iChip, iEngine, TRUE);
 	
 		// Read back results immediately (with a little delay), it shouldv'e been finished since it takes about 40ns
@@ -280,7 +354,7 @@ char ASIC_diagnose_processor(char iChip, char iEngine)
 		NOP_OPERATION; NOP_OPERATION;
 		NOP_OPERATION; NOP_OPERATION;
 	
-		__MCU_ASIC_Activate_CS();
+		__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	
 		iReadbackStatus = __ASIC_ReadEngine(iChip,iEngine, ASIC_SPI_READ_STATUS_REGISTER);
 		if ((iReadbackStatus & ASIC_SPI_READ_STATUS_DONE_BIT) != ASIC_SPI_READ_STATUS_DONE_BIT)
@@ -302,14 +376,14 @@ char ASIC_diagnose_processor(char iChip, char iEngine)
 			break;
 		}
 
-		__MCU_ASIC_Deactivate_CS();	
+		__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));	
 
 		// Clear the fifo on engines
 		ASIC_ReadComplete(iChip,iEngine);		
 	}		
 		
 	// Deactivate the CS just to be sure
-	__MCU_ASIC_Deactivate_CS();	
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));	
 	
 	// Clear the fifo on engines
 	ASIC_ReadComplete(iChip,iEngine);
@@ -335,12 +409,13 @@ int ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnO
 	// Actual hovering indexes
 	char iActualHoverIndex = __ASIC_FREQUENCY_ACTUAL_INDEX;
 	char bInFrequencyReductionState = FALSE;
+	char szTemp[256];
 		
 	// Repeat this process until tuned
 	while (TRUE)
 	{
 		// Now send the job to the engine
-		ASIC_job_issue_to_specified_engine(iChip, iEngineToUse, &jp, TRUE, TRUE, 0x8D98229A, 0x8D9CB67A); // 300,000 attempts will take 1.2ms per chip and gives us 1.7% precision
+		ASIC_job_issue_to_specified_engine(iChip, iEngineToUse, &jp, TRUE, TRUE, FALSE, 0x8D98229A, 0x8D9CB67A); // 300,000 attempts will take 1.2ms per chip and gives us 1.7% precision
 		ASIC_job_start_processing(iChip, iEngineToUse, TRUE);
 		
 		// Hold the time
@@ -357,7 +432,7 @@ int ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnO
 		unsigned int iReadbackStatus = 0;
 		unsigned char isProcessorOK = TRUE;	
 		
-		__MCU_ASIC_Activate_CS();
+		__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	
 		// Wait for the thing to finish...
 		while (TRUE)
@@ -395,7 +470,7 @@ int ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnO
 			if (iActualHoverIndex == 0) // END OF LINE!!!
 			{
 				// We have a problem, abort...
-				__MCU_ASIC_Deactivate_CS();	
+				__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));	
 				
 				// Clear the fifo on engines
 				ASIC_ReadComplete(iChip,iEngineToUse);
@@ -405,7 +480,7 @@ int ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnO
 			else
 			{
 				// This is being modified by functions execute after...
-				__MCU_ASIC_Deactivate_CS();	
+				__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));	
 				
 				// Hover back one index, set frequency and exit
 				iActualHoverIndex -= 1;
@@ -428,7 +503,7 @@ int ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnO
 			if (iActualHoverIndex == 0)
 			{
 				// We have a problem, abort...
-				__MCU_ASIC_Deactivate_CS();
+				__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 				
 				// Clear the fifo on engines
 				ASIC_ReadComplete(iChip,iEngineToUse);
@@ -439,7 +514,7 @@ int ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnO
 			else
 			{
 				// This is being modified by functions execute after...
-				__MCU_ASIC_Deactivate_CS();
+				__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 				
 				// Clear the fifo on engines
 				ASIC_ReadComplete(iChip,iEngineToUse);				
@@ -457,7 +532,7 @@ int ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnO
 		}
 	
 		// Finally deactivate the CS... we have processing to do...
-		__MCU_ASIC_Deactivate_CS();		
+		__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));		
 		
 		// Clear the fifo on engines
 		ASIC_ReadComplete(iChip,iEngineToUse);
@@ -512,7 +587,7 @@ int ASIC_tune_chip_to_frequency(char iChip, char iEngineToUse, char bOnlyReturnO
 // Say Read-Complete
 void ASIC_ReadComplete(char iChip, char iEngine)
 {
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	if (iEngine == 0)
 	{
 		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | __ActualRegister0Value));	
@@ -523,7 +598,7 @@ void ASIC_ReadComplete(char iChip, char iEngine)
 		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT));	
 		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (0));	
 	}	
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 }	
 
 
@@ -623,17 +698,17 @@ void __Reset_Engine(int CHIP, int ENGINE)
 
 void __Write_SPI(int iChip, int iEngine, int iAddress, int iData)
 {
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	__ASIC_WriteEngine(iChip, iEngine, iAddress, iData);
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 }
 
 unsigned int __Read_SPI(int iChip, int iEngine, int iAddress)
 {
 	unsigned int iRetVal = 0;
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	iRetVal = __ASIC_ReadEngine(iChip, iEngine, iAddress);
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 	return iRetVal;
 }
 
@@ -874,7 +949,7 @@ int	ASIC_GetFrequencyFactor()
 void ASIC_SetFrequencyFactor(char iChip, int iFreqFactor)
 {
 	// if iChip is FF, then we set frequency for all
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	if (iChip == 0xFF)
 	{
 		__Write_SPI(iChip,0,0x60,iFreqFactor);	
@@ -901,7 +976,7 @@ void ASIC_SetFrequencyFactor(char iChip, int iFreqFactor)
 	{
 		__Write_SPI(iChip,0,0x60,iFreqFactor); //int caddr, int engine, int reg, int data	
 	}	
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 }
 
 void ASIC_WriteComplete(char iChip, char iEngine)
@@ -921,7 +996,7 @@ void ASIC_WriteComplete(char iChip, char iEngine)
 
 int ASIC_are_all_engines_done(unsigned int iChip)
 {
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	
 	volatile unsigned char iExpectedEnginesToBeDone = 0;
 	volatile unsigned char iTotalEnginesDone = 0;
@@ -945,14 +1020,14 @@ int ASIC_are_all_engines_done(unsigned int iChip)
 			iTotalEnginesDone++;	
 			
 			// Also we update the flag for global supervision of engine activity, because THIS FUNCTION IS REPETITIVELY USED AND CALLED			
-			#if defined(__ENGINE_ACTIVITY_SUPERVISION)
+			#if defined(__ENGINE_ENABLE_TIMESTAMPING)
 				GLOBAL_ENGINE_PROCESSING_STATUS[iChip][imx] = FALSE; // Meaning no longer processing			
 			#endif
 		}			
 
 	}	
 	
-	__MCU_ASIC_Deactivate_CS();	
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));	
 		
 	// We're ok
 	return (iExpectedEnginesToBeDone == iTotalEnginesDone);
@@ -960,16 +1035,26 @@ int ASIC_are_all_engines_done(unsigned int iChip)
 
 char ASIC_has_engine_finished_processing(char iChip, char iEngine)
 {
-	return ((__AVR32_SC_ReadData(iChip, iEngine, ASIC_SPI_READ_STATUS_REGISTER) & ASIC_SPI_READ_STATUS_BUSY_BIT) != ASIC_SPI_READ_STATUS_BUSY_BIT);
+	char bVal = ((__AVR32_SC_ReadData(iChip, iEngine, ASIC_SPI_READ_STATUS_REGISTER) & ASIC_SPI_READ_STATUS_BUSY_BIT) != ASIC_SPI_READ_STATUS_BUSY_BIT);
+	
+	// Also we update the flag for global supervision of engine activity, because THIS FUNCTION IS REPETITIVELY USED AND CALLED
+	#if defined(__ENGINE_ENABLE_TIMESTAMPING)
+		if (bVal == TRUE)
+		{
+			GLOBAL_ENGINE_PROCESSING_STATUS[iChip][iEngine] = FALSE; // Meaning no longer processing	
+		}		
+	#endif	
+
+	// return the value
+	return bVal;
 }
 
 // How many total processors are there?
 int ASIC_get_processor_count()
 {
 	volatile int iTotalProcessorCount = 0;
-	static int iTotalProcessorCountDetected = 0xFFFFFFFF;
-	
-	if (iTotalProcessorCountDetected != 0xFFFFFFFF) return iTotalProcessorCountDetected;
+	//static int iTotalProcessorCountDetected = 0xFFFFFFFF;
+	//if (iTotalProcessorCountDetected != 0xFFFFFFFF) return iTotalProcessorCountDetected;
 	
 	for (unsigned char xchip =0; xchip < TOTAL_CHIPS_INSTALLED; xchip++)
 	{
@@ -981,7 +1066,7 @@ int ASIC_get_processor_count()
 		}
 	}
 	
-	iTotalProcessorCountDetected = iTotalProcessorCount;
+	//iTotalProcessorCountDetected = iTotalProcessorCount;
 	return iTotalProcessorCount;
 }
 
@@ -1130,8 +1215,6 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, con
 	
 	unsigned char iEnginesIDLE = 0;
 		
-	// Activate the chips
-	__MCU_ASIC_Activate_CS();
 					
 	// Try to read their results...
 	for (int x_chip = ((iCheckOnlyOneChip == TRUE) ? iChipToCheck : 0) ; x_chip < TOTAL_CHIPS_INSTALLED; x_chip++)
@@ -1147,8 +1230,8 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, con
 			{
 				continue;
 			}				
-		}			 
-		
+		}	
+				
 		// Check done 
 		if (iChipDoneFlag[x_chip] == FALSE)
 		{
@@ -1160,7 +1243,10 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, con
 			{				
 				continue; // Skip it...
 			}				
-		}			 
+		}	
+		
+		// Activate the chips
+		__MCU_ASIC_Activate_CS((x_chip < 8) ? (1) : (2));		 
 		
 		// Test all engines
 		for (int y_engine = 0; y_engine < 16; y_engine++)
@@ -1328,10 +1414,13 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, con
 		// Are we checking only one chip? If so, we need to exit
 		if (iCheckOnlyOneChip == TRUE) break;
 		
+		// Deactivate the CHIPs
+		__MCU_ASIC_Deactivate_CS((x_chip < 8) ? (1) : (2));		
 	}
 	
 	// Deactivate the CHIPs
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS(1);
+	__MCU_ASIC_Deactivate_CS(2);	
 	
 	// Set the read count
 	*iNonceCount = iDetectedNonces;
@@ -1347,6 +1436,165 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, con
 	}
 	
 }
+
+int ASIC_get_job_status_from_engine(unsigned int *iNonceList, unsigned int *iNonceCount, const char iChip, const char iEngine)
+{
+	// Check if any chips are done...
+	if (!CHIP_EXISTS(iChip)) return ASIC_JOB_IDLE;
+	if (!IS_PROCESSOR_OK(iChip, iEngine)) return ASIC_JOB_IDLE;						
+
+	// Activate the chips
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
+	
+	// Is engine done?
+	if (!ASIC_has_engine_finished_processing(iChip, iEngine))
+	{
+		__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
+		return ASIC_JOB_NONCE_PROCESSING;
+	}
+
+	// Proceed
+	volatile unsigned int i_status_reg = __ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_READ_STATUS_REGISTER);
+			
+	// Is this engine IDLE?
+	if ((i_status_reg & (ASIC_SPI_READ_STATUS_DONE_BIT | ASIC_SPI_READ_STATUS_BUSY_BIT)) == 0)
+	{
+		// This engine is IDLE
+		__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
+		return ASIC_JOB_IDLE;
+	}
+
+	// Is DONE bit set for this engine?
+	if ((i_status_reg & ASIC_SPI_READ_STATUS_DONE_BIT) != ASIC_SPI_READ_STATUS_DONE_BIT)
+	{
+		// This engine is IDLE
+		__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
+		return ASIC_JOB_NONCE_PROCESSING;
+	}				 
+			
+	// Check FIFO depths
+	unsigned int  iLocNonceCount = 0;
+	unsigned char iDetectedNonces = 0;
+	unsigned int  iLocNonceFlag[8] = {0,0,0,0,0,0,0,0};
+					
+	// Check nonce existence
+	if ((i_status_reg & ASIC_SPI_READ_STATUS_FIFO_DEPTH1_BIT) != 0) { iLocNonceCount++; iLocNonceFlag[0] = 1; }
+	if ((i_status_reg & ASIC_SPI_READ_STATUS_FIFO_DEPTH2_BIT) != 0) { iLocNonceCount++;	iLocNonceFlag[1] = 1; }
+	if ((i_status_reg & ASIC_SPI_READ_STATUS_FIFO_DEPTH3_BIT) != 0) { iLocNonceCount++;	iLocNonceFlag[2] = 1; }
+	if ((i_status_reg & ASIC_SPI_READ_STATUS_FIFO_DEPTH4_BIT) != 0) { iLocNonceCount++; iLocNonceFlag[3] = 1; }
+	if ((i_status_reg & ASIC_SPI_READ_STATUS_FIFO_DEPTH5_BIT) != 0) { iLocNonceCount++; iLocNonceFlag[4] = 1; } 
+	if ((i_status_reg & ASIC_SPI_READ_STATUS_FIFO_DEPTH6_BIT) != 0) { iLocNonceCount++; iLocNonceFlag[5] = 1; }
+	if ((i_status_reg & ASIC_SPI_READ_STATUS_FIFO_DEPTH7_BIT) != 0) { iLocNonceCount++; iLocNonceFlag[6] = 1; }
+	if ((i_status_reg & ASIC_SPI_READ_STATUS_FIFO_DEPTH8_BIT) != 0) { iLocNonceCount++; iLocNonceFlag[7] = 1; }
+				
+	// Do any nonces exist?
+	if (iLocNonceCount == 0)
+	{
+		// Clear FIFO for this engine
+		if (iEngine == 0)
+		{
+			__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | __ActualRegister0Value));
+			__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value));
+		}
+		else
+		{
+			__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT));
+			__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (0));
+		}		 
+				
+		__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
+		return ASIC_JOB_NONCE_NO_NONCE;
+	}				 
+				
+	// Read them one by one
+	volatile unsigned int iNonceX = 0;
+
+	// Check
+	if (iLocNonceFlag[0] == TRUE)
+	{
+		iNonceX = (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO0_LWORD)) |
+				  (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO0_HWORD) << 16);
+		iNonceList[iDetectedNonces++] = iNonceX;
+	}
+	
+	// Check
+	if (iLocNonceFlag[1] == TRUE)
+	{
+		iNonceX = (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO1_LWORD)) |
+			      (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO1_HWORD) << 16);
+		iNonceList[iDetectedNonces++] = iNonceX;
+	}
+	
+	// Check
+	if (iLocNonceFlag[2] == TRUE)
+	{
+		iNonceX = (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO2_LWORD)) |
+				  (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO2_HWORD) << 16);
+		iNonceList[iDetectedNonces++] = iNonceX;
+	}
+	
+	// Check
+	if (iLocNonceFlag[3] == TRUE)
+	{
+		iNonceX = (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO3_LWORD)) |
+				  (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO3_HWORD) << 16);
+		iNonceList[iDetectedNonces++] = iNonceX;
+	}
+	
+	// Check
+	if (iLocNonceFlag[4] == TRUE)
+	{
+		iNonceX = (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO4_LWORD)) |
+				  (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO4_HWORD) << 16);
+		iNonceList[iDetectedNonces++] = iNonceX;
+	}
+	
+	// Check
+	if (iLocNonceFlag[5] == TRUE)
+	{
+		iNonceX = (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO5_LWORD)) |
+				  (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO5_HWORD) << 16);
+		iNonceList[iDetectedNonces++] = iNonceX;
+	}
+	
+	// Check
+	if (iLocNonceFlag[6] == TRUE)
+	{
+		iNonceX = (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO6_LWORD)) |
+				  (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO6_HWORD) << 16);
+		iNonceList[iDetectedNonces++] = iNonceX;
+	}
+	
+	// Check
+	if (iLocNonceFlag[7] == TRUE)
+	{
+		iNonceX = (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO7_LWORD)) |
+			      (__ASIC_ReadEngine(iChip, iEngine, ASIC_SPI_FIFO7_HWORD) << 16);
+		iNonceList[iDetectedNonces++] = iNonceX;
+	}
+	
+	// Clear the engine [ NOTE : CORRECT !!!!!!!!!!!! ]
+	if (iEngine == 0)
+	{
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | __ActualRegister0Value));
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value));
+	}
+	else
+	{
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT));
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (0));
+	}
+	
+	// Deactivate the CHIPs
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
+	
+	// Set the read count
+	*iNonceCount = iDetectedNonces;
+	
+	// What to return...
+	return (iDetectedNonces > 0) ? ASIC_JOB_NONCE_FOUND : ASIC_JOB_NONCE_NO_NONCE;	
+}
+
 
 #define MACRO__ASIC_WriteEngine(x,y,z,d)				__AVR32_SC_WriteData(x,y,z,d);
 #define MACRO__ASIC_WriteEngine_SecondBank(x,y,z,d)		__AVR32_SC_WriteData(x,y,z,d);
@@ -1414,9 +1662,7 @@ void ASIC_job_issue(void* pJobPacket,
 	volatile int iTotalChipsHovered = 0;
 	pjob_packet pjp = (pjob_packet)(pJobPacket);
 	
-	// Activate the SPI
-	__MCU_ASIC_Activate_CS();
-	NOP_OPERATION;
+
 	
 	// Have we ever come here before? If so, don't program static data in the registers any longer
 	static unsigned char bIsThisOurFirstTime = TRUE;
@@ -1424,6 +1670,10 @@ void ASIC_job_issue(void* pJobPacket,
 	for (volatile int x_chip = (bIssueToSingleChip == TRUE) ? (iChipToIssue) : (0); 
 		 x_chip < TOTAL_CHIPS_INSTALLED; x_chip++)
 	{
+		// Activate the SPI
+		__MCU_ASIC_Activate_CS((x_chip < 8) ? (1) : (2));
+		NOP_OPERATION;		
+		
 		// Check chip existence
 		if (CHIP_EXISTS(x_chip) == FALSE) continue; // Skip it...
 		
@@ -1540,7 +1790,11 @@ void ASIC_job_issue(void* pJobPacket,
 					MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCC,0x0000);
 					MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCD,0x0000);
 					MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCE,0x0100);
-					MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCF,0x0000);			
+					MACRO__ASIC_WriteEngineExpress(x_chip,y_engine,0xCF,0x0000);
+					
+					// Set barrier offsets
+					MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_LWORD, 0x0FF7F);
+					MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_HWORD, 0x0FFFF);			
 				}			
 	
 				// All data sent, now set range
@@ -1576,8 +1830,6 @@ void ASIC_job_issue(void* pJobPacket,
 				//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0x4280));
 				//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x38E9));
 	
-				MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_LWORD, 0x0FF7F);
-				MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_BARRIER_HWORD, 0x0FFFF);	
 			
 				// Should we export spreads?
 				#if defined(__EXPORT_ENGINE_RANGE_SPREADS)			
@@ -1590,11 +1842,25 @@ void ASIC_job_issue(void* pJobPacket,
 				{
 					MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));			
 					MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+					
+					// This info is useful for Engine activity supervision
+					#if defined(__ENGINE_ENABLE_TIMESTAMPING)
+						// Also mark that this engine has started processing
+						GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[x_chip][y_engine] = MACRO_GetTickCountRet;
+						GLOBAL_ENGINE_PROCESSING_STATUS[x_chip][y_engine] = TRUE;
+					#endif
 				}
 				else
 				{
 					MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT ));			
 					MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, 0); // Clear Write-Register Valid Bit
+					
+					// This info is useful for Engine activity supervision
+					#if defined(__ENGINE_ENABLE_TIMESTAMPING)
+						// Also mark that this engine has started processing
+						GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[x_chip][y_engine] = MACRO_GetTickCountRet;
+						GLOBAL_ENGINE_PROCESSING_STATUS[x_chip][y_engine] = TRUE;					
+					#endif
 				}
 								
 			
@@ -1764,13 +2030,26 @@ void ASIC_job_issue(void* pJobPacket,
 					{
 						MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));
 						MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+						
+						// This info is useful for Engine activity supervision
+						#if defined(__ENGINE_ENABLE_TIMESTAMPING)
+							// Also mark that this engine has started processing
+							GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[x_chip][y_engine] = MACRO_GetTickCountRet;
+							GLOBAL_ENGINE_PROCESSING_STATUS[x_chip][y_engine] = TRUE;
+						#endif						
 					}
 					else
 					{
 						MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT ));
 						MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, 0); // Clear Write-Register Valid Bit
-					}
-					
+						
+						// This info is useful for Engine activity supervision
+						#if defined(__ENGINE_ENABLE_TIMESTAMPING)
+							// Also mark that this engine has started processing
+							GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[x_chip][y_engine] = MACRO_GetTickCountRet;
+							GLOBAL_ENGINE_PROCESSING_STATUS[x_chip][y_engine] = TRUE;
+						#endif						
+					}					
 					
 					// Increase our range
 					iLowerRange += iRangeSlice;
@@ -1784,6 +2063,9 @@ void ASIC_job_issue(void* pJobPacket,
 		// Chip Started, so make it blink
 		if (GLOBAL_ChipActivityLEDCounter[x_chip] == 0) { GLOBAL_ChipActivityLEDCounter[x_chip] = 10; }
 		
+		// Deactivate CS
+		__MCU_ASIC_Deactivate_CS((x_chip < 8) ? (1) : (2));		
+		
 		// Are we issuing to one chip only? If so, we need to exit here as we've already issued the job to the desired chip
 		if (bIssueToSingleChip == TRUE) break;	
 	}	
@@ -1795,8 +2077,7 @@ void ASIC_job_issue(void* pJobPacket,
 	// ORIGINAL> if (bIssueToSingleChip == FALSE) bIsThisOurFirstTime = FALSE; // We only set it to false if we're sending the job to all engines on the BOARD
 	bIsThisOurFirstTime = FALSE; // We only set it to false if we're sending the job to all engines on the BOARD
 
-	// Deactivate the SPI
-	__MCU_ASIC_Deactivate_CS();
+
 }
 
 void ASIC_job_start_processing(char iChip, char iEngine, char bForcedStart)
@@ -1812,7 +2093,7 @@ void ASIC_job_start_processing(char iChip, char iEngine, char bForcedStart)
 	}
 	
 	// Activate the SPI
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	NOP_OPERATION;
 	NOP_OPERATION;	
 	
@@ -1830,7 +2111,7 @@ void ASIC_job_start_processing(char iChip, char iEngine, char bForcedStart)
 	}
 				
 	// Deactivate the SPI
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 }
 
 
@@ -1839,6 +2120,7 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 										void* pJobPacket,
 										char  bLoadStaticData,
 										char  bResetBeforStart,
+										char  bIgniteEngine,
 										unsigned int _LowRange,
 										unsigned int _HighRange)
 {
@@ -1858,7 +2140,7 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 	pjob_packet pjp = (pjob_packet)(pJobPacket);
 	
 	// Activate the SPI
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	NOP_OPERATION;
 	NOP_OPERATION;
 	
@@ -1981,6 +2263,35 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (_HighRange & 0x0FFFF));
 		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (_HighRange & 0x0FFFF0000) >> 16);
 		
+		// Ignite the engine?
+		if (bIgniteEngine == TRUE)
+		{
+			// We're all set, for this chips... Tell the engine to start
+			if ((y_engine == 0))
+			{
+				MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));
+				MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+				
+				// This info is useful for Engine activity supervision
+				#if defined(__ENGINE_ENABLE_TIMESTAMPING)
+					// Also mark that this engine has started processing
+					GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[x_chip][y_engine] = MACRO_GetTickCountRet;
+					GLOBAL_ENGINE_PROCESSING_STATUS[x_chip][y_engine] = TRUE;
+				#endif
+			}
+			else
+			{
+				MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT ));
+				MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, 0); // Clear Write-Register Valid Bit
+				
+				// This info is useful for Engine activity supervision
+				#if defined(__ENGINE_ENABLE_TIMESTAMPING)
+					// Also mark that this engine has started processing
+					GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[x_chip][y_engine] = MACRO_GetTickCountRet;
+					GLOBAL_ENGINE_PROCESSING_STATUS[x_chip][y_engine] = TRUE;
+				#endif
+			}
+		}		
 	}
 	else
 	{
@@ -2104,18 +2415,48 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 		
 		MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (_HighRange & 0x0FFFF)); // We use original chip number here, not the x_chip_b2
 		MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (_HighRange & 0x0FFFF0000) >> 16);  // We use original chip number here, not the x_chip_b2
+		
+		// Ignite the engine?
+		if (bIgniteEngine == TRUE)
+		{
+			// We're all set, for this chips... Tell the engine to start
+			if ((y_engine == 0))
+			{
+				MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));
+				MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+					
+				// This info is useful for Engine activity supervision
+				#if defined(__ENGINE_ENABLE_TIMESTAMPING)
+					// Also mark that this engine has started processing
+					GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[x_chip][y_engine] = MACRO_GetTickCountRet;
+					GLOBAL_ENGINE_PROCESSING_STATUS[x_chip][y_engine] = TRUE;
+				#endif
+			}
+			else
+			{
+				MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT ));
+				MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, 0); // Clear Write-Register Valid Bit
+					
+				// This info is useful for Engine activity supervision
+				#if defined(__ENGINE_ENABLE_TIMESTAMPING)
+					// Also mark that this engine has started processing
+					GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[x_chip][y_engine] = MACRO_GetTickCountRet;
+					GLOBAL_ENGINE_PROCESSING_STATUS[x_chip][y_engine] = TRUE;
+				#endif
+			}
+		}
 	}
 			
 	// Deactivate the SPI
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 }
 
 // Reset the engines...
 void ASIC_reset_engine(char iChip, char iEngine)
 {
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	__Reset_Engine(iChip, iEngine);
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 }
 
 ///////////////////////////////////////////////////////////////
@@ -2178,23 +2519,30 @@ int ASIC_is_chip_processing(char iChip)
 	}		
 }
 
+int	 ASIC_is_engine_processing(char iChip, char iEngine)
+{
+	if (!CHIP_EXISTS(iChip)) return FALSE;
+	if (!IS_PROCESSOR_OK(iChip, iEngine)) return FALSE;
+	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
+	int bRetVal =  ((__AVR32_SC_ReadData(iChip, iEngine, ASIC_SPI_READ_STATUS_REGISTER) & ASIC_SPI_READ_STATUS_BUSY_BIT) == ASIC_SPI_READ_STATUS_BUSY_BIT);
+	__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
+	return bRetVal;	
+}
+
 int ASIC_get_chip_count()
 {
-	// Have we already detected this? If so, just return the previously known number
-	static int iChipCount = 0;
-	
 	// This function WILL NOT CHANGE THE MAP IF THE ENUMERATION HAS BEEN PERFORMED BEFORE!
-	if (iChipCount != 0)
-		return iChipCount;
-				
-	// Activate CS# of ASIC engines
-	__MCU_ASIC_Activate_CS();
-		
+	if ((__internal_global_iChipCount != 0))
+		return __internal_global_iChipCount;
+						
 	// We haven't, so we need to read their register (one by one) to find which ones exist.
 	int iActualChipCount = 0;
 	
 	for (int x_chip = 0; x_chip < TOTAL_CHIPS_INSTALLED; x_chip++)
 	{
+		// Activate CS# of ASIC engines
+		__MCU_ASIC_Activate_CS((x_chip < 8) ? (1) : (2));		
+		
 		#if defined(DECOMISSION_CHIP_15)
 			if (x_chip == 15) { __chip_existence_map[x_chip] = 0; continue; }
 		#endif		
@@ -2276,22 +2624,22 @@ int ASIC_get_chip_count()
 				break;
 			}						
 		}
+		
+		// Deactivate CS# of ASIC engines
+		__MCU_ASIC_Deactivate_CS((x_chip < 8) ? (1) : (2));				
 	}
 	
-	// Deactivate CS# of ASIC engines
-	__MCU_ASIC_Deactivate_CS();
+
 	
-	iChipCount = iActualChipCount;
+	__internal_global_iChipCount = iActualChipCount;
 	return iActualChipCount;	
 }
-
 
 int ASIC_does_chip_exist(unsigned int iChipIndex)
 {
 	// Does this chip exist?
 	return CHIP_EXISTS(iChipIndex);
 }
-
 
 inline void __ASIC_WriteEngine(char iChip, char iEngine, unsigned int iAddress, unsigned int iData16Bit)
 {

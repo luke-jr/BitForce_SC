@@ -2,7 +2,7 @@
  * AVR32_MODULE.h
  *
  * Created: 11/10/2012 21:59:40
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 #ifndef AVR32_MODULE_H_
 #define AVR32_MODULE_H_
@@ -227,8 +227,8 @@ unsigned int __AVR32_SC_GetDone  (char iChip);
 unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs);
 void __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData);
 void __AVR32_SC_WriteData_Express(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData);
-void __AVR32_ASIC_Activate_CS(void); 
-void __AVR32_ASIC_Deactivate_CS(void);
+void __AVR32_ASIC_Activate_CS(char iBank); 
+void __AVR32_ASIC_Deactivate_CS(char iBank);
 void __AVR32_SPI0_SendWord(unsigned short data);
 void __AVR32_SPI1_SendWord(unsigned short data);
 unsigned short __AVR32_SPI0_ReadWord(void);

@@ -4,11 +4,11 @@
  * JobPipe_Module.c
  *
  * Created: 08/10/2012 21:39:04
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 ////////////////////////////////////////////////////////////////////////////////
-/// This is our Pipelined job processing system (holder of 2 jobs + 1 process)
+/// This is our Pipelined job processing system 
 ////////////////////////////////////////////////////////////////////////////////
 
 // Job interleaving
@@ -136,6 +136,30 @@ void* JobPipe__pipe_get_buf_job_result(unsigned int iIndex)
 	return (void*)&__buf_job_results[iIndex];
 }
 
+void  JobPipe__pipe_skip_buf_job_results(unsigned int iTotalToSkip)
+{
+	if (iTotalToSkip == 0) return; // Nothing special to do really...
+		
+	// Flush these amount of jobs from results
+	char iTotalActualResults = __buf_job_results_count;
+	if (iTotalToSkip >= iTotalActualResults)
+	{
+		// Just clear the results buffer
+		__buf_job_results_count = 0;
+		return;
+	}
+	
+	// Copy the results backward	
+	for (char umr = iTotalToSkip; umr < iTotalActualResults; umr++)
+	{
+		memcpy(&__buf_job_results[umr - iTotalToSkip],
+			   (void*)(&__buf_job_results[umr]),
+			   sizeof(buf_job_result_packet));				   
+	}
+	
+	__buf_job_results_count -= iTotalToSkip;
+}
+
 inline unsigned int JobPipe__pipe_get_buf_job_results_count(void)			 {return __buf_job_results_count;}
 inline void JobPipe__pipe_set_buf_job_results_count(unsigned int iCount)	 {__buf_job_results_count = iCount;}
 inline void JobPipe__set_was_last_job_loaded_in_engines(char iVal)			 {__interleaved_was_last_job_loaded_into_engines = iVal;}
@@ -146,3 +170,18 @@ inline void JobPipe__set_interleaved_loading_progress_engine(char iVal)		 {__int
 inline char JobPipe__get_interleaved_loading_progress_engine()				 {return __interleaved_loading_progress_engine;}
 inline void JobPipe__set_interleaved_loading_progress_finished(char iVal)	 {__interleaved_loading_progress_finished = iVal;}
 inline char JobPipe__get_interleaved_loading_progress_finished()			 {return __interleaved_loading_progress_finished;}
+	
+///////////////////
+// TEST FUNCTIONS
+
+
+void JobPipe__test_buffer_shifter(void)
+{
+	// Then move all items one-index back (resulting in loss of the job-result at index 0)
+	for (char pIndex = 0; pIndex < PIPE_MAX_BUFFER_DEPTH - 1; pIndex += 1) // PIPE_MAX_BUFFER_DEPTH - 1 because we don't touch the last item in queue
+	{
+		memcpy((void*)__buf_job_results[pIndex].midstate, 	(void*)__buf_job_results[pIndex+1].midstate, 	32);
+		memcpy((void*)__buf_job_results[pIndex].block_data, (void*)__buf_job_results[pIndex+1].block_data, 	12);
+		memcpy((void*)__buf_job_results[pIndex].nonce_list,	(void*)__buf_job_results[pIndex+1].nonce_list,  8*sizeof(UL32)); // 8 nonces maximum
+	}	
+}

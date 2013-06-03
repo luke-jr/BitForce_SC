@@ -2,7 +2,7 @@
  * AVR32_Module.c
  *
  * Created: 21/11/2012 20:58:33
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #include <avr32/io.h>
@@ -774,11 +774,17 @@ volatile void __AVR32_SC_Initialize()
 	#endif
 }
 
-volatile inline void __AVR32_ASIC_Activate_CS()
+volatile inline void __AVR32_ASIC_Activate_CS(char iBank)
 {
-	AVR32_GPIO.port[0].ovrc   = AVR32_SPI0_PIN_NPCS;
+	if (iBank == 1)
+	{
+		AVR32_GPIO.port[0].ovrc   = AVR32_SPI0_PIN_NPCS;	
+	}	
 	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
-		AVR32_GPIO.port[0].ovrc   = AVR32_SPI1_PIN_NPCS;
+		if (iBank == 2)
+		{
+			AVR32_GPIO.port[0].ovrc   = AVR32_SPI1_PIN_NPCS;	
+		}		
 	#endif
 	NOP_OPERATION;
 	NOP_OPERATION;
@@ -791,11 +797,18 @@ volatile inline void __AVR32_ASIC_Activate_CS()
 	NOP_OPERATION;
 }
 
-volatile inline void __AVR32_ASIC_Deactivate_CS()
+volatile inline void __AVR32_ASIC_Deactivate_CS(char iBank)
 {
-	AVR32_GPIO.port[0].ovrs   = AVR32_SPI0_PIN_NPCS;
+	if (iBank == 1)
+	{
+		AVR32_GPIO.port[0].ovrs   = AVR32_SPI0_PIN_NPCS;	
+	}
+	
 	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
-		AVR32_GPIO.port[0].ovrs   = AVR32_SPI1_PIN_NPCS;
+		if (iBank == 2) 
+		{
+			AVR32_GPIO.port[0].ovrs   = AVR32_SPI1_PIN_NPCS;
+		}			
 	#endif
 	NOP_OPERATION;
 	NOP_OPERATION;

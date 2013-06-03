@@ -2,7 +2,7 @@
  * std_defs.h
  *
  * Created: 09/10/2012 01:14:49
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #ifndef STD_DEFS_H_
@@ -22,7 +22,7 @@
 /*************** Product Model *********************/
 // #define __PRODUCT_MODEL_JALAPENO__
 #define    __PRODUCT_MODEL_LITTLE_SINGLE__
-//#define __PRODUCT_MODEL_SINGLE__
+// #define __PRODUCT_MODEL_SINGLE__
 // #define __PRODUCT_MODEL_MINIRIG__
 
 /********* TOTAL CHIPS INSTALLED ON BOARD **********/
@@ -38,6 +38,10 @@
 // Some useful macros
 
 /////////////////////////////////////////////////////////////////////////
+// Total of runs we perform in diagnostics
+#define __TOTAL_DIAGNOSTICS_RUN  40
+
+/////////////////////////////////////////////////////////////////////////
 // This means DO NOT USE ENGINE 0. It's needed for the actual Version
 #define DO_NOT_USE_ENGINE_ZERO				1
 
@@ -45,17 +49,6 @@
 // -- DO NOT SET THIS MACRO
 // -- If set, basically all the chips will go to IDLE state
 //#define DISABLE_CLOCK_TO_ALL_ENGINES		1
-
-/////////////////////////////////////////////////////////////////////////
-// -- This macro forces the Queue Operator to send one job to each chip.
-// -- Once activated, device will process parallel jobs at nearly the same speed.
-// -- This also impacts the ZOX response, where the processor that got the job done will be added to the response list
-#define QUEUE_OPERATE_ONE_JOB_PER_CHIP	1
-
-/////////////////////////////////////////////////////////////////////////
-// -- This macro enforces the queue to use one engine per board ( verses one engine per chip )
-// -- It will also modify the results queue and no processing chip identifier will exist any longer
-//#define  QUEUE_OPERATE_ONE_JOB_PER_BOARD		1
 
 /********* Pulse Reuqest *************/
 /////////////////////////////////////////////////////////////////////////
@@ -69,7 +62,7 @@
 // #define	__CHIP_DIAGNOSTICS_VERBOSE		1
 //
 // -- Also this option enables chip by chip diagnostics
-// #define __CHIP_BY_CHIP_DIAGNOSTICS		1
+// #define __CHIP_BY_CHIP_DIAGNOSTICS		1 
 // #define __ENGINE_BY_ENGINE_DIAGNOSTICS	1
 // #define __EXPORT_ENGINE_RANGE_SPREADS	1
 
@@ -80,8 +73,9 @@
 
 /////////////////////////////////////////////////////////////////////////
 // Detect frequency of each chip
-#define __CHIP_FREQUENCY_DETECT_AND_REPORT 1 
-#define __LIVE_FREQ_DETECTION 1				 // If set, it'll force the report to be a live detection instead of initial results found
+#define __CHIP_FREQUENCY_DETECT_AND_REPORT 1     // Roundtrip
+#define __LIVE_FREQ_DETECTION			   1	 // If set, it'll force the report to be a live detection instead of initial results found
+#define __EXPORT_ENGINE_TIMEOUT_DETAIL	   1	 // ASIC_tune_chip_frequency log will be exported
 
 /////////////////////////////////////////////////////////////////////////
 // This MACRO disables the kernel from trying to increase frequency on ASICS
@@ -89,16 +83,22 @@
 // #define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
 
 /////////////////////////////////////////////////////////////////////////
-// Interleaved job loading enabled?
-// #define __INTERLEAVED_JOB_LOADING
+// ASIC Frequency settings
+// ACTUAL VALUES WOULD BE -- const unsigned int __ASIC_FREQUENCY_WORDS [10] = {0x0, 0xFFFF, 0xFFFD, 0xFFF5, 0xFFD5, 0xFF55, 0xFD55, 0xF555, 0xD555, 0x5555};
+extern const unsigned int __ASIC_FREQUENCY_WORDS[10];  // Values here are known...
+extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure frequency for each word...
+#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 
+#define __MAXIMUM_FREQUENCY_INDEX       9
 
 /////////////////////////////////////////////////////////////////////////
 // Engine activity supervision
 // Enabling this feature will force the MCU to decommission the malfunctioning
 // engines detected on runtime
-#define __ENGINE_ACTIVITY_SUPERVISION	1
-#define ENGINE_MAXIMUM_BUSY_TIME		4000000  
-
+//#define __ENGINE_ENABLE_TIMESTAMPING				1 // Enable timestamping, meaning we mark the job initiation and termination
+//#define __ENGINE_MAXIMUM_BUSY_TIME					4000000 // 4 Seconds is max
+//#define __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION	1		// 
+//#define __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION   1 // The same as Activity-Supervision, except that it's used for progressive engine job loading system
+//#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      300000 // 300 milliseconds
 
 /////////////////////////////////////////////////////////////////////////
 // Activate job-load balancing
@@ -112,6 +112,33 @@
 // Report balancing 
 // #define __REPORT_BALANCING_SPREADS	1
 
+/******************************** BUFFER MANAGEMENT **************************/
+/////////////////////////////////////////////////////////////////////////
+// Progressive per-engine job submission
+#define __PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION	1
+
+// OR Interleaved job loading enabled? (With the option of interleaved job loading (i.e. Pipelined))
+//#define __IMMEDIATE_ENGINE_JOB_SUBMISSION
+//#define __INTERLEAVED_JOB_LOADING
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// -- This macro forces the Queue Operator to send one job to each chip.
+// -- Once activated, device will process parallel jobs at nearly the same speed.
+// -- This also impacts the ZOX response, where the processor that got the job done will be added to the response list
+// #define QUEUE_OPERATE_ONE_JOB_PER_CHIP	    1
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// -- This macro enforces the queue to use one engine per board ( verses one engine per chip )
+// -- It will also modify the results queue and no processing chip identifier will exist any longer
+#define  QUEUE_OPERATE_ONE_JOB_PER_BOARD		1
+
+/***************************************************************************/
+
+/////////////////////////////////////////////////////////////////////////
+// General Engine Reseting - if too many engines have failed...
+// We'll reset the ASICs. It must have been a while since we last produced a result...
+#define GENERAL_ASIC_RESET_ON_LOW_ENGINE_COUNT	1
+
 /////////////////////////////////////////////////////////////////////////
 // Enabling this macro will force the results buffer to be cleared when 
 // QUEUE_FLUSH Command is issued
@@ -119,16 +146,17 @@
 
 /////////////////////////////////////////////////////////////////////////
 // FAN SUBSYSTEM: FAN REMAIN AT FULL SPEED
-#define FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED		1
+#define FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED	1
 
-/////////////////////////////////////////////////////////////////////////
-// ASIC Frequency settings
-// ACTUAL VALUES WOULD BE :: const unsigned int __ASIC_FREQUENCY_WORDS [10] = {0x0, 0xFFFF, 0xFFFD, 0xFFF5, 0xFFD5, 0xFF55, 0xFD55, 0xF555, 0xD555, 0x5555};
-extern const unsigned int __ASIC_FREQUENCY_WORDS[10];  // Values here are known...
-extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure frequency for each word...
-#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 
-#define __MAXIMUM_FREQUENCY_INDEX       9
+#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+	#if !defined(FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED)
+		#error For this model of product, FAN subsystem is best remained at high-speed
+	#endif
+#endif
 
+///////////////////////////////////////////////////////////////////////// 
+// Reinitialize the ASICs after high-temp recovery
+#define __ASICS_RESTART_AFTER_HIGH_TEMP_RECOVERY 1
 
 /////////////////////////////////////////////////////////////////////////
 // If this is defined, the chip will no longer be used
@@ -148,6 +176,93 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 // #define DECOMISSION_CHIP_2				1
 // #define DECOMISSION_CHIP_1				1
 // #define DECOMISSION_CHIP_0				1
+// #define ENFORCE_USAGE_CHIP_15			1
+// #define ENFORCE_USAGE_CHIP_14			1
+// #define ENFORCE_USAGE_CHIP_13			1
+// #define ENFORCE_USAGE_CHIP_12			1
+// #define ENFORCE_USAGE_CHIP_11			1
+// #define ENFORCE_USAGE_CHIP_10			1
+// #define ENFORCE_USAGE_CHIP_9				1
+// #define ENFORCE_USAGE_CHIP_8				1
+// #define ENFORCE_USAGE_CHIP_7				1
+// #define ENFORCE_USAGE_CHIP_6				1
+// #define ENFORCE_USAGE_CHIP_5				1
+// #define ENFORCE_USAGE_CHIP_4				1
+// #define ENFORCE_USAGE_CHIP_3				1
+// #define ENFORCE_USAGE_CHIP_2				1
+// #define ENFORCE_USAGE_CHIP_1				1
+// #define ENFORCE_USAGE_CHIP_0				1
+
+
+/////////////////////////////////////////////////////////////////////////
+// Error detection
+#if (defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)) && defined(FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED)
+	#pragma  GCC warning "Using FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED with PRODUCT_MODEL_SINGLE or PRODUCT_MODEL_MINIRIG is not recommended"
+#endif
+
+#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP) && defined(QUEUE_OPERATE_ONE_JOB_PER_BOARD)
+	#error Unable to use both QUEUE_OPERATE_ONE_JOB_PER_CHIP and QUEUE_OPERATE_ONE_JOB_PER_BOARD at the same time
+#endif
+
+#if !defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP) && !defined(QUEUE_OPERATE_ONE_JOB_PER_BOARD)
+	#error Either QUEUE_OPERATE_ONE_JOB_PER_CHIP or QUEUE_OPERATE_ONE_JOB_PER_BOARD must be selected
+#endif
+
+#if defined(__PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION) && defined(__IMMEDIATE_ENGINE_JOB_SUBMISSION)
+	#error Unable to use __PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION and IMMEDIATE-ENGINE-JOB-SUBMISSION at the same time
+#endif
+
+#if defined(__PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION) && defined(__INTERLEAVED_JOB_LOADING)
+	#error Unable to use __PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION and __INTERLEAVED_JOB_LOADING at the same time
+#endif
+
+#if !defined(__PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION) && defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)
+	#error __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION can only work when __PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION is enabled
+#endif
+
+#if defined(__ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION) && defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)
+	#error  Cannot have both __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION and __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION
+	#error  ONLY one is allowed at a time
+#endif
+
+#if defined (__ENGINE_ENABLE_TIMESTAMPING) && (!defined(__ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION) && !defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION))
+	#error  Timestamping (__ENGINE_ENABLE_TIMESTAMPING) enabled but no monitoring authority defined
+#endif
+
+#if defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION) && !defined(__ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME)
+	#error  Monitoring authority defined but __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME not defined
+#endif
+
+#if defined(__ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION) && !defined(__ENGINE_MAXIMUM_BUSY_TIME)
+	#error  __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION defined but __ENGINE_MAXIMUM_BUSY_TIME not defined
+#endif
+
+#if (defined(__ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION) || defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)) && !defined(__ENGINE_ENABLE_TIMESTAMPING)
+	#error  __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION but __ENGINE_ENABLE_TIMESTAMPING not defined
+#endif
+
+#if !defined(__ENGINE_ENABLE_TIMESTAMPING)
+	#if defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)
+		#error  __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION was requested by Timestamping has not been enabled
+	#endif
+	#if defined(__ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION)
+		#error  __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION was requested by Timestamping has not been enabled
+	#endif
+#endif
+
+#if defined(__INTERLEAVED_JOB_LOADING) && !defined(__ACTIVATE_JOB_LOAD_BALANCING)
+	#error With __INTERLEAVED_JOB_LOADING submission, __ACTIVATE_JOB_LOAD_BALANCING must be defined as well
+#endif
+
+#if defined(__PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION) && !defined(__ACTIVATE_JOB_LOAD_BALANCING)
+	#error With __PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION, __ACTIVATE_JOB_LOAD_BALANCING must be defined as well
+#endif
+
+/////////////////////////////////////////////////////////////////////////
+// Pipe Operation Testing...
+// If set, the PROTOCOL_GET_INTO_REQUEST will submit 3 jobs in the pipe and
+// measures how long it takes for the unit to finish it...
+#define __TEST_PIPE_PERFORMANCE 1
 
 
 /*************** Used for debugging ****************/
@@ -175,6 +290,9 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 typedef unsigned long long UL64;
 typedef unsigned int UL32;
 
+// Total engines detected first time on startup
+unsigned int GLOBAL_TotalEnginesDetectedOnStartup;
+unsigned int GLOBAL_LastJobResultProduced;
 
 ///////////////////////////////////////// typedefs
 // Master Tick Counter (Holds clock in 1uS ticks)
@@ -242,6 +360,7 @@ unsigned int GLOBAL_CHIP_PROCESSOR_ENGINE_HIGHBOUND[TOTAL_CHIPS_INSTALLED][16]; 
 
 // Monitoring Authority arrays
 unsigned char GLOBAL_ENGINE_PROCESSING_STATUS[TOTAL_CHIPS_INSTALLED][16]; // If 1, the engine is processing
+unsigned char GLOBAL_ENGINE_PROCESSING_FAILURE_SCORES[TOTAL_CHIPS_INSTALLED][16]; // If this number reaches 5 failures, we'll decommission the engine
 unsigned int  GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[TOTAL_CHIPS_INSTALLED][16]; // When did this engine start processing?
 
 // This should be by default zero
@@ -263,10 +382,17 @@ volatile unsigned int GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK;
 // Our Wathdog Reset command
 #define WATCHDOG_RESET  AVR32_WDT.clr = 0x0FFFFFFFF
 
+// Have we already detected this? If so, just return the previously known number
+unsigned int __internal_global_iChipCount;
+
+// For Test only
+volatile unsigned int iMark1;
+volatile unsigned int iMark2;
+
 // Basic boolean definition
 #define TRUE	1
 #define FALSE	0
-#define CHIP_EXISTS(x)						   ((__chip_existence_map[x] != 0))
+#define CHIP_EXISTS(x)						   (((__chip_existence_map[x] & 0xFF) != 0))
 #define IS_PROCESSOR_OK(xchip, yengine)		   ((__chip_existence_map[xchip] & (1 << yengine)) != 0)
 #define DECOMMISSION_PROCESSOR(xchip, yengine) (__chip_existence_map[xchip] &= ~(1<<yengine))
 

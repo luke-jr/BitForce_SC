@@ -2,7 +2,7 @@
  * JohnChengASIC.c
  *
  * Created: 24/03/2013 17:28:45
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #include "JohnChengASIC.h"
@@ -49,27 +49,36 @@ int DATAOUT;
 
 void SynchronizeSPI_Module(void)
 {
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS(1);
+	__MCU_ASIC_Deactivate_CS(2);
+	
 	__ASIC_WriteEngine(0, 0, 0, 0);
 	__ASIC_WriteEngine(0, 0, 0, 0);
 	__ASIC_WriteEngine(0, 0, 0, 0);
 	__ASIC_WriteEngine(0, 0, 0, 0);
+	
+	#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
+		__ASIC_WriteEngine(8, 0, 0, 0);
+		__ASIC_WriteEngine(8, 0, 0, 0);
+		__ASIC_WriteEngine(8, 0, 0, 0);
+		__ASIC_WriteEngine(8, 0, 0, 0);
+	#endif
 }
 
 //==================================================================
 void Write_SPI(int chip, int engine, int reg, int value)
 {
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((chip < 8) ? (1) : (2));
 	__ASIC_WriteEngine(chip, engine, reg, value);
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((chip < 8) ? (1) : (2));
 }
 
 //==================================================================
 int Read_SPI(int chip, int engine, int reg){
 	int res;
-	__MCU_ASIC_Activate_CS();
+	__MCU_ASIC_Activate_CS((chip < 8) ? (1) : (2));
 	res = __ASIC_ReadEngine(chip, engine, reg);
-	__MCU_ASIC_Deactivate_CS();
+	__MCU_ASIC_Deactivate_CS((chip < 8) ? (1) : (2));
 	return res;
 }
 

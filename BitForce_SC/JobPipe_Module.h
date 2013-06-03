@@ -2,7 +2,7 @@
  * JobPipe_Module.h
  *
  * Created: 08/10/2012 21:38:56
- *  Author: NASSER
+  *  Author: NASSER GHOSEIRI
  */ 
 #ifndef JOBPIPE_MODULE_H_
 #define JOBPIPE_MODULE_H_
@@ -13,10 +13,12 @@
 #define SHA256_Test_String  "2f33a240bd6785caed5b67b4122079dd9359004ae23c64512c5c2dfbce097b08"
 
 /// ************************** This is our Pipelined job processing system (holder of 2 jobs + 1 process)
-#define PIPE_MAX_BUFFER_DEPTH	 20
+#define PIPE_MAX_BUFFER_DEPTH	 40
 #define PIPE_JOB_BUFFER_OK		 0
 #define PIPE_JOB_BUFFER_FULL	 1
 #define PIPE_JOB_BUFFER_EMPTY	 2
+
+#define MAX_RESULTS_TO_SEND_AT_A_TIME_FROM_BUFFER 15
 
 unsigned int    __total_jobs_in_buffer;
 unsigned int	__total_buf_pipe_jobs_ever_received;
@@ -39,6 +41,7 @@ char			JobPipe__pipe_pop_job (void* __output_job_info);
 void*			JobPipe__pipe_get_buf_job_result(unsigned int iIndex);
 unsigned int	JobPipe__pipe_get_buf_job_results_count(void);
 void			JobPipe__pipe_set_buf_job_results_count(unsigned int iCount);
+void			JobPipe__pipe_skip_buf_job_results(unsigned int iTotalToSkip);
 void			JobPipe__pipe_flush_buffer(void);
 char			JobPipe__pipe_preview_next_job(void* __output_pipe_job_info);
 
@@ -51,5 +54,8 @@ void			JobPipe__set_interleaved_loading_progress_engine(char iVal);
 char			JobPipe__get_interleaved_loading_progress_engine(void);
 void			JobPipe__set_interleaved_loading_progress_finished(char iVal);
 char			JobPipe__get_interleaved_loading_progress_finished(void);
+
+// Functio made for performace test reasons
+void			JobPipe__test_buffer_shifter(void);
 
 #endif /* MCU_INITIALIZATION_H_ */

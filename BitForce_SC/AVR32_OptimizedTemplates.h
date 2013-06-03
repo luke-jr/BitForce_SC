@@ -2,7 +2,7 @@
  * AVR32_OptimizedTemplates.h
  *
  * Created: 19/01/2013 19:20:48
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 

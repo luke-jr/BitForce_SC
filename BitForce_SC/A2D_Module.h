@@ -3,7 +3,7 @@
  * A2D_Module.h
  *
  * Created: 08/10/2012 21:38:25
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #ifndef A2D_MODULE_H_

@@ -2,7 +2,7 @@
  * USBProtocol_Module.h
  *
  * Created: 13/10/2012 00:29:33
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 

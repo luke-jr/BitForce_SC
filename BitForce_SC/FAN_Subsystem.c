@@ -2,7 +2,7 @@
  * FAN_Subsystem.c
  *
  * Created: 11/02/2013 23:10:36
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 // Include standard definitions
@@ -14,6 +14,7 @@
 #include <avr32/io.h>
 #include "AVR32_OptimizedTemplates.h"
 #include "FAN_Subsystem.h"
+#include "ASIC_Engine.h"
 
 // Now to our codes
 volatile void FAN_SUBSYS_Initialize(void)
@@ -62,9 +63,14 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 	{
 		if (GLOBAL_CRITICAL_TEMPERATURE == TRUE)
 		{
-			if (iTempAveraged < 82) // Hysterysis
+			if (iTempAveraged < 60) // Hysterysis
 			{ 
 				GLOBAL_CRITICAL_TEMPERATURE = FALSE;
+				
+				// Also, restart the ASICs
+				#if defined(__ASICS_RESTART_AFTER_HIGH_TEMP_RECOVERY)
+					init_ASIC();				
+				#endif
 			}
 		}
 		else

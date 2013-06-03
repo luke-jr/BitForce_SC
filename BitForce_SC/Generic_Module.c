@@ -2,7 +2,7 @@
  * Generic_Module.c
  *
  * Created: 21/11/2012 00:54:04
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 
@@ -264,10 +264,10 @@ volatile unsigned int MCU_SC_GetDone(char iChip)
 	#endif
 }
 
-volatile void __MCU_ASIC_Activate_CS(void)
+volatile void __MCU_ASIC_Activate_CS(char iBank) // iBank can be 1 or 2
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
-		 __AVR32_ASIC_Activate_CS();
+		 __AVR32_ASIC_Activate_CS(iBank);
 	#elif defined( __COMPILING_FOR_STM32__)
 		 __STM32_ASIC_Activate_CS();
 	#elif defined( __COMPILING_FOR_PIC32__)
@@ -275,10 +275,10 @@ volatile void __MCU_ASIC_Activate_CS(void)
 	#endif
 }
  
-volatile void __MCU_ASIC_Deactivate_CS(void)
+volatile void __MCU_ASIC_Deactivate_CS(char iBank)  // iBank can be 1 or 2
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
-		 __AVR32_ASIC_Deactivate_CS();
+		 __AVR32_ASIC_Deactivate_CS(iBank);
 	#elif defined( __COMPILING_FOR_STM32__)
 		 __STM32_ASIC_Deactivate_CS();
 	#elif defined( __COMPILING_FOR_PIC32__)

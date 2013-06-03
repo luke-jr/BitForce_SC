@@ -2,7 +2,7 @@
  * Generic_Module.h
  *
  * Created: 12/10/2012 00:10:54
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 #ifndef GENERIC_MODULE_H_
 #define GENERIC_MODULE_H_
@@ -68,8 +68,8 @@ void	MCU_FAN_SetAccess();
 void	MCU_FAN_SetSpeed(char iSpeed);
 
 // Some ASIC definitions
-void    __MCU_ASIC_Activate_CS(void);
-void    __MCU_ASIC_Deactivate_CS(void);
+void    __MCU_ASIC_Activate_CS(char iBank);
+void    __MCU_ASIC_Deactivate_CS(char iBank);
 
 
 #endif /* GENERIC_MODULE_H_ */

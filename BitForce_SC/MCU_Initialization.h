@@ -2,7 +2,7 @@
  * MCU_Initialization.h
  *
  * Created: 08/10/2012 21:47:12
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #ifndef MCU_INITIALIZATION_H_

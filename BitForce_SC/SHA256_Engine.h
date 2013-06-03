@@ -2,7 +2,7 @@
  * SHA256_Engine.h
  *
  * Created: 10/01/2013 21:07:00
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 

@@ -2,7 +2,7 @@
  * A2D_Module.c
  *
  * Created: 08/10/2012 21:38:35
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #include "A2D_Module.h"

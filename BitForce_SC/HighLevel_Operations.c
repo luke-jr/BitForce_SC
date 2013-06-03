@@ -2,7 +2,7 @@
  * HighLevel_Operations.c
  *
  * Created: 10/01/2013 00:13:49
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #include "std_defs.h"
@@ -17,19 +17,21 @@
 #include "HighLevel_Operations.h"
 #include "FAN_Subsystem.h"
 #include "AVR32_OptimizedTemplates.h"
+#include "PipeProcessingKernel.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <avr32/io.h>
 
-volatile void HighLevel_Operations_Spin()
+volatile void Microkernel_Spin()
 {
 	// Nothing for the moment
 	// Reset Watchdog to prevent system reset. (Timeout for watchdog is 17ms)
 	WATCHDOG_RESET;	
 	
 	// Job-Pipe Scheduling
-	Flush_buffer_into_engines();	
+	PipeKernel_Spin();	
+
 	
 	// Scan XLINK Chain, to be executed every 1.2 seconds
 	/*
@@ -155,7 +157,7 @@ volatile void HighLevel_Operations_Spin()
 	
 	
 	// Engine monitoring Authority
-	#if defined(__ENGINE_ACTIVITY_SUPERVISION)
+	#if defined(__ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION)
 	{
 		// We perform this run every 200th attempt
 		static int iActualAttempt = 0;
@@ -190,13 +192,18 @@ volatile void HighLevel_Operations_Spin()
 					if (GLOBAL_ENGINE_PROCESSING_STATUS[xChip][yEngine] == FALSE) continue; // No need to check, as this engine is IDLE
 					
 					// Check operating time
-					if ((unsigned int)(MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[xChip][yEngine]) > ENGINE_MAXIMUM_BUSY_TIME)
+					if ((unsigned int)(MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[xChip][yEngine]) > __ENGINE_MAXIMUM_BUSY_TIME)
 					{
 						// Deactivate it
 						DECOMMISSION_PROCESSOR(xChip, yEngine);
 						bWasAnyEngineModified = TRUE;
-					}
-					
+					}					
+				}
+				
+				// Decomission chips if they have zero processors left
+				if (ASIC_get_chip_processor_count(xChip) == 0)
+				{
+					__chip_existence_map[xChip] = 0;
 				}
 			}
 			
@@ -204,12 +211,56 @@ volatile void HighLevel_Operations_Spin()
 			#if !defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
 				if (bWasAnyEngineModified == TRUE)
 				{
+					// First, update the chip count if necessary
+					unsigned int iNewChipCount = 0;
+					for (char umz = 0; umz < TOTAL_CHIPS_INSTALLED; umz++)
+					{
+						if ((__chip_existence_map[umz] & 0xFF) != 0) iNewChipCount++;
+					}
+					__internal_global_iChipCount = iNewChipCount; // This will affect the ASIC_get_chip_count function
+					
+									
+					// Proceed with nonce calculation
 					ASIC_calculate_engines_nonce_range();
 				}
 			#endif
 		}
 	}
-	#endif
+	#endif	
 	
+	// Also update the LEDs (on small board model)
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
+		static char itAttempt = 0;
+		
+		if (itAttempt == 150)
+		{
+			itAttempt = 0;
+			if (ASIC_does_chip_exist(0) == TRUE) MCU_LED_Set(1); else MCU_LED_Reset(1);
+			if (ASIC_does_chip_exist(1) == TRUE) MCU_LED_Set(2); else MCU_LED_Reset(2);
+			if (ASIC_does_chip_exist(2) == TRUE) MCU_LED_Set(3); else MCU_LED_Reset(3);
+			if (ASIC_does_chip_exist(3) == TRUE) MCU_LED_Set(4); else MCU_LED_Reset(4);
+			if (ASIC_does_chip_exist(4) == TRUE) MCU_LED_Set(5); else MCU_LED_Reset(5);
+			if (ASIC_does_chip_exist(5) == TRUE) MCU_LED_Set(6); else MCU_LED_Reset(6);
+			if (ASIC_does_chip_exist(6) == TRUE) MCU_LED_Set(7); else MCU_LED_Reset(7);
+			if (ASIC_does_chip_exist(7) == TRUE) MCU_LED_Set(8); else MCU_LED_Reset(8);			
+		}
+		else
+		{
+			itAttempt++;
+		}
+	#endif
+		
+	#if defined(GENERAL_ASIC_RESET_ON_LOW_ENGINE_COUNT)
+		// Check the time from last 
+		// What was the last job produced on Queue? Was it more than like 1 minute ago?
+		if (MACRO_GetTickCountRet - GLOBAL_LastJobResultProduced > 60000000) 
+		{
+			if (ASIC_get_processor_count() < (GLOBAL_TotalEnginesDetectedOnStartup / 2))
+			{
+				// Reset the ASICs -- Something must have gone wrong...
+				init_ASIC();
+			}			
+		}		
+	#endif	
 }
 
