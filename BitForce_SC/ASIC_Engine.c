@@ -2139,6 +2139,12 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 	volatile int iTotalChipsHovered = 0;
 	pjob_packet pjp = (pjob_packet)(pJobPacket);
 	
+	// Do we need to export spreads?
+	#if defined(__EXPORT_ENGINE_RANGE_SPREADS)
+		__ENGINE_LOWRANGE_SPREADS[iChip][iEngine] = _LowRange;
+		__ENGINE_HIGHRANGE_SPREADS[iChip][iEngine] = _HighRange;
+	#endif
+	
 	// Activate the SPI
 	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	NOP_OPERATION;

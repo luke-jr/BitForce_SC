@@ -230,6 +230,11 @@ void MCU_Main_Loop()
 	
 	for (umx = 0; umx < 1024; umx++) sz_cmd[umx] = 0;
 	
+	// Clear logg buffer if needed
+	#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
+		strcpy(szDecommLog,"");	
+	#endif
+	
 	//////////////////////////////////////////
 	// Turn the LED on
 	//////////////////////////////////////////
@@ -246,7 +251,7 @@ void MCU_Main_Loop()
 		if (XLINK_ARE_WE_MASTER)
 		{
 			// We listen to USB
-			i = 1000;
+			i = 3;
 			while (!USB_inbound_USB_data() && i-- > 1);
 			
 			// Check, if 'i' equals zero, we discard the actual command buffer

@@ -31,7 +31,6 @@ volatile void Microkernel_Spin()
 	
 	// Job-Pipe Scheduling
 	PipeKernel_Spin();	
-
 	
 	// Scan XLINK Chain, to be executed every 1.2 seconds
 	/*

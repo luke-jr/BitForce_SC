@@ -56,6 +56,7 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 			// Declare our variables
 			unsigned int iTotalEnginesCount = ASIC_get_processor_count();
 			
+			DEBUG_TraceTimer0 = MACRO_GetTickCountRet;			
 					
 			// Were we processing a job from queue before? If not, then check for engines availability.
 			// If they are processing, we just exit the function (ZDX is at work or something else)
@@ -67,6 +68,10 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 				{
 					// Before we exit, if __PROGRESSIV_MONITORING is enabled, we need to decommission bad chips
 					#if defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)
+					
+						// For logging reasons
+						char szTempEX[128];
+						
 						// Ok, we check engines. If anyone has been working extra hours, he has to go... :)
 						for (char uzChip = 0; uzChip < TOTAL_CHIPS_INSTALLED; uzChip++)
 						{
@@ -91,6 +96,12 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 										// Decomission directly
 										ASIC_reset_engine(uzChip, uzEngine);
 										DECOMMISSION_PROCESSOR(uzChip, uzEngine);
+										
+										#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
+											sprintf(szTempEX,"CHIP %d ENGINE %d DECOMMISSIONED!\n", uzChip, uzEngine);
+											strcat(szDecommLog, szTempEX);
+										#endif
+										
 										ASIC_calculate_engines_nonce_range();										
 									}
 								}
@@ -137,6 +148,8 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 					return;	
 				}																	
 			}					
+			
+			DEBUG_TraceTimer1 = MACRO_GetTickCountRet - DEBUG_TraceTimer0;
 			
 			// Loading job into engines
 			for (char iHoverChip = 0; iHoverChip < TOTAL_CHIPS_INSTALLED; iHoverChip++)			
@@ -261,6 +274,14 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 				}				
 			}
 			
+			DEBUG_TraceTimer2 = MACRO_GetTickCountRet - DEBUG_TraceTimer0;
+			DEBUG_TraceTimers[DEBUG_TraceTimersIndex] = DEBUG_TraceTimer2;
+			DEBUG_TraceTimersIndex += 1;
+			if (DEBUG_TraceTimersIndex == 7) DEBUG_TraceTimersIndex = 0;
+			
+			
+			
+			
 			// Ok, all the engines checked and nonces were collect if necessary (furthermore, next job in queue was issued)
 			// Now, if all engines have finished processing the actual job, then it's time to push it to the results buffer
 			if (iTotalEnginesFinishedActiveJob >= iTotalEnginesCount)
@@ -300,7 +321,7 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 				if (__buf_job_results_count < PIPE_MAX_BUFFER_DEPTH) __buf_job_results_count++;				
 				
 				// If __buf_job_result is 4, then sent Mark2
-				if (__buf_job_results_count == 8)
+				if (__buf_job_results_count == 4)
 				{
 					if (iMark2 == 0) iMark2 = MACRO_GetTickCountRet;
 				}				
@@ -343,7 +364,10 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 					_prev_job_was_from_pipe = FALSE;
 				}				
 			}
+
 		}		
+		
+		
 	
 	#elif defined(__IMMEDIATE_ENGINE_JOB_SUBMISSION)
 	

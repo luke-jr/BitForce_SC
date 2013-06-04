@@ -21,9 +21,9 @@
 
 /*************** Product Model *********************/
 // #define __PRODUCT_MODEL_JALAPENO__
-#define    __PRODUCT_MODEL_LITTLE_SINGLE__
-// #define __PRODUCT_MODEL_SINGLE__
-// #define __PRODUCT_MODEL_MINIRIG__
+//#define    __PRODUCT_MODEL_LITTLE_SINGLE__
+#define __PRODUCT_MODEL_SINGLE__
+//#define __PRODUCT_MODEL_MINIRIG__
 
 /********* TOTAL CHIPS INSTALLED ON BOARD **********/
 /////////////////////////////////////////////////////////////////////////
@@ -59,16 +59,23 @@
 /////////////////////////////////////////////////////////////////////////
 // -- This option will provide detailed information when PROTOCOL_REQ_INFO_REQ
 // -- regarding chips behavior
-// #define	__CHIP_DIAGNOSTICS_VERBOSE		1
+//#define	__CHIP_DIAGNOSTICS_VERBOSE		1
 //
 // -- Also this option enables chip by chip diagnostics
-// #define __CHIP_BY_CHIP_DIAGNOSTICS		1 
+//#define __CHIP_BY_CHIP_DIAGNOSTICS		1 
 // #define __ENGINE_BY_ENGINE_DIAGNOSTICS	1
-// #define __EXPORT_ENGINE_RANGE_SPREADS	1
+//#define __EXPORT_ENGINE_RANGE_SPREADS	1
+//-- Reports the busy engines on InfoRequest command
+#define __REPORT_BUSY_ENGINES				1
+#define __SHOW_DECOMMISSIONED_ENGINES_LOG	1
 
 #if defined(__EXPORT_ENGINE_RANGE_SPREADS)
 	volatile unsigned int __ENGINE_LOWRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
 	volatile unsigned int __ENGINE_HIGHRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
+#endif
+
+#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
+	volatile char szDecommLog[4096];
 #endif
 
 /////////////////////////////////////////////////////////////////////////
@@ -87,18 +94,18 @@
 // ACTUAL VALUES WOULD BE -- const unsigned int __ASIC_FREQUENCY_WORDS [10] = {0x0, 0xFFFF, 0xFFFD, 0xFFF5, 0xFFD5, 0xFF55, 0xFD55, 0xF555, 0xD555, 0x5555};
 extern const unsigned int __ASIC_FREQUENCY_WORDS[10];  // Values here are known...
 extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure frequency for each word...
-#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 
+#define __ASIC_FREQUENCY_ACTUAL_INDEX   9 // 
 #define __MAXIMUM_FREQUENCY_INDEX       9
 
 /////////////////////////////////////////////////////////////////////////
 // Engine activity supervision
 // Enabling this feature will force the MCU to decommission the malfunctioning
 // engines detected on runtime
-//#define __ENGINE_ENABLE_TIMESTAMPING				1 // Enable timestamping, meaning we mark the job initiation and termination
+#define __ENGINE_ENABLE_TIMESTAMPING				1 // Enable timestamping, meaning we mark the job initiation and termination
 //#define __ENGINE_MAXIMUM_BUSY_TIME					4000000 // 4 Seconds is max
 //#define __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION	1		// 
-//#define __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION   1 // The same as Activity-Supervision, except that it's used for progressive engine job loading system
-//#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      300000 // 300 milliseconds
+#define __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION   1 // The same as Activity-Supervision, except that it's used for progressive engine job loading system
+#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      300000 // 300 milliseconds
 
 /////////////////////////////////////////////////////////////////////////
 // Activate job-load balancing
@@ -146,7 +153,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 
 /////////////////////////////////////////////////////////////////////////
 // FAN SUBSYSTEM: FAN REMAIN AT FULL SPEED
-#define FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED	1
+//#define FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED	1
 
 #if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
 	#if !defined(FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED)
@@ -400,6 +407,13 @@ unsigned int __chip_existence_map[TOTAL_CHIPS_INSTALLED]; // Bit 0 to Bit 16 in 
 	
 // Our sleep function
 volatile void Sleep(unsigned int iSleepPeriod);
+
+// For Debug
+volatile unsigned int DEBUG_TraceTimer0;
+volatile unsigned int DEBUG_TraceTimer1;
+volatile unsigned int DEBUG_TraceTimer2;
+volatile unsigned int DEBUG_TraceTimers[8];
+volatile unsigned int DEBUG_TraceTimersIndex;
 
 // Assembly NOP operation
 #ifdef __OPERATING_FREQUENCY_64MHz__

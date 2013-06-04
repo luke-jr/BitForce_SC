@@ -143,6 +143,46 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"Mark1: %d, Mark2: %d, Diff: %d\n", iMark1, iMark2, (unsigned int)(iMark2 - iMark1));
 	strcat(szInfoReq, szTemp);
 	
+	sprintf(szTemp,"DbgTraceTimers %d,%d,%d,%d,%d,%d,%d,%d\n",
+			DEBUG_TraceTimers[0],
+			DEBUG_TraceTimers[1],
+			DEBUG_TraceTimers[2],
+			DEBUG_TraceTimers[3],
+			DEBUG_TraceTimers[4],
+			DEBUG_TraceTimers[5],
+			DEBUG_TraceTimers[6],
+			DEBUG_TraceTimers[7]
+			);
+	strcat(szInfoReq, szTemp);
+	
+	// Report all busy engines
+	#if defined(__REPORT_BUSY_ENGINES)
+		strcat(szInfoReq,"Engines processings:\n");
+		for (char nmc = 0; nmc < TOTAL_CHIPS_INSTALLED; nmc++)
+		{
+			for (char nme = 0; nme < 16; nme++)
+			{
+				#if defined(DO_NOT_USE_ENGINE_ZERO)
+					if (nme == 0) continue;
+				#endif
+				
+				// Is this engine busy
+				if (ASIC_is_engine_processing(nmc, nme))
+				{
+					sprintf(szTemp,"\tCHIP %d, ENGINE %d is PROCESSING\n", nmc, nme);
+					strcat(szInfoReq, szTemp);
+				}
+			}
+		}	
+	#endif
+	
+	// Report all busy engines
+	#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
+		strcat(szInfoReq, szDecommLog);		
+	#endif
+	
+	
+	// Proceed
 	#if defined(__REPORT_TEST_MINING_SPEED)
 		// Our job-packet by default (Expected nonce is 8D9CB675 - Hence counter range is 8D9C670 to 8D9C67A)
 		static job_packet jp;
@@ -199,6 +239,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 			JobPipe__pipe_push_job(&jp);
 			JobPipe__pipe_push_job(&jp);
 			JobPipe__pipe_push_job(&jp);
+			Microkernel_Spin();
 
 			volatile unsigned int iActualTPP_Count = 0;		
 			char	 bTimeoutDetected = FALSE;
@@ -222,15 +263,15 @@ PROTOCOL_RESULT Protocol_info_request(void)
 				
 				// Proceed
 				WATCHDOG_RESET;
-				iMicroKernelT1 = MACRO_GetTickCountRet;
+				//iMicroKernelT1 = MACRO_GetTickCountRet;
 				Microkernel_Spin();
-				iMicroKernelT2 = MACRO_GetTickCountRet - iMicroKernelT1 + 1;
+				//iMicroKernelT2 = MACRO_GetTickCountRet - iMicroKernelT1 + 1;
 				
-				if (iMicroKernelT2 > iMicroKernelTMAX) 
-				{
-					iMicroKernelTMAX = iMicroKernelT2;
-					iPA = JobPipe__pipe_get_buf_job_results_count();
-				}					
+				//if (iMicroKernelT2 > iMicroKernelTMAX) 
+				//{
+				//	iMicroKernelTMAX = iMicroKernelT2;
+				//	iPA = JobPipe__pipe_get_buf_job_results_count();
+				//}					
 				
 				// If job count is one then set the thing
 				if (JobPipe__pipe_get_buf_job_results_count() == 1)
@@ -247,8 +288,8 @@ PROTOCOL_RESULT Protocol_info_request(void)
 				}
 			}
 			
-			sprintf(szTemp,"MicroKernel TMAX: %dus , iPA: %d\n", iMicroKernelT2,iPA);
-			strcat(szInfoReq, szTemp);
+			//sprintf(szTemp,"MicroKernel TMAX: %dus , iPA: %d\n", iMicroKernelT2,iPA);
+			//strcat(szInfoReq, szTemp);
 		
 			if (bTimeoutDetected == TRUE)
 			{
@@ -257,7 +298,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 			}
 			else
 			{
-				unsigned int iTotalPipeTimeItTook = iActualTPP_Count;
+				unsigned int iTotalPipeTimeItTook =  iActualTPP_Count;
 				float fTotalPipeSpeed = ((4.2949 * 1000000) / (iTotalPipeTimeItTook));
 				sprintf(szTemp,"PIPE Mining Speed: %.2f GH/s\n", fTotalPipeSpeed);
 				strcat(szInfoReq, szTemp);				
@@ -403,9 +444,9 @@ PROTOCOL_RESULT Protocol_info_request(void)
 						xL2 = MACRO_GetTickCountRet;
 						while (TRUE)
 						{
-							 __MCU_ASIC_Activate_CS();
+							 __MCU_ASIC_Activate_CS((umx < 8) ? 1 : 2);
 						     if (ASIC_has_engine_finished_processing(umx, i_engine) == TRUE) break;
-							 __MCU_ASIC_Deactivate_CS();
+							 __MCU_ASIC_Deactivate_CS((umx < 8) ? 1 : 2);
 							 
 							 WATCHDOG_RESET;
 							 if (MACRO_GetTickCountRet - xL2 > 250000)
