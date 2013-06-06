@@ -189,6 +189,9 @@ int main(void)
 	unsigned int iNonceCount;
 	ASIC_get_job_status(iNonceValues, &iNonceCount, FALSE, 0);
 	
+	// Did we reset the ASICs internally?
+	GLOBAL_INTERNAL_ASIC_RESET_EXECUTED = FALSE;
+	
 	// Go to our protocol main loop
 	MCU_Main_Loop();
 	return(0);

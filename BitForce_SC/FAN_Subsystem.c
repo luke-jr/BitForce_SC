@@ -25,18 +25,6 @@ volatile void FAN_SUBSYS_Initialize(void)
 	GLOBAL_CRITICAL_TEMPERATURE = FALSE;
 }
 
-#define FAN_CONTROL_BYTE_VERY_SLOW			(0b0010)
-#define FAN_CONTROL_BYTE_SLOW				(0b0100)
-#define FAN_CONTROL_BYTE_MEDIUM				(0b1000)
-#define FAN_CONTROL_BYTE_FAST				(0b0001)
-#define FAN_CONTROL_BYTE_VERY_FAST			(0b1111)
-#define FAN_CONTROL_BYTE_REMAIN_FULL_SPEED	(FAN_CTRL0 | FAN_CTRL1 | FAN_CTRL2 | FAN_CTRL3)	// Turn all mosfets off...
-
-#define FAN_CTRL0	 0b00001
-#define FAN_CTRL1	 0b00010
-#define FAN_CTRL2	 0b00100
-#define FAN_CTRL3	 0b01000
-
 volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 {
 	// We execute this function every 50th call

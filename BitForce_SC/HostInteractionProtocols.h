@@ -100,6 +100,7 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK(void);
 // Returns only the status of the last processed job
 // from the buffer, and will not initiate the next job process
 PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void);
+volatile void __aux_PrintResultToBuffer(char* szBuffer, const void* pResult, const unsigned int iStartPosition, unsigned int* iEndPositionPlusOne);
 
 // This function flushes the P2P FIFO
 PROTOCOL_RESULT Protocol_PIPE_BUF_FLUSH(void);

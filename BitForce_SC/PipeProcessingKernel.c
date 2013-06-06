@@ -91,7 +91,7 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 								// Is it processing for longer than it should have had?
 								if (bIsEngineProcessing)
 								{
-									if (MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[uzChip][uzEngine] > (2*__ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME))
+									if (MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[uzChip][uzEngine] > (__ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME))
 									{
 										// Decomission directly
 										ASIC_reset_engine(uzChip, uzEngine);
@@ -102,7 +102,10 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 											strcat(szDecommLog, szTempEX);
 										#endif
 										
-										ASIC_calculate_engines_nonce_range();										
+										ASIC_calculate_engines_nonce_range();	
+										
+										// Also update total engines count
+										iTotalEnginesCount -= 1;									
 									}
 								}
 							}
@@ -244,12 +247,22 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 								{
 									// We Decommission the engine while saying that the job was completed here. We also recalculate the nonce ranges
 									DECOMMISSION_PROCESSOR(iHoverChip, iHoverEngine);
+									
+									#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
+										char szTempEX[128];
+										sprintf(szTempEX,"CHIP %d ENGINE %d DECOMMISSIONED!\n", iHoverChip, iHoverEngine);
+										strcat(szDecommLog, szTempEX);
+									#endif
+										
 								
 									// Recalculate
 									ASIC_calculate_engines_nonce_range();
 								
 									// We also tell the system that the engine was finished (so the work can proceed)
 									iTotalEnginesTakenInQueueJob++;
+									
+									// Also reduce the total engines count
+									iTotalEnginesCount--;
 								}
 								else
 								{

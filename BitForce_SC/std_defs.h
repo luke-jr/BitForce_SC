@@ -38,10 +38,6 @@
 // Some useful macros
 
 /////////////////////////////////////////////////////////////////////////
-// Total of runs we perform in diagnostics
-#define __TOTAL_DIAGNOSTICS_RUN  40
-
-/////////////////////////////////////////////////////////////////////////
 // This means DO NOT USE ENGINE 0. It's needed for the actual Version
 #define DO_NOT_USE_ENGINE_ZERO				1
 
@@ -66,8 +62,9 @@
 // #define __ENGINE_BY_ENGINE_DIAGNOSTICS	1
 //#define __EXPORT_ENGINE_RANGE_SPREADS	1
 //-- Reports the busy engines on InfoRequest command
-#define __REPORT_BUSY_ENGINES				1
-#define __SHOW_DECOMMISSIONED_ENGINES_LOG	1
+// #define __REPORT_BUSY_ENGINES				1
+//#define __SHOW_DECOMMISSIONED_ENGINES_LOG	1
+//#define __SHOW_PIPE_TO_USB_LOG				1
 
 #if defined(__EXPORT_ENGINE_RANGE_SPREADS)
 	volatile unsigned int __ENGINE_LOWRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
@@ -94,7 +91,14 @@
 // ACTUAL VALUES WOULD BE -- const unsigned int __ASIC_FREQUENCY_WORDS [10] = {0x0, 0xFFFF, 0xFFFD, 0xFFF5, 0xFFD5, 0xFF55, 0xFD55, 0xF555, 0xD555, 0x5555};
 extern const unsigned int __ASIC_FREQUENCY_WORDS[10];  // Values here are known...
 extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure frequency for each word...
-#define __ASIC_FREQUENCY_ACTUAL_INDEX   9 // 
+
+#if defined(__PRODUCT_MODEL_JALAPENO)
+	#define __ASIC_FREQUENCY_ACTUAL_INDEX   1 // 180MHz for Jalapeno
+#else	
+	// #define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 274MHz for the rest
+	#define __ASIC_FREQUENCY_ACTUAL_INDEX   9 // 274MHz for the rest
+#endif
+
 #define __MAXIMUM_FREQUENCY_INDEX       9
 
 /////////////////////////////////////////////////////////////////////////
@@ -105,15 +109,54 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 //#define __ENGINE_MAXIMUM_BUSY_TIME					4000000 // 4 Seconds is max
 //#define __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION	1		// 
 #define __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION   1 // The same as Activity-Supervision, except that it's used for progressive engine job loading system
-#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      300000 // 300 milliseconds
 
-/////////////////////////////////////////////////////////////////////////
+#if TOTAL_CHIPS_INSTALLED == 16
+	#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      190000 // 190 milliseconds
+#elif TOTAL_CHIPS_INSTALLED == 8
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__)
+		#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      160000 // 160 milliseconds
+	#elif defined(__PRODUCT_MODEL_JALAPENO__)
+		#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      800000 // 800 milliseconds	
+	#endif
+#else
+	// .. Nothing
+#endif
+
+/////////////////////////////////////
 // Activate job-load balancing
 #define __ACTIVATE_JOB_LOAD_BALANCING	1
 
-/////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////
 // Report the mining speed by testing it...
 #define __REPORT_TEST_MINING_SPEED		1
+
+
+
+/*********************************** DIAGNOSTICS *********************************/
+// Full Nonce Range diagnostics ( Runs each engine with 8 nonce job, 
+// and verifies the results
+
+//// BEGIN
+#define __RUN_HEAVY_DIAGNOSTICS_ON_EACH_ENGINE	1
+#define __HEAVY_DIAGNOSTICS_STRICT_8_NONCES	1
+//	#define __HEAVY_DIAGNOSTICS_MODERATE_7_NONCES	1
+//// END
+
+//// BEGIN
+//#define __RUN_SCATTERED_DIAGNOSTICS 		// Sends 45 different jobs and checks if all nonces were detected.
+#if defined(__PRODUCT_MODEL_MINIRIG__) || defined(__PRODUCT_MODEL_SINGLE__)
+	#define __TOTAL_SCATTERED_JOBS_TO_TEST 45
+#elif defined(__PRODUCT_MODEL_LITTLE_SINGLE__)
+	#define __TOTAL_SCATTERED_JOBS_TO_TEST 13
+#else // Jalapeno model
+	#define __TOTAL_SCATTERED_JOBS_TO_TEST 5
+#endif
+//// END
+
+/////////////////////////////////////////////////////////////////////////
+// Total of runs we perform in diagnostics (for Engine busy-fault error)
+#define ASIC_DIAGNOSE_ENGINE_REMAINING_BUSY 1
+#define __TOTAL_DIAGNOSTICS_RUN  10
 
 /////////////////////////////////////////////////////////////////////////
 // Report balancing 
@@ -153,13 +196,15 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 
 /////////////////////////////////////////////////////////////////////////
 // FAN SUBSYSTEM: FAN REMAIN AT FULL SPEED
-//#define FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED	1
+// #define FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED	1
 
+/*
 #if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
 	#if !defined(FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED)
 		#error For this model of product, FAN subsystem is best remained at high-speed
 	#endif
 #endif
+*/
 
 ///////////////////////////////////////////////////////////////////////// 
 // Reinitialize the ASICs after high-temp recovery
@@ -307,6 +352,9 @@ volatile UL32 MAST_TICK_COUNTER;
 
 void IncrementTickCounter(void);
 
+// Was internal reset activated?
+unsigned char GLOBAL_INTERNAL_ASIC_RESET_EXECUTED;
+
 // Other definitions
 #define TRUE		1
 #define FALSE		0
@@ -407,6 +455,24 @@ unsigned int __chip_existence_map[TOTAL_CHIPS_INSTALLED]; // Bit 0 to Bit 16 in 
 	
 // Our sleep function
 volatile void Sleep(unsigned int iSleepPeriod);
+
+// How long did it take to sent the results data to USB?
+volatile unsigned int GLOBAL_BufResultToUSBLatency;
+volatile unsigned int GLOBAL_USBToHostLatency;
+volatile unsigned int GLOBAL_ResBufferCompilationLatency;
+
+// FAN Controls
+#define FAN_CONTROL_BYTE_VERY_SLOW			(0b0010)
+#define FAN_CONTROL_BYTE_SLOW				(0b0100)
+#define FAN_CONTROL_BYTE_MEDIUM				(0b1000)
+#define FAN_CONTROL_BYTE_FAST				(0b0001)
+#define FAN_CONTROL_BYTE_VERY_FAST			(0b1111)
+#define FAN_CONTROL_BYTE_REMAIN_FULL_SPEED	(FAN_CTRL0 | FAN_CTRL1 | FAN_CTRL2 | FAN_CTRL3)	// Turn all mosfets off...
+
+#define FAN_CTRL0	 0b00001
+#define FAN_CTRL1	 0b00010
+#define FAN_CTRL2	 0b00100
+#define FAN_CTRL3	 0b01000
 
 // For Debug
 volatile unsigned int DEBUG_TraceTimer0;

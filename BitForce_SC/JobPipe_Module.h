@@ -18,7 +18,7 @@
 #define PIPE_JOB_BUFFER_FULL	 1
 #define PIPE_JOB_BUFFER_EMPTY	 2
 
-#define MAX_RESULTS_TO_SEND_AT_A_TIME_FROM_BUFFER 15
+#define MAX_RESULTS_TO_SEND_AT_A_TIME_FROM_BUFFER 16
 
 unsigned int    __total_jobs_in_buffer;
 unsigned int	__total_buf_pipe_jobs_ever_received;

@@ -109,7 +109,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
 	
 	// What is our information request?
-	char szInfoReq[8024];
+	char szInfoReq[16384];
 	char szTemp[256];
 	
 	strcpy(szInfoReq,"DEVICE: BitFORCE SC\n");
@@ -133,6 +133,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	unsigned int  iNonceCount;
 	
 	
+	/*
 	unsigned int iTMTX = MACRO_GetTickCountRet;
 	JobPipe__test_buffer_shifter();
 	unsigned int iTMTX2 = MACRO_GetTickCountRet - iTMTX;
@@ -153,6 +154,20 @@ PROTOCOL_RESULT Protocol_info_request(void)
 			DEBUG_TraceTimers[6],
 			DEBUG_TraceTimers[7]
 			);
+	strcat(szInfoReq, szTemp);
+	*/
+	
+	#if defined(__SHOW_PIPE_TO_USB_LOG)
+		sprintf(szTemp, "BUFFER to HOST Took: %d us\n", GLOBAL_BufResultToUSBLatency);
+		strcat(szInfoReq, szTemp);		
+		sprintf(szTemp, "-- USB to HOST latency: %d us\n", GLOBAL_USBToHostLatency);
+		strcat(szInfoReq, szTemp);		
+		sprintf(szTemp, "-- BUFFER compilation: %d us\n", GLOBAL_ResBufferCompilationLatency);
+		strcat(szInfoReq, szTemp);
+	#endif
+		
+	// Did we internally reset the ASICS?
+	sprintf(szTemp,"IAR Executed: %s\n", (GLOBAL_INTERNAL_ASIC_RESET_EXECUTED == TRUE) ? "YES" : "NO");
 	strcat(szInfoReq, szTemp);
 	
 	// Report all busy engines
@@ -234,7 +249,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 		
 		// Do we test pipe?
 		#if defined(__TEST_PIPE_PERFORMANCE)
-		
+	
 			JobPipe__pipe_set_buf_job_results_count(0);
 			JobPipe__pipe_push_job(&jp);
 			JobPipe__pipe_push_job(&jp);
@@ -308,10 +323,9 @@ PROTOCOL_RESULT Protocol_info_request(void)
 				
 	#endif
 	
-	
-		
-	
 	#if defined(__CHIP_FREQUENCY_DETECT_AND_REPORT)
+		unsigned int iTheoreticalMaxSpeed = 0;
+		
 		for (char umx = 0; umx < TOTAL_CHIPS_INSTALLED; umx++)
 		{		
 			// Reset watchdog
@@ -327,7 +341,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 			#if !defined(__LIVE_FREQ_DETECTION)
 			
 				// Report what we had detected before
-				sprintf(szTemp,"PROCESSOR %d: %d engines @ %d MHz\n", umx, ASIC_get_chip_processor_count(umx) ,GLOBAL_CHIP_FREQUENCY_INFO[umx]);
+				sprintf(szTemp,"PROCESSOR %d: %d engines @ %d MHz -- MAP: %04X\n", umx, ASIC_get_chip_processor_count(umx) ,GLOBAL_CHIP_FREQUENCY_INFO[umx], (__chip_existence_map[umx] & 0x0FFFF));
 				strcat(szInfoReq, szTemp);
 			#else
 			
@@ -358,11 +372,21 @@ PROTOCOL_RESULT Protocol_info_request(void)
 					// We have a good engine, test it
 					int iDetectedFreq = 0;
 					iDetectedFreq = ASIC_tune_chip_to_frequency(umx, iGoodEnginesIndex, TRUE);
-					sprintf(szTemp,"PROCESSOR %d: %d engines @ %d MHz\n", umx, ASIC_get_chip_processor_count(umx) , (iDetectedFreq / 1000000));
+					
+					sprintf(szTemp,"PROCESSOR %d: %d engines @ %d MHz -- MAP: %04X\n", umx, 
+							ASIC_get_chip_processor_count(umx), 
+							(iDetectedFreq / 1000000), 
+							(__chip_existence_map[umx] & 0x0FFFF));
+							
 					strcat(szInfoReq, szTemp);
+					iTheoreticalMaxSpeed += (ASIC_get_chip_processor_count(umx) * (iDetectedFreq / 1000000));
 				}
+				
 			#endif 
 		}
+		
+		sprintf(szTemp,"THEORETICAL MAX %d MH/s\n", iTheoreticalMaxSpeed);
+		strcat(szInfoReq, szTemp);
 	
 	#endif
 	
@@ -1611,16 +1635,35 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	// Are we processing something?
 	unsigned int  found_nonce_list[8];
 	char found_nonce_count;
+	
+	// How many jobs to take? The smallest between 15 and "total results in buffer"
+	unsigned int iTotalResultsToTake = 0;
+	unsigned char bHaveMoreResultsForNextTransaction = FALSE;
+	
+	if (JobPipe__pipe_get_buf_job_results_count() <= MAX_RESULTS_TO_SEND_AT_A_TIME_FROM_BUFFER)
+	{
+		iTotalResultsToTake = JobPipe__pipe_get_buf_job_results_count();
+	}
+	else
+	{
+		iTotalResultsToTake = MAX_RESULTS_TO_SEND_AT_A_TIME_FROM_BUFFER;
+		bHaveMoreResultsForNextTransaction = TRUE;
+	}
 
 	// How many results?
-	sprintf(sz_temp,"INPROCESS:%d\n", (PipeKernel_WasPreviousJobFromPipe() == TRUE) ? 1 : 0);
+	sprintf(sz_temp,"INPROCESS:%d\n", ((PipeKernel_WasPreviousJobFromPipe() == TRUE) || (bHaveMoreResultsForNextTransaction == TRUE)) ? 1 : 0);
 	strcat(sz_rep, sz_temp);
 		
-	sprintf(sz_temp,"COUNT:%d\n", JobPipe__pipe_get_buf_job_results_count());
+	//sprintf(sz_temp,"COUNT:%d\n", JobPipe__pipe_get_buf_job_results_count());
+	sprintf(sz_temp,"COUNT:%d\n", iTotalResultsToTake);	
 	strcat(sz_rep, sz_temp);
 
-	// How many jobs to take? The smallest between 15 and "total results in buffer"
-	char iTotalResultsToTake = 0;	
+	// What is our last index?
+	unsigned int iActualTerminationIndex = strlen(sz_rep);
+
+	GLOBAL_BufResultToUSBLatency = MACRO_GetTickCountRet;
+	GLOBAL_ResBufferCompilationLatency = MACRO_GetTickCountRet;
+	
 	
 	// Ok, return the last result as well
 	if (JobPipe__pipe_get_buf_job_results_count() == 0)
@@ -1629,23 +1672,17 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	}
 	else
 	{
-		if (JobPipe__pipe_get_buf_job_results_count() <= MAX_RESULTS_TO_SEND_AT_A_TIME_FROM_BUFFER)
-		{
-			iTotalResultsToTake = JobPipe__pipe_get_buf_job_results_count();
-		}
-		else
-		{
-			iTotalResultsToTake = MAX_RESULTS_TO_SEND_AT_A_TIME_FROM_BUFFER;
-		}
-		
-		
 		// Now post them one by one
 		for (i_cnt = 0; i_cnt < iTotalResultsToTake; i_cnt++)
 		{
 			// Get our job
 			pbuf_job_result_packet pjob_res = (pbuf_job_result_packet)(JobPipe__pipe_get_buf_job_result(i_cnt));
 			
+			// Add it to stream
+			__aux_PrintResultToBuffer(sz_rep, pjob_res, iActualTerminationIndex, &iActualTerminationIndex);
+			
 			// Also say which midstate and nonce-range is in process
+			/*
 			stream_to_hex(pjob_res->midstate , sz_temp2, 32, &istream_len);
 			sz_temp2[istream_len] = 0;
 			stream_to_hex(pjob_res->block_data, sz_temp3, 12, &istream_len);
@@ -1691,6 +1728,7 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 
 			// In the end, add the <LF>
 			strcat(sz_rep,"\n");
+			*/
 		}
 	}
 
@@ -1700,11 +1738,15 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	volatile int iStrLen = 0;
 	iStrLen = strlen(sz_rep);
 	
+	// Set compilation latency
+	GLOBAL_ResBufferCompilationLatency = MACRO_GetTickCountRet - GLOBAL_ResBufferCompilationLatency;
 
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
 	{
+		GLOBAL_USBToHostLatency = MACRO_GetTickCountRet;
 		USB_send_string(sz_rep);  // Send it to USB
+		GLOBAL_USBToHostLatency = MACRO_GetTickCountRet - GLOBAL_USBToHostLatency;
 	}		
 	else // We're a slave... send it by XLINK
 	{
@@ -1719,12 +1761,101 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 	// Also, we clear the results buffer
 	JobPipe__pipe_skip_buf_job_results(iTotalResultsToTake);
 	
+	// Also say how long it has taken
+	GLOBAL_BufResultToUSBLatency = MACRO_GetTickCountRet - GLOBAL_BufResultToUSBLatency;
+	
 	// Also Flush jobs into engines
-	PipeKernel_Spin();
+	// PipeKernel_Spin();
 	
 	// Return the result...
 	return res;
 }
+
+// Accelerate buffer compilation 
+const unsigned char __aux_CharMap[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+#define _AUX_LEFT_HEX(x)   (__aux_CharMap[((x & 0xF0) >> 4)]) 
+#define _AUX_RIGHT_HEX(x)  (__aux_CharMap[(x & 0x0F)]) 
+
+volatile void __aux_PrintResultToBuffer(char* szBuffer, const void* pResult, const unsigned int iStartPosition, unsigned int* iEndPositionPlusOne)
+{
+	// We have the job result
+	volatile pbuf_job_result_packet pjob_res = (pbuf_job_result_packet)(pResult);
+	
+	// Ok, we start by outputting the midstate, starting from position 
+	volatile unsigned int iHoverPos = iStartPosition;
+	volatile unsigned int iTemp = 0;
+	
+	for (iTemp = 0; iTemp < 32; iTemp++)
+	{
+		szBuffer[iHoverPos]   = _AUX_LEFT_HEX(pjob_res->midstate[iTemp]);
+		szBuffer[iHoverPos+1] = _AUX_RIGHT_HEX(pjob_res->midstate[iTemp]);
+		
+		// Increase iHover by 2
+		iHoverPos += 2;
+	}			
+
+	// Add comma
+	szBuffer[iHoverPos++] = ',';
+	
+	// Proceed	
+	for (iTemp = 0; iTemp < 12; iTemp++)
+	{
+		szBuffer[iHoverPos]   = _AUX_LEFT_HEX (pjob_res->block_data[iTemp]);
+		szBuffer[iHoverPos+1] = _AUX_RIGHT_HEX(pjob_res->block_data[iTemp]);
+		
+		// Increase iHover by 2
+		iHoverPos += 2;
+	}
+	
+	// Add comma
+	szBuffer[iHoverPos++] = ',';
+	
+	// Count of the nonces?
+	szBuffer[iHoverPos++] = __aux_CharMap[pjob_res->i_nonce_count];
+	
+	// Nonce Holder
+	volatile char szNonceHolder[8];
+	
+	// Ok, do we put '\n' or do we have nonces?
+	if (pjob_res->i_nonce_count > 0)
+	{
+		// We proceed with nonces
+		szBuffer[iHoverPos++] = ',';
+		
+		// Ok, for each nonce, we print
+		for (char iNonceCounter = 0; iNonceCounter < pjob_res->i_nonce_count; iNonceCounter++)
+		{
+			// Each nonce is 8 characters, so we put them manualy to speed things up
+			sprintf(szNonceHolder,"%08X", pjob_res->nonce_list[iNonceCounter]);
+			szBuffer[iHoverPos + 0] = szNonceHolder[0];
+			szBuffer[iHoverPos + 1] = szNonceHolder[1];
+			szBuffer[iHoverPos + 2] = szNonceHolder[2];
+			szBuffer[iHoverPos + 3] = szNonceHolder[3];
+			szBuffer[iHoverPos + 4] = szNonceHolder[4];
+			szBuffer[iHoverPos + 5] = szNonceHolder[5];
+			szBuffer[iHoverPos + 6] = szNonceHolder[6];
+			szBuffer[iHoverPos + 7] = szNonceHolder[7];
+			szBuffer[iHoverPos + 8] = (iNonceCounter == pjob_res->i_nonce_count - 1) ? ('\n') : (',');
+			iHoverPos += 9;
+		}
+		
+		// Now we return
+		szBuffer[iHoverPos] = '\0'; // Terminate the string
+		*iEndPositionPlusOne = iHoverPos;
+	}
+	else
+	{
+		szBuffer[iHoverPos++] = '\n';
+		szBuffer[iHoverPos] = '\0';
+		*iEndPositionPlusOne = iHoverPos;
+		return;
+	}
+	
+}
+
+
+
+
 
 PROTOCOL_RESULT Protocol_handle_job(void)
 {

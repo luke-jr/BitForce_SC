@@ -256,6 +256,9 @@ volatile void Microkernel_Spin()
 		{
 			if (ASIC_get_processor_count() < (GLOBAL_TotalEnginesDetectedOnStartup / 2))
 			{
+				// Say what we've done
+				GLOBAL_INTERNAL_ASIC_RESET_EXECUTED = TRUE;
+				
 				// Reset the ASICs -- Something must have gone wrong...
 				init_ASIC();
 			}			
