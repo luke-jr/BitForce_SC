@@ -170,6 +170,42 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"IAR Executed: %s\n", (GLOBAL_INTERNAL_ASIC_RESET_EXECUTED == TRUE) ? "YES" : "NO");
 	strcat(szInfoReq, szTemp);
 	
+	// Scattered operation took?
+	// Issue jobs to the queue
+	/*static int iMMA = 0;
+	
+	if (iMMA == 1)
+	{
+		volatile unsigned int iHighTestTime = MACRO_GetTickCountRet;
+		
+		JobPipe__pipe_set_buf_job_results_count(0);
+		job_packet jpx;
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		
+		while (JobPipe__pipe_get_buf_job_results_count() != 16)
+		{
+			WATCHDOG_RESET;
+			//Microkernel_Spin();
+			PipeKernel_Spin();
+		}
+		
+		JobPipe__pipe_set_buf_job_results_count(0);
+		
+		iHighTestTime = MACRO_GetTickCountRet - iHighTestTime;
+		sprintf(szTemp,"HIGH-TEST Took: %d ms\n", (iHighTestTime/1000));
+		strcat(szInfoReq, szTemp);				
+	}
+	
+	iMMA = 1;
+	*/
+		
 	// Report all busy engines
 	#if defined(__REPORT_BUSY_ENGINES)
 		strcat(szInfoReq,"Engines processings:\n");
@@ -217,7 +253,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 		// Now send the job to the engine
 		volatile unsigned int UL_TIMEZERO = MACRO_GetTickCountRet;
 		
-		ASIC_job_issue(&jp, 0x0, 0xFFFFFFFF, FALSE, 0);
+		ASIC_job_issue(&jp, 0x0, 0xFFFFFFFF, FALSE, 0, FALSE);
 		
 		volatile unsigned int UL_TIMESTART = MACRO_GetTickCountRet;
 		volatile unsigned int UL_TOTALTIME = 0;		
@@ -299,7 +335,6 @@ PROTOCOL_RESULT Protocol_info_request(void)
 				else if (JobPipe__pipe_get_buf_job_results_count() == 2)
 				{
 					iActualTPP_Count = MACRO_GetTickCountRet - iActualTPP_Count;
-					break;
 				}
 			}
 			
@@ -320,7 +355,11 @@ PROTOCOL_RESULT Protocol_info_request(void)
 			}
 
 		#endif 
-				
+		
+		
+		// At this point, clear results buffer
+		JobPipe__pipe_set_buf_job_results_count(0);
+		
 	#endif
 	
 	#if defined(__CHIP_FREQUENCY_DETECT_AND_REPORT)
@@ -407,8 +446,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 				strcat(szInfoReq, szTemp);				
 			}
 		}
-		
-	
+			
 	#endif
 	
 	#if defined(__CHIP_DIAGNOSTICS_VERBOSE)
@@ -502,6 +540,8 @@ PROTOCOL_RESULT Protocol_info_request(void)
 		// Turn it back on...
 		MCU_MainLED_Set();
 	#endif
+	
+	
 	
 	// Add Engine count
 	sprintf(szTemp,"ENGINES: %d\n", ASIC_get_processor_count());
@@ -912,7 +952,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	//{
 		WATCHDOG_RESET;
 		//ASIC_job_issue_to_specified_engine(0,4,&jp, 0, 0x0FFFFFFFF);
-		ASIC_job_issue(&jp,0,0x0FFFFFFFF, FALSE, 0);
+		ASIC_job_issue(&jp,0,0x0FFFFFFFF, FALSE, 0, FALSE);
 		//Test_Sequence_2(3,1);
 		
 		/*__MCU_ASIC_Activate_CS();
@@ -1972,7 +2012,7 @@ PROTOCOL_RESULT Protocol_handle_job(void)
 	}
 
 	// We have all what we need, send it to ASIC-COMM interface
-	ASIC_job_issue(p_job, 0, 0x0FFFFFFFF, FALSE, 0);
+	ASIC_job_issue(p_job, 0, 0x0FFFFFFFF, FALSE, 0, FALSE);
 
 	// Send our OK
 	if (XLINK_ARE_WE_MASTER)
@@ -2038,7 +2078,7 @@ PROTOCOL_RESULT Protocol_handle_job_single_stage(char* szStream)
 	}
 
 	// We have all what we need, send it to ASIC-COMM interface
-	ASIC_job_issue(p_job, 0, 0x0FFFFFFFF, FALSE, 0);
+	ASIC_job_issue(p_job, 0, 0x0FFFFFFFF, FALSE, 0, FALSE);
 
 	// Send our OK
 	if (XLINK_ARE_WE_MASTER)
@@ -2163,7 +2203,7 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	ASIC_job_issue(p_job, 
 				   p_job->nonce_begin, 
 				   p_job->nonce_end,
-				   FALSE, 0);				   
+				   FALSE, 0, FALSE);				   
 				   
 	// Send our OK	
 	if (XLINK_ARE_WE_MASTER)

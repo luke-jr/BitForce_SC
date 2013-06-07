@@ -62,7 +62,7 @@
 // #define __ENGINE_BY_ENGINE_DIAGNOSTICS	1
 //#define __EXPORT_ENGINE_RANGE_SPREADS	1
 //-- Reports the busy engines on InfoRequest command
-// #define __REPORT_BUSY_ENGINES				1
+//#define __REPORT_BUSY_ENGINES				1
 //#define __SHOW_DECOMMISSIONED_ENGINES_LOG	1
 //#define __SHOW_PIPE_TO_USB_LOG				1
 
@@ -96,7 +96,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 	#define __ASIC_FREQUENCY_ACTUAL_INDEX   1 // 180MHz for Jalapeno
 #else	
 	// #define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 274MHz for the rest
-	#define __ASIC_FREQUENCY_ACTUAL_INDEX   9 // 274MHz for the rest
+	#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 274MHz for the rest
 #endif
 
 #define __MAXIMUM_FREQUENCY_INDEX       9
@@ -111,10 +111,10 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #define __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION   1 // The same as Activity-Supervision, except that it's used for progressive engine job loading system
 
 #if TOTAL_CHIPS_INSTALLED == 16
-	#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      190000 // 190 milliseconds
+	#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      85000 // 85 milliseconds
 #elif TOTAL_CHIPS_INSTALLED == 8
 	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__)
-		#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      160000 // 160 milliseconds
+		#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      230000 // 160 milliseconds
 	#elif defined(__PRODUCT_MODEL_JALAPENO__)
 		#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      800000 // 800 milliseconds	
 	#endif
@@ -131,15 +131,14 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #define __REPORT_TEST_MINING_SPEED		1
 
 
-
 /*********************************** DIAGNOSTICS *********************************/
 // Full Nonce Range diagnostics ( Runs each engine with 8 nonce job, 
 // and verifies the results
 
 //// BEGIN
 #define __RUN_HEAVY_DIAGNOSTICS_ON_EACH_ENGINE	1
-#define __HEAVY_DIAGNOSTICS_STRICT_8_NONCES	1
-//	#define __HEAVY_DIAGNOSTICS_MODERATE_7_NONCES	1
+//#define __HEAVY_DIAGNOSTICS_STRICT_8_NONCES	1
+#define __HEAVY_DIAGNOSTICS_MODERATE_7_NONCES	1
 //// END
 
 //// BEGIN
@@ -327,7 +326,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      44
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION		"1.0.0"
+#define __FIRMWARE_VERSION		"1.1.0"	// This is firmware 1.1.0
 
 /*************** UNIT ID STRING ********************/
 #define  UNIT_ID_STRING			"BitForce SHA256 SC 1.0\n"
@@ -349,7 +348,6 @@ unsigned int GLOBAL_LastJobResultProduced;
 ///////////////////////////////////////// typedefs
 // Master Tick Counter (Holds clock in 1uS ticks)
 volatile UL32 MAST_TICK_COUNTER;
-
 void IncrementTickCounter(void);
 
 // Was internal reset activated?
@@ -363,6 +361,8 @@ unsigned char GLOBAL_INTERNAL_ASIC_RESET_EXECUTED;
 #define GET_BYTE_FROM_DWORD(dword, byte) ((dword >> (byte * 8)) & 0x0FF)
 
 volatile char GLOBAL_InterProcChars[128];
+
+volatile unsigned int GLOBAL_SCATTERED_DIAG_TIME;
 
 volatile unsigned short GLOBAL_ChipActivityLEDCounter[TOTAL_CHIPS_INSTALLED];
 
@@ -450,6 +450,7 @@ volatile unsigned int iMark2;
 #define CHIP_EXISTS(x)						   (((__chip_existence_map[x] & 0xFF) != 0))
 #define IS_PROCESSOR_OK(xchip, yengine)		   ((__chip_existence_map[xchip] & (1 << yengine)) != 0)
 #define DECOMMISSION_PROCESSOR(xchip, yengine) (__chip_existence_map[xchip] &= ~(1<<yengine))
+
 
 unsigned int __chip_existence_map[TOTAL_CHIPS_INSTALLED]; // Bit 0 to Bit 16 in each word says if the engine is OK or not...
 	

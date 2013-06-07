@@ -239,7 +239,9 @@ void init_ASIC(void)
 	
 	// Do we run scattered diagnostics?
 	#if defined(__RUN_SCATTERED_DIAGNOSTICS)
+		GLOBAL_SCATTERED_DIAG_TIME = MACRO_GetTickCountRet;
 		ASIC_run_scattered_diagnostics();	
+		GLOBAL_SCATTERED_DIAG_TIME = MACRO_GetTickCountRet - GLOBAL_SCATTERED_DIAG_TIME;
 	#endif
 	
 	// Also, clear Timestamping for Engine supervision
@@ -714,7 +716,7 @@ void ASIC_run_scattered_diagnostics()
 		if (iTestingJob == 44) { jpX = &Jb45; jpXNonceCount = &Jb45NonceCount; jpXNonces = Jb45Nonces;	}		
 		
 		// Ok, we have the job, proceed with it...
-		ASIC_job_issue(jpX, 0x0, 0xFFFFFFFF, FALSE, 0);
+		ASIC_job_issue(jpX, 0x0, 0xFFFFFFFF, FALSE, 0, FALSE);
 		
 		// Ok, wait until the thing is finished
 		volatile unsigned int iActualTime = MACRO_GetTickCountRet;
@@ -2241,7 +2243,8 @@ void ASIC_job_issue(void* pJobPacket,
 					unsigned int _LowRange, 
 					unsigned int _HighRange,
 					const char bIssueToSingleChip,
-					const char iChipToIssue)
+					const char iChipToIssue,
+					const char bAdd2msLatency)
 {
 	// Error Check: _HighRange - _LowRange must be at least 256
 	if (_HighRange - _LowRange < 256) return;
@@ -2467,13 +2470,14 @@ void ASIC_job_issue(void* pJobPacket,
 						GLOBAL_ENGINE_PROCESSING_STATUS[x_chip][y_engine] = TRUE;					
 					#endif
 				}
-								
+												
 			
 				// Increase our range
 				iLowerRange += iRangeSlice;
 				iUpperRange += iRangeSlice;
 				if (iUpperRange < iLowerRange) iUpperRange = 0xFFFFFFFF; // Last Number
 				if (iUpperRange > 0x0FFFFFF00) iUpperRange = 0xFFFFFFFF;
+				
 			}	
 		}
 		#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
@@ -2661,6 +2665,7 @@ void ASIC_job_issue(void* pJobPacket,
 					iUpperRange += iRangeSlice;
 					if (iUpperRange < iLowerRange) iUpperRange = 0xFFFFFFFF; // Last Number
 					if (iUpperRange > 0x0FFFFFF00) iUpperRange = 0xFFFFFFFF;
+					
 				}	
 			}
 		#endif		

@@ -13,7 +13,7 @@
 #define SHA256_Test_String  "2f33a240bd6785caed5b67b4122079dd9359004ae23c64512c5c2dfbce097b08"
 
 /// ************************** This is our Pipelined job processing system (holder of 2 jobs + 1 process)
-#define PIPE_MAX_BUFFER_DEPTH	 40
+#define PIPE_MAX_BUFFER_DEPTH	 20
 #define PIPE_JOB_BUFFER_OK		 0
 #define PIPE_JOB_BUFFER_FULL	 1
 #define PIPE_JOB_BUFFER_EMPTY	 2

@@ -125,7 +125,7 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 					JobPipe__pipe_pop_job(&jpActiveJobBeingProcessed);
 					iTotalEnginesFinishedActiveJob = 0;
 					iNonceListForActualJob_Count = 0;
-					ASIC_job_issue(&jpActiveJobBeingProcessed, 0x00000000, 0xFFFFFFFF, FALSE, 0);
+					ASIC_job_issue(&jpActiveJobBeingProcessed, 0x00000000, 0xFFFFFFFF, FALSE, 0, TRUE);
 					
 					// Also, do we have any other jobs?
 					if (JobPipe__pipe_ok_to_pop())
@@ -292,9 +292,6 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 			DEBUG_TraceTimersIndex += 1;
 			if (DEBUG_TraceTimersIndex == 7) DEBUG_TraceTimersIndex = 0;
 			
-			
-			
-			
 			// Ok, all the engines checked and nonces were collect if necessary (furthermore, next job in queue was issued)
 			// Now, if all engines have finished processing the actual job, then it's time to push it to the results buffer
 			if (iTotalEnginesFinishedActiveJob >= iTotalEnginesCount)
@@ -377,10 +374,7 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 					_prev_job_was_from_pipe = FALSE;
 				}				
 			}
-
 		}		
-		
-		
 	
 	#elif defined(__IMMEDIATE_ENGINE_JOB_SUBMISSION)
 	
@@ -645,7 +639,7 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 				memcpy((void*)__inprocess_blockdata, 	(void*)job_from_pipe.block_data, 12);
 
 				// Send it to processing...
-				ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, FALSE, 0);		
+				ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, FALSE, 0, FALSE);		
 			#endif 
 	
 			// The job is coming from the PIPE...

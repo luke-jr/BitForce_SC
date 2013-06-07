@@ -103,6 +103,7 @@ volatile void Microkernel_Spin()
 	}
 	
 	// Blink Chip LEDs if needed
+	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__) || defined(__PRODUCT_MODEL_JALAPENO__)
 	{
 		volatile unsigned char index_hover = 0;
 		
@@ -122,6 +123,7 @@ volatile void Microkernel_Spin()
 			}				
 		}			
 	}
+	#endif
 	
 	// Should we Pulse?
 	{
