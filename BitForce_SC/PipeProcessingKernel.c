@@ -66,6 +66,17 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 				// Is it already processing? If so, just exit...
 				if (ASIC_is_processing() == TRUE)
 				{
+					// Check if there is a single Job-Issue fault
+					#if defined(ENABLED_SINGLE_JOB_ISSUE_MONITORING)
+						// Note, this section of code can work because we know the _previous_job was not issued by pipe
+						if (MACRO_GetTickCountRet - GLOBAL_LastJobIssueToAllEngines > 4000000) // 4 Seconds max
+						{
+							GLOBAL_INTERNAL_ASIC_RESET_EXECUTED = TRUE;
+							init_ASIC();
+							return;
+						}					
+					#endif
+					
 					// Before we exit, if __PROGRESSIV_MONITORING is enabled, we need to decommission bad chips
 					#if defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)
 					
@@ -91,21 +102,24 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 								// Is it processing for longer than it should have had?
 								if (bIsEngineProcessing)
 								{
-									if (MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[uzChip][uzEngine] > (__ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME))
+									if (MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[uzChip][uzEngine] > (GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[uzChip][uzEngine] + __ENGINE_OPERATING_TIME_OVERHEAD))
 									{
 										// Decomission directly
 										ASIC_reset_engine(uzChip, uzEngine);
-										DECOMMISSION_PROCESSOR(uzChip, uzEngine);
 										
-										#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
-											sprintf(szTempEX,"CHIP %d ENGINE %d DECOMMISSIONED!\n", uzChip, uzEngine);
-											strcat(szDecommLog, szTempEX);
+										#if defined(DECOMMISSION_ENGINES_IF_LATE)
+											DECOMMISSION_PROCESSOR(uzChip, uzEngine);
+										
+											#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
+												sprintf(szTempEX,"CHIP %d ENGINE %d DECOMMISSIONED!\n", uzChip, uzEngine);
+												strcat(szDecommLog, szTempEX);
+											#endif
+										
+											ASIC_calculate_engines_nonce_range();	
+										
+											// Also update total engines count
+											iTotalEnginesCount -= 1;									
 										#endif
-										
-										ASIC_calculate_engines_nonce_range();	
-										
-										// Also update total engines count
-										iTotalEnginesCount -= 1;									
 									}
 								}
 							}
@@ -173,7 +187,7 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 					// What is the status of the actual engine?
 					unsigned int iNonceListForThisEngine[8];
 					unsigned int iNonceCountForThisEngine = 0;
-					int iEngineStatus = ASIC_get_job_status_from_engine(&iNonceListForThisEngine, &iNonceCountForThisEngine, iHoverChip, iHoverEngine);
+					int iEngineStatus = ASIC_get_job_status_from_engine(&iNonceListForThisEngine, &iNonceCountForThisEngine, iHoverChip, iHoverEngine, FALSE);
 					
 					// Check status
 					if ((iEngineStatus == ASIC_JOB_IDLE) || (iEngineStatus == ASIC_JOB_NONCE_NO_NONCE) || (iEngineStatus == ASIC_JOB_NONCE_FOUND))
@@ -237,32 +251,41 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 							// If it has been running for longer than it should have (relative to operating frequency)
 							// We will reset it.
 							// Should this engine fail frequently, we'll completely decommission it...
-							if ((MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[iHoverChip][iHoverEngine]) > __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME)
+							if ((MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[iHoverChip][iHoverEngine]) > (GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[iHoverChip][iHoverEngine] + __ENGINE_OPERATING_TIME_OVERHEAD))
 							{
 								// First we restart the chip to prevent it from consuming power
 								ASIC_reset_engine(iHoverChip, iHoverEngine);
 								
 								// Check the score, if it's 5 then we reset the engine. If it's 10 then we decommission it
-								if (GLOBAL_ENGINE_PROCESSING_FAILURE_SCORES[iHoverChip][iHoverEngine] >= 3)
+								if (GLOBAL_ENGINE_PROCESSING_FAILURE_SCORES[iHoverChip][iHoverEngine] >= TOTAL_FAILURES_BEFORE_DECOMMISSIONING)
 								{
 									// We Decommission the engine while saying that the job was completed here. We also recalculate the nonce ranges
-									DECOMMISSION_PROCESSOR(iHoverChip, iHoverEngine);
+									#if defined(DECOMMISSION_ENGINES_IF_LATE)
+										DECOMMISSION_PROCESSOR(iHoverChip, iHoverEngine);
 									
-									#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
-										char szTempEX[128];
-										sprintf(szTempEX,"CHIP %d ENGINE %d DECOMMISSIONED!\n", iHoverChip, iHoverEngine);
-										strcat(szDecommLog, szTempEX);
-									#endif
+										#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
+											char szTempEX[128];
+											sprintf(szTempEX,"CHIP %d ENGINE %d DECOMMISSIONED!\n", iHoverChip, iHoverEngine);
+											strcat(szDecommLog, szTempEX);
+										#endif
+																	
+										// Recalculate
+										ASIC_calculate_engines_nonce_range();
 										
-								
-									// Recalculate
-									ASIC_calculate_engines_nonce_range();
-								
-									// We also tell the system that the engine was finished (so the work can proceed)
-									iTotalEnginesTakenInQueueJob++;
+										// We also tell the system that the engine was finished (so the work can proceed)
+										iTotalEnginesTakenInQueueJob++;
+										
+										// This is not true, but since we're decommissioning the engine...
+										iTotalEnginesFinishedActiveJob++;
+							
+										// Don't scan this engine again
+										sEnginesActivityMap[iHoverChip] |= (1<<iHoverEngine);
+										 
+									#else
+										// Ok, just reset the engine. In the next loop, we'll scan this engine and take found nonces
+										ASIC_reset_engine(iHoverChip, iHoverEngine);
+									#endif
 									
-									// Also reduce the total engines count
-									iTotalEnginesCount--;
 								}
 								else
 								{
@@ -270,10 +293,40 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 									// and probably reseting it every once in a while will resolve the issue
 									// Increase the penalty score...
 									GLOBAL_ENGINE_PROCESSING_FAILURE_SCORES[iHoverChip][iHoverEngine]++;	
+									
+									// FORCE Reading results from engine
+									ASIC_get_job_status_from_engine(&iNonceListForThisEngine, &iNonceCountForThisEngine, iHoverChip, iHoverEngine, TRUE);
+									
+									// Add them to the result for the actual job in process
+									for (char iNonceHover = 0; iNonceHover < iNonceCountForThisEngine; iNonceHover++)
+									{
+										if (iNonceCountForThisEngine >= 8) continue; // We will no longer take nonces, buffer for this engine is full
+										iNonceListForActualJob[iNonceListForActualJob_Count] = iNonceListForThisEngine[iNonceHover];
+										iNonceListForActualJob_Count += 1;
+									}
+									
+									// Read Complete first
+									ASIC_ReadComplete(iHoverChip, iHoverEngine);
+
+									// We send the job to this engine
+									ASIC_job_issue_to_specified_engine (iHoverChip,
+																		iHoverEngine,
+																		&jpInQueueJob,
+																		FALSE,  // = bLoadStaticData
+																		TRUE,   // = bResetBeforeSubmission
+																		TRUE,   // = bIgniteEngine
+																		GLOBAL_CHIP_PROCESSOR_ENGINE_LOWBOUND[iHoverChip][iHoverEngine],
+																		GLOBAL_CHIP_PROCESSOR_ENGINE_HIGHBOUND[iHoverChip][iHoverEngine]);									
 								
 									// We also tell the system that the engine was finished (so the work can proceed)
 									iTotalEnginesTakenInQueueJob++;							
 								}
+								
+								// Officially, this engine should be considered examined
+								sEnginesActivityMap[iHoverChip] |= (1<<iHoverEngine);
+								
+								// Officially, this engine should be considered finished
+								iTotalEnginesFinishedActiveJob++;
 							}
 							else
 							{
@@ -291,6 +344,9 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 			DEBUG_TraceTimers[DEBUG_TraceTimersIndex] = DEBUG_TraceTimer2;
 			DEBUG_TraceTimersIndex += 1;
 			if (DEBUG_TraceTimersIndex == 7) DEBUG_TraceTimersIndex = 0;
+			
+			// How many engines?
+			iTotalEnginesCount = ASIC_get_processor_count();
 			
 			// Ok, all the engines checked and nonces were collect if necessary (furthermore, next job in queue was issued)
 			// Now, if all engines have finished processing the actual job, then it's time to push it to the results buffer
@@ -748,7 +804,7 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 			}				 
 
 			// Update timestamp on the last job result produced
-			GLOBAL_LastJobResultProduced = MACRO_GetTickCountRet
+			GLOBAL_LastJobResultProduced = MACRO_GetTickCountRet;
 			
 			// We return, since there is nothing left to do
 		}
@@ -786,7 +842,7 @@ static unsigned int  sEnginesActivityMap[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 		
 		
 		// Send it to processing...
-		ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, TRUE, iChip);
+		ASIC_job_issue(&job_from_pipe, 0x0, 0xFFFFFFFF, TRUE, iChip, FALSE);
 		
 		// This chip is processing now
 		__inprocess_SCQ_chip_processing[iChip] = TRUE;

@@ -116,6 +116,13 @@ int main(void)
 	// Reset the total number of engines detected on startup
 	GLOBAL_TotalEnginesDetectedOnStartup = 0;
 	
+	// Last time JobIssue was called. 
+	GLOBAL_LastJobIssueToAllEngines = 0;
+	
+	// Wait for 500ms before doing anything
+	volatile unsigned int iHolder = MACRO_GetTickCountRet;
+	while (MACRO_GetTickCountRet + 2 - iHolder < 500000) WATCHDOG_RESET;
+	
 	// Perform an ASIC GET CHIP COUNT
 	init_ASIC();
 	
@@ -419,6 +426,7 @@ void MCU_Main_Loop()
 				if ((sz_cmd[0] != '@') &&
 					(bSingleStageJobIssueCommand == FALSE) && 
 					(sz_cmd[1] != PROTOCOL_REQ_INFO_REQUEST) &&
+					(sz_cmd[1] != PROTOCOL_REQ_BUF_FLUSH_EX) &&
 					(sz_cmd[1] != PROTOCOL_REQ_HANDLE_JOB) &&
 					(sz_cmd[1] != PROTOCOL_REQ_ID) &&
 					(sz_cmd[1] != PROTOCOL_REQ_GET_FIRMWARE_VERSION) &&
@@ -487,6 +495,7 @@ void MCU_Main_Loop()
 					
 						// The rest of the commands
 						if (sz_cmd[1] == PROTOCOL_REQ_BUF_FLUSH)			Protocol_PIPE_BUF_FLUSH();
+						if (sz_cmd[1] == PROTOCOL_REQ_BUF_FLUSH_EX)			Protocol_PIPE_BUF_FLUSH_EX();
 						if (sz_cmd[1] == PROTOCOL_REQ_BUF_STATUS)			Protocol_PIPE_BUF_STATUS();
 						if (sz_cmd[1] == PROTOCOL_REQ_INFO_REQUEST)			Protocol_info_request();
 						if (sz_cmd[1] == PROTOCOL_REQ_ID)					Protocol_id();

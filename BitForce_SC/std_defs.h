@@ -55,16 +55,17 @@
 /////////////////////////////////////////////////////////////////////////
 // -- This option will provide detailed information when PROTOCOL_REQ_INFO_REQ
 // -- regarding chips behavior
-//#define	__CHIP_DIAGNOSTICS_VERBOSE		1
-//
+//#define	__CHIP_DIAGNOSTICS_VERBOSE		
+
 // -- Also this option enables chip by chip diagnostics
-//#define __CHIP_BY_CHIP_DIAGNOSTICS		1 
-// #define __ENGINE_BY_ENGINE_DIAGNOSTICS	1
-//#define __EXPORT_ENGINE_RANGE_SPREADS	1
+//#define __CHIP_BY_CHIP_DIAGNOSTICS		
+// #define __ENGINE_BY_ENGINE_DIAGNOSTICS	
+//#define __EXPORT_ENGINE_RANGE_SPREADS	
+
 //-- Reports the busy engines on InfoRequest command
-//#define __REPORT_BUSY_ENGINES				1
-//#define __SHOW_DECOMMISSIONED_ENGINES_LOG	1
-//#define __SHOW_PIPE_TO_USB_LOG				1
+//#define __REPORT_BUSY_ENGINES				
+//#define __SHOW_DECOMMISSIONED_ENGINES_LOG	
+//#define __SHOW_PIPE_TO_USB_LOG			
 
 #if defined(__EXPORT_ENGINE_RANGE_SPREADS)
 	volatile unsigned int __ENGINE_LOWRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
@@ -79,7 +80,8 @@
 // Detect frequency of each chip
 #define __CHIP_FREQUENCY_DETECT_AND_REPORT 1     // Roundtrip
 #define __LIVE_FREQ_DETECTION			   1	 // If set, it'll force the report to be a live detection instead of initial results found
-#define __EXPORT_ENGINE_TIMEOUT_DETAIL	   1	 // ASIC_tune_chip_frequency log will be exported
+//#define __EXPORT_ENGINE_TIMEOUT_DETAIL	   1	 // ASIC_tune_chip_frequency log will be exported
+//#define __PERFORM_CHIP_BY_CHIP_TEST		   1	 // Send job to each chip, get the result and measure speed
 
 /////////////////////////////////////////////////////////////////////////
 // This MACRO disables the kernel from trying to increase frequency on ASICS
@@ -95,8 +97,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #if defined(__PRODUCT_MODEL_JALAPENO)
 	#define __ASIC_FREQUENCY_ACTUAL_INDEX   1 // 180MHz for Jalapeno
 #else	
-	// #define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 274MHz for the rest
-	#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 274MHz for the rest
+	#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 291MHz for the rest
 #endif
 
 #define __MAXIMUM_FREQUENCY_INDEX       9
@@ -105,31 +106,30 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 // Engine activity supervision
 // Enabling this feature will force the MCU to decommission the malfunctioning
 // engines detected on runtime
-#define __ENGINE_ENABLE_TIMESTAMPING				1 // Enable timestamping, meaning we mark the job initiation and termination
-//#define __ENGINE_MAXIMUM_BUSY_TIME					4000000 // 4 Seconds is max
-//#define __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION	1		// 
-#define __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION   1 // The same as Activity-Supervision, except that it's used for progressive engine job loading system
+#define __ENGINE_ENABLE_TIMESTAMPING				  // Enable timestamping, meaning we mark the job initiation and termination
+#define __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION	  // For one job per chip, you need this...
+//#define __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION   1 // The same as Activity-Supervision, except that it's used for progressive engine job loading system
+//#define TOTAL_FAILURES_BEFORE_DECOMMISSIONING       300 // Meaning after 300 consequtive failures, decommission the engine
 
-#if TOTAL_CHIPS_INSTALLED == 16
-	#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      85000 // 85 milliseconds
-#elif TOTAL_CHIPS_INSTALLED == 8
-	#if defined(__PRODUCT_MODEL_LITTLE_SINGLE__)
-		#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      230000 // 160 milliseconds
-	#elif defined(__PRODUCT_MODEL_JALAPENO__)
-		#define __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME      800000 // 800 milliseconds	
-	#endif
-#else
-	// .. Nothing
-#endif
+// Used with __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION
+// #define ENABLED_SINGLE_JOB_ISSUE_MONITORING			// ASIC_job_issue sets time of its execution. If this time has taken more than a second, and it's still processing, then we restart the chips
 
-/////////////////////////////////////
+// #define DECOMMISSION_ENGINES_IF_LATE	// If set, engines will be decommissioned if they are too late, otherwise they'll be simply reset...
+
+////////////////////////////////////////////
 // Activate job-load balancing
 #define __ACTIVATE_JOB_LOAD_BALANCING	1
 
-//////////////////////////////////////
-// Report the mining speed by testing it...
-#define __REPORT_TEST_MINING_SPEED		1
+////////////////////////////////////////////
+// Report the mining speed by testing it
+//#define __REPORT_TEST_MINING_SPEED		1
 
+
+/////////////////////////////////////////////////////////////////////////
+// Pipe Operation Testing...
+// If set, the PROTOCOL_GET_INTO_REQUEST will submit 3 jobs in the pipe and
+// measures how long it takes for the unit to finish it...
+// #define __TEST_PIPE_PERFORMANCE 
 
 /*********************************** DIAGNOSTICS *********************************/
 // Full Nonce Range diagnostics ( Runs each engine with 8 nonce job, 
@@ -162,24 +162,26 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 // #define __REPORT_BALANCING_SPREADS	1
 
 /******************************** BUFFER MANAGEMENT **************************/
-/////////////////////////////////////////////////////////////////////////
-// Progressive per-engine job submission
-#define __PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION	1
-
-// OR Interleaved job loading enabled? (With the option of interleaved job loading (i.e. Pipelined))
-//#define __IMMEDIATE_ENGINE_JOB_SUBMISSION
-//#define __INTERLEAVED_JOB_LOADING
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // -- This macro forces the Queue Operator to send one job to each chip.
 // -- Once activated, device will process parallel jobs at nearly the same speed.
 // -- This also impacts the ZOX response, where the processor that got the job done will be added to the response list
-// #define QUEUE_OPERATE_ONE_JOB_PER_CHIP	    1
+#define QUEUE_OPERATE_ONE_JOB_PER_CHIP	 
 
+  
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // -- This macro enforces the queue to use one engine per board ( verses one engine per chip )
 // -- It will also modify the results queue and no processing chip identifier will exist any longer
-#define  QUEUE_OPERATE_ONE_JOB_PER_BOARD		1
+// #define  QUEUE_OPERATE_ONE_JOB_PER_BOARD		1
+	
+	////////////////////////////////////////////////////////////////////////
+	// Progressive per-engine job submission
+	//#define __PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION	1
+
+	// OR Interleaved job loading enabled? (With the option of interleaved job loading (i.e. Pipelined))
+	//#define __IMMEDIATE_ENGINE_JOB_SUBMISSION
+	//#define __INTERLEAVED_JOB_LOADING
 
 /***************************************************************************/
 
@@ -247,8 +249,18 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 
 /////////////////////////////////////////////////////////////////////////
 // Error detection
+#if defined(ENABLED_SINGLE_JOB_ISSUE_MONITORING) && !defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)
+	#error The feature ENABLED_SINGLE_JOB_ISSUE_MONITORING can only be used with __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION
+#endif
+
 #if (defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)) && defined(FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED)
 	#pragma  GCC warning "Using FAN_SUBSYSTEM_REMAIN_AT_FULL_SPEED with PRODUCT_MODEL_SINGLE or PRODUCT_MODEL_MINIRIG is not recommended"
+#endif
+
+#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+	#if defined(__TEST_PIPE_PERFORMANCE)
+		#error Unable to use __TEST_PIPE_PERFORMANCE on board operating in QUEUE_OPERATE_ONE_JOB_PER_CHIP mode
+	#endif 
 #endif
 
 #if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP) && defined(QUEUE_OPERATE_ONE_JOB_PER_BOARD)
@@ -280,14 +292,6 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 	#error  Timestamping (__ENGINE_ENABLE_TIMESTAMPING) enabled but no monitoring authority defined
 #endif
 
-#if defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION) && !defined(__ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME)
-	#error  Monitoring authority defined but __ENGINE_PROGRESSIVE_MAXIMUM_BUSY_TIME not defined
-#endif
-
-#if defined(__ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION) && !defined(__ENGINE_MAXIMUM_BUSY_TIME)
-	#error  __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION defined but __ENGINE_MAXIMUM_BUSY_TIME not defined
-#endif
-
 #if (defined(__ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION) || defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)) && !defined(__ENGINE_ENABLE_TIMESTAMPING)
 	#error  __ENGINE_AUTHORITIVE_ACTIVITY_SUPERVISION but __ENGINE_ENABLE_TIMESTAMPING not defined
 #endif
@@ -309,11 +313,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 	#error With __PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION, __ACTIVATE_JOB_LOAD_BALANCING must be defined as well
 #endif
 
-/////////////////////////////////////////////////////////////////////////
-// Pipe Operation Testing...
-// If set, the PROTOCOL_GET_INTO_REQUEST will submit 3 jobs in the pipe and
-// measures how long it takes for the unit to finish it...
-#define __TEST_PIPE_PERFORMANCE 1
+
 
 
 /*************** Used for debugging ****************/
@@ -326,7 +326,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      44
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION		"1.1.0"	// This is firmware 1.1.0
+#define __FIRMWARE_VERSION		"1.2.0"	// This is firmware 1.2.0
 
 /*************** UNIT ID STRING ********************/
 #define  UNIT_ID_STRING			"BitForce SHA256 SC 1.0\n"
@@ -418,6 +418,14 @@ unsigned char GLOBAL_ENGINE_PROCESSING_STATUS[TOTAL_CHIPS_INSTALLED][16]; // If 
 unsigned char GLOBAL_ENGINE_PROCESSING_FAILURE_SCORES[TOTAL_CHIPS_INSTALLED][16]; // If this number reaches 5 failures, we'll decommission the engine
 unsigned int  GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[TOTAL_CHIPS_INSTALLED][16]; // When did this engine start processing?
 
+// Maximum operating time for engines
+unsigned int  GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[TOTAL_CHIPS_INSTALLED][16];
+#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+	#define __ENGINE_OPERATING_TIME_OVERHEAD 5000 // Maximum 5ms error is allowed!
+#else // QUEUE_OPERATE_ONE_JOB_PER_BOARD
+	#define __ENGINE_OPERATING_TIME_OVERHEAD 50000 // Maximum 50ms error is allowed!
+#endif
+
 // This should be by default zero
 int GLOBAL_BLINK_REQUEST;
 
@@ -443,6 +451,7 @@ unsigned int __internal_global_iChipCount;
 // For Test only
 volatile unsigned int iMark1;
 volatile unsigned int iMark2;
+volatile unsigned int GLOBAL_LAST_ASIC_IS_PROCESSING_LATENCY;
 
 // Basic boolean definition
 #define TRUE	1
@@ -461,6 +470,11 @@ volatile void Sleep(unsigned int iSleepPeriod);
 volatile unsigned int GLOBAL_BufResultToUSBLatency;
 volatile unsigned int GLOBAL_USBToHostLatency;
 volatile unsigned int GLOBAL_ResBufferCompilationLatency;
+volatile unsigned int GLOBAL_LastJobIssueToAllEngines;
+
+#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+	volatile unsigned int GLOBAL_LastJobIssuedToChip[TOTAL_CHIPS_INSTALLED];
+#endif
 
 // FAN Controls
 #define FAN_CONTROL_BYTE_VERY_SLOW			(0b0010)

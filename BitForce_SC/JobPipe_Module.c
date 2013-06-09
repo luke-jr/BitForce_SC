@@ -75,6 +75,11 @@ inline char JobPipe__pipe_ok_to_push()
 	return ((__total_jobs_in_buffer < PIPE_MAX_BUFFER_DEPTH) ? 1 : 0);
 }
 
+inline char	JobPipe__total_jobs_in_pipe()
+{
+	return __total_jobs_in_buffer;
+}
+
 char JobPipe__pipe_push_job(void* __input_pipe_job_info)
 {
 	// Is it ok to push a job into stack?

@@ -232,6 +232,11 @@ void init_ASIC(void)
 		ASIC_set_clock_mask(iHoveringChip, __chip_existence_map[iHoveringChip]);
 	}	
 	
+	// Ok, now we calculate nonce-range for the engines
+	#if defined(__ACTIVATE_JOB_LOAD_BALANCING)
+		ASIC_calculate_engines_nonce_range();
+	#endif
+	
 	// Do we run heavy diagnostics
 	#if defined(__RUN_HEAVY_DIAGNOSTICS_ON_EACH_ENGINE)
 		ASIC_run_heavy_diagnostics();
@@ -321,6 +326,8 @@ void ASIC_run_heavy_diagnostics()
 	// What is the desired frequency? We'll wait for that much + 40%
 	unsigned int iTimeToWait = (4294 / __ASIC_FREQUENCY_VALUES[__ASIC_FREQUENCY_ACTUAL_INDEX]);
 	iTimeToWait += (iTimeToWait * 3) / 10;
+	
+	MCU_MainLED_Set();
 		
 	// We wait for this long
 	volatile unsigned int iTimeHolder = MACRO_GetTickCountRet;
@@ -334,8 +341,18 @@ void ASIC_run_heavy_diagnostics()
 		if (((iVTime - iTimeHolder) / 1000000) > iTimeToWait) break;
 			
 		// Do the usual tasks
-		// Microkernel_Spin();
+		// Do some light show, just to let everyone we're working
+		if (((iVTime - iTimeHolder) % 800000) <= 400000)
+		{
+			MCU_MainLED_Set();
+		}			
+		else
+		{
+			MCU_MainLED_Reset();
+		}			
 	}
+	
+	MCU_MainLED_Set();
 		
 	// Ok, now we read back results. All engines should have the following nonces
 	// 0F83379F,3E145360,64DD5309,C88E0D8E,DAFD7BE9,F4AD7CFD,F6DA3CAB,F9B1BC01
@@ -366,7 +383,7 @@ void ASIC_run_heavy_diagnostics()
 			iReadBackNonceCount = 0;
 				
 			//submit the job to this engine
-			unsigned int iStatRet = ASIC_get_job_status_from_engine(&iReadBackNonces, &iReadBackNonceCount, cDiagChip, cDiagEngine);
+			unsigned int iStatRet = ASIC_get_job_status_from_engine(&iReadBackNonces, &iReadBackNonceCount, cDiagChip, cDiagEngine, FALSE);
 		
 			if ((iStatRet == ASIC_JOB_NONCE_PROCESSING) ||
 				(iStatRet == ASIC_JOB_NONCE_NO_NONCE) ||
@@ -1669,6 +1686,10 @@ int ASIC_get_processor_count()
 		
 		for (unsigned char yproc = 0; yproc < 16; yproc++)
 		{
+			#if defined(DO_NOT_USE_ENGINE_ZERO)
+				if (yproc == 0) continue;
+			#endif
+			
 			if (IS_PROCESSOR_OK(xchip, yproc)) iTotalProcessorCount++;	
 		}
 	}
@@ -1686,6 +1707,27 @@ void ASIC_calculate_engines_nonce_range()
 	{
 		if (!CHIP_EXISTS(vChip)) continue;
 		iTotalProcessingPower += (GLOBAL_CHIP_FREQUENCY_INFO[vChip] * ASIC_get_chip_processor_count(vChip));
+	}
+	
+	// Is total processing power ZERO? If so, this will cause a infinite reset loop.
+	// Ask the user to powerup the board
+	// WARNING: BOARD FAILED, ASICS REQUIRE POWER CYCLE
+	if (iTotalProcessingPower == 0)
+	{
+		volatile unsigned int iVFR = MACRO_GetTickCountRet;
+		while (TRUE)
+		{
+			WATCHDOG_RESET;
+			unsigned int iRes = MACRO_GetTickCountRet + 1 - iVFR;
+			if ((iRes % 200000) < 100000)
+			{
+				MCU_MainLED_Set();
+			}
+			else
+			{
+				MCU_MainLED_Reset();
+			}
+		}
 	}
 	
 	// Now we have total processing power, see the TotalAttempts / TotalProcessingPower
@@ -1726,6 +1768,9 @@ void ASIC_calculate_engines_nonce_range()
 				if (vEngine == 0) continue;
 			#endif
 			
+			// Reset the GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME
+			GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[vChip][vEngine] = 0;
+			
 			// Is the engine OK?
 			if (!IS_PROCESSOR_OK(vChip, vEngine)) continue;
 			
@@ -1733,6 +1778,20 @@ void ASIC_calculate_engines_nonce_range()
 			GLOBAL_CHIP_PROCESSOR_ENGINE_LOWBOUND[vChip][vEngine] =	iActualLowBound;
 			GLOBAL_CHIP_PROCESSOR_ENGINE_HIGHBOUND[vChip][vEngine] = iActualLowBound + iEngineShare + ((iEngineShare > 1) ? (-1) : 0);
 			iActualLowBound += iEngineShare;
+			
+			// Also set it's maximum operating time
+			if (GLOBAL_CHIP_FREQUENCY_INFO[vChip] != 0)
+			{
+				#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+					if (ASIC_get_chip_processor_count(vChip) > 0)
+					{
+						GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[vChip][vEngine] = (((0xFFFFFFFF / GLOBAL_CHIP_FREQUENCY_INFO[vChip] / (ASIC_get_chip_processor_count(vChip))) * 180) / 100); // The result is in microseconds	(+20% overhead)	
+					}					
+				#else // One Job Per Board
+					GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[vChip][vEngine] = (iEngineShare / GLOBAL_CHIP_FREQUENCY_INFO[vChip]); // The result is in microseconds	
+				#endif
+				
+			}			
 			
 			// Remember the last engines index
 			iLastEnginesIndex = vEngine;
@@ -2044,7 +2103,11 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, con
 	
 }
 
-int ASIC_get_job_status_from_engine(unsigned int *iNonceList, unsigned int *iNonceCount, const char iChip, const char iEngine)
+int ASIC_get_job_status_from_engine(unsigned int *iNonceList, 
+									unsigned int *iNonceCount, 
+									const char iChip, 
+									const char iEngine, 
+									const bForceNonceReading)
 {
 	// Check if any chips are done...
 	if (!CHIP_EXISTS(iChip)) return ASIC_JOB_IDLE;
@@ -2054,7 +2117,7 @@ int ASIC_get_job_status_from_engine(unsigned int *iNonceList, unsigned int *iNon
 	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	
 	// Is engine done?
-	if (!ASIC_has_engine_finished_processing(iChip, iEngine))
+	if ((!ASIC_has_engine_finished_processing(iChip, iEngine)) && (bForceNonceReading == FALSE))
 	{
 		__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
 		return ASIC_JOB_NONCE_PROCESSING;
@@ -2072,7 +2135,7 @@ int ASIC_get_job_status_from_engine(unsigned int *iNonceList, unsigned int *iNon
 	}
 
 	// Is DONE bit set for this engine?
-	if ((i_status_reg & ASIC_SPI_READ_STATUS_DONE_BIT) != ASIC_SPI_READ_STATUS_DONE_BIT)
+	if (((i_status_reg & ASIC_SPI_READ_STATUS_DONE_BIT) != ASIC_SPI_READ_STATUS_DONE_BIT) && (bForceNonceReading == FALSE))
 	{
 		// This engine is IDLE
 		__MCU_ASIC_Deactivate_CS((iChip < 8) ? (1) : (2));
@@ -2271,7 +2334,6 @@ void ASIC_job_issue(void* pJobPacket,
 	pjob_packet pjp = (pjob_packet)(pJobPacket);
 	
 
-	
 	// Have we ever come here before? If so, don't program static data in the registers any longer
 	static unsigned char bIsThisOurFirstTime = TRUE;
 
@@ -2430,14 +2492,6 @@ void ASIC_job_issue(void* pJobPacket,
 						MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (iUpperRange & 0x0FFFF0000) >> 16);
 					#endif					
 				}
-
-
-	
-				//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (0x4250));
-				//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (0x38E9));
-				//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (0x4280));
-				//__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (0x38E9));
-	
 			
 				// Should we export spreads?
 				#if defined(__EXPORT_ENGINE_RANGE_SPREADS)			
@@ -2490,7 +2544,7 @@ void ASIC_job_issue(void* pJobPacket,
 				for (volatile int y_engine = 0; y_engine < 16; y_engine++)
 				{
 					// Is this processor healthy?
-					if (!IS_PROCESSOR_OK(x_chip_b2, y_engine)) continue;
+					if (!IS_PROCESSOR_OK(x_chip, y_engine)) continue;
 					
 					// STATIC RULE - Engine 0 not used
 					#if defined(DO_NOT_USE_ENGINE_ZERO)
@@ -2603,10 +2657,10 @@ void ASIC_job_issue(void* pJobPacket,
 					// All data sent, now set range
 					if (bIssueToSingleChip == TRUE)
 					{
-						MACRO__ASIC_WriteEngineExpress(x_chip_b2, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (iLowerRange & 0x0FFFF));
-						MACRO__ASIC_WriteEngineExpress(x_chip_b2, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (iLowerRange & 0x0FFFF0000) >> 16);
-						MACRO__ASIC_WriteEngineExpress(x_chip_b2, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (iUpperRange & 0x0FFFF));
-						MACRO__ASIC_WriteEngineExpress(x_chip_b2, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (iUpperRange & 0x0FFFF0000) >> 16);
+						MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2, y_engine, ASIC_SPI_MAP_COUNTER_LOW_LWORD,  (iLowerRange & 0x0FFFF));
+						MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2, y_engine, ASIC_SPI_MAP_COUNTER_LOW_HWORD,  (iLowerRange & 0x0FFFF0000) >> 16);
+						MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, (iUpperRange & 0x0FFFF));
+						MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2, y_engine, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, (iUpperRange & 0x0FFFF0000) >> 16);
 					}
 					else
 					{
@@ -2687,6 +2741,16 @@ void ASIC_job_issue(void* pJobPacket,
 	// ORIGINAL> if (bIssueToSingleChip == FALSE) bIsThisOurFirstTime = FALSE; // We only set it to false if we're sending the job to all engines on the BOARD
 	bIsThisOurFirstTime = FALSE; // We only set it to false if we're sending the job to all engines on the BOARD
 
+	if (bIssueToSingleChip == FALSE)
+	{
+		// Set our timestamp
+		GLOBAL_LastJobIssueToAllEngines = MACRO_GetTickCountRet;
+	}
+
+	// Are we on OneJobPerChip?
+	#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+		GLOBAL_LastJobIssuedToChip[iChipToIssue] = MACRO_GetTickCountRet;	
+	#endif
 
 }
 
@@ -3085,6 +3149,8 @@ int ASIC_is_processing()
 	int iTotalChips = ASIC_get_chip_count();
 	int iTotalChipsDone = 0;
 	
+	GLOBAL_LAST_ASIC_IS_PROCESSING_LATENCY = MACRO_GetTickCountRet;
+	
 	for (unsigned char iChip = 0; iChip < TOTAL_CHIPS_INSTALLED; iChip++)
 	{
 		if (!CHIP_EXISTS(iChip)) continue;
@@ -3100,6 +3166,9 @@ int ASIC_is_processing()
 			return TRUE;
 		}		
 	}
+	
+		
+	GLOBAL_LAST_ASIC_IS_PROCESSING_LATENCY = MACRO_GetTickCountRet - GLOBAL_LAST_ASIC_IS_PROCESSING_LATENCY;
 		
 	// Since jobs are divided equally among the engines. they will all nearly finish the same time... 
 	// (Almost that is...)

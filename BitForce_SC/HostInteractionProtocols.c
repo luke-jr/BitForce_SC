@@ -131,8 +131,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	unsigned int  iLM[16];
 	unsigned char ilmCounter = 0;
 	unsigned int  iNonceCount;
-	
-	
+		
 	/*
 	unsigned int iTMTX = MACRO_GetTickCountRet;
 	JobPipe__test_buffer_shifter();
@@ -170,13 +169,27 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"IAR Executed: %s\n", (GLOBAL_INTERNAL_ASIC_RESET_EXECUTED == TRUE) ? "YES" : "NO");
 	strcat(szInfoReq, szTemp);
 	
+	// Chip parallelization?
+	#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+		sprintf(szTemp,"CHIP PARALLELIZATION: YES @ %d\n", ASIC_get_chip_count());
+		strcat(szInfoReq, szTemp);
+	#else
+		sprintf(szTemp,"CHIP PARALLELIZATION: NO\n");
+		strcat(szInfoReq, szTemp);
+	#endif
+	
+	// Also mark the Queue depth
+	sprintf(szTemp,"QUEUE DEPTH:%d\n", PIPE_MAX_BUFFER_DEPTH);
+	strcat(szInfoReq, szTemp);
+	
 	// Scattered operation took?
 	// Issue jobs to the queue
-	/*static int iMMA = 0;
+	/*
+	static int iMMA = 0;
 	
 	if (iMMA == 1)
 	{
-		volatile unsigned int iHighTestTime = MACRO_GetTickCountRet;
+		volatile unsigned int iHighTestTime = 0;
 		
 		JobPipe__pipe_set_buf_job_results_count(0);
 		job_packet jpx;
@@ -188,12 +201,24 @@ PROTOCOL_RESULT Protocol_info_request(void)
 		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
 		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
 		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);
+		JobPipe__pipe_push_job(&jpx); JobPipe__pipe_push_job(&jpx);		
 		
-		while (JobPipe__pipe_get_buf_job_results_count() != 16)
+		while (JobPipe__pipe_get_buf_job_results_count() != 32)
 		{
 			WATCHDOG_RESET;
-			//Microkernel_Spin();
-			PipeKernel_Spin();
+			Microkernel_Spin();
+			if (JobPipe__pipe_get_buf_job_results_count() == 16)
+			{
+				if (iHighTestTime == 0) iHighTestTime = MACRO_GetTickCountRet;
+			}
+			//PipeKernel_Spin();
 		}
 		
 		JobPipe__pipe_set_buf_job_results_count(0);
@@ -205,6 +230,82 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	
 	iMMA = 1;
 	*/
+	
+	
+	// Perform chip-by-chip test
+	#if defined(__PERFORM_CHIP_BY_CHIP_TEST)
+		
+		for (char iScanChip = 0; iScanChip < TOTAL_CHIPS_INSTALLED; iScanChip++)
+		{
+			if (!CHIP_EXISTS(iScanChip)) continue;
+			
+			const job_packet Jb7 = {{0x33,0xFB,0x46,0xDC,0x61,0x2A,0x7A,0x23,0xF0,0xA2,0x2D,0x63,0x31,0x54,0x21,0xDC,0xAE,0x86,0xFE,0xC3,0x88,0xC1,0x9C,0x8C,0x20,0x18,0x10,0x68,0xFC,0x95,0x3F,0xF7},
+									{0xEF,0xAF,0xBA,0xC3,0x51,0xA3,0x6F,0x32,0x1A,0x01,0x61,0x64},0xAA};
+			const unsigned int Jb7NonceCount = 8;
+			const unsigned int Jb7Nonces[] = {0x045ABCED,0x50460F87,0x6C4054E0,0x7C04C5EA,0x82D56423,0xA1C4B2A0,0xECF081A3,0xF803DF88};
+				
+			// OK, Send a job to this chip (8 Nonce one)
+			if (iScanChip < 16)
+			{
+				ASIC_job_issue(&Jb7, 0x0,0xFFFFFFFF, TRUE, iScanChip, FALSE);
+			}				
+			else
+			{
+				__MCU_ASIC_Activate_CS(2);
+				for (unsigned char tt = 0; tt < 16; tt++)
+				{
+					if (!IS_PROCESSOR_OK(iScanChip, tt)) continue;
+					__AVR32_SC_WriteData(iScanChip, tt, ASIC_SPI_MAP_COUNTER_LOW_LWORD, 0x0000);
+					__AVR32_SC_WriteData(iScanChip, tt, ASIC_SPI_MAP_COUNTER_LOW_HWORD, 0x0000);										
+					__AVR32_SC_WriteData(iScanChip, tt, ASIC_SPI_MAP_COUNTER_HIGH_LWORD, 0x0000);
+					__AVR32_SC_WriteData(iScanChip, tt, ASIC_SPI_MAP_COUNTER_HIGH_HWORD, 0x1000);
+					ASIC_WriteComplete(iScanChip,tt);
+				}			
+				__MCU_ASIC_Deactivate_CS(2);	
+			}				
+			
+			// Wait until it finishes
+			unsigned int iNonceList[8];
+			unsigned int iNonceCount = 0;
+			volatile unsigned int ivTimeHolder = MACRO_GetTickCountRet;
+			unsigned char bTimeoutDetected = FALSE;
+			
+			while (TRUE)
+			{
+				// Have we surpassed 4 seconds? 
+				if (MACRO_GetTickCountRet + 1 - ivTimeHolder > 4000000) // 4 seconds
+				{
+					bTimeoutDetected = TRUE;
+					break;
+				}
+				
+				// Check
+				char vRes = ASIC_get_job_status(&iNonceList, &iNonceCount, TRUE, iScanChip);
+				
+				// Is it still processing?
+				if (vRes == ASIC_JOB_NONCE_PROCESSING)
+				{
+					WATCHDOG_RESET;
+					continue;
+				} else break;			
+			}	
+			
+			unsigned int ivTotalTime = MACRO_GetTickCountRet - ivTimeHolder;
+			
+			// Did we timeout?
+			if (bTimeoutDetected == TRUE)
+			{
+				sprintf(szTemp,"PROCESSOR %X Timeout!\n", iScanChip);
+				strcat(szInfoReq, szTemp);				
+			}
+			else
+			{
+				// Number of nonces found @ time
+				sprintf(szTemp,"PROCESSOR %X Finished; %d Nonces @ %d ms\n", iScanChip, iNonceCount, ivTotalTime / 1000);
+				strcat(szInfoReq, szTemp);				
+			}
+		}	
+	#endif
 		
 	// Report all busy engines
 	#if defined(__REPORT_BUSY_ENGINES)
@@ -265,7 +366,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 			 WATCHDOG_RESET;
 		}			 
 		
-		UL_TOTALTIME = MACRO_GetTickCountRet - UL_TIMESTART;
+		UL_TOTALTIME = MACRO_GetTickCountRet - UL_TIMESTART - GLOBAL_LAST_ASIC_IS_PROCESSING_LATENCY;
 		
 		/*unsigned int iResVals[16];
 		unsigned int iResCount = 0;
@@ -276,11 +377,11 @@ PROTOCOL_RESULT Protocol_info_request(void)
 		// Total time in microseconds is in UL_TOTALTIME
 		float fTotalSpeed = ((4.2969 * 1000000) / (UL_TOTALTIME));
 		float fTotalSpeedPostJob = ((4.2969 * 1000000) / (MACRO_GetTickCountRet - UL_TIMEZERO));
-		sprintf(szTemp,"RAW MINIG SPEED: %.2f GH/s\n", fTotalSpeed);
+		sprintf(szTemp,"Raw Speed: %.2f GH/s\n", fTotalSpeed);
 		strcat(szInfoReq, szTemp);		
-		sprintf(szTemp,"JOB SUBMISSION: %d us\n", UL_TIMESTART - UL_TIMEZERO);
-		strcat(szInfoReq, szTemp);		
-		sprintf(szTemp,"ZDX(SX) Mining Speed: %.2f GH/s\n", fTotalSpeedPostJob);
+		//sprintf(szTemp,"JOB SUBMISSION: %d us\n", UL_TIMESTART - UL_TIMEZERO);
+		//strcat(szInfoReq, szTemp);		
+		sprintf(szTemp,"ZDX(SX) Speed: %.2f GH/s\n", fTotalSpeedPostJob);
 		strcat(szInfoReq, szTemp);		
 		
 		// Do we test pipe?
@@ -325,22 +426,20 @@ PROTOCOL_RESULT Protocol_info_request(void)
 				//}					
 				
 				// If job count is one then set the thing
-				if (JobPipe__pipe_get_buf_job_results_count() == 1)
+				if (JobPipe__pipe_get_buf_job_results_count() == 2)
 				{
 					if (iActualTPP_Count == 0)
 					{
 						iActualTPP_Count = MACRO_GetTickCountRet;
 					}						
 				}
-				else if (JobPipe__pipe_get_buf_job_results_count() == 2)
+				else if (JobPipe__pipe_get_buf_job_results_count() == 3)
 				{
 					iActualTPP_Count = MACRO_GetTickCountRet - iActualTPP_Count;
+					break;
 				}
 			}
 			
-			//sprintf(szTemp,"MicroKernel TMAX: %dus , iPA: %d\n", iMicroKernelT2,iPA);
-			//strcat(szInfoReq, szTemp);
-		
 			if (bTimeoutDetected == TRUE)
 			{
 				sprintf(szTemp,"TIMEOUT DETECTED @ %dus!\n", MACRO_GetTickCountRet - iActualTime );
@@ -355,11 +454,9 @@ PROTOCOL_RESULT Protocol_info_request(void)
 			}
 
 		#endif 
-		
-		
+				
 		// At this point, clear results buffer
-		JobPipe__pipe_set_buf_job_results_count(0);
-		
+		JobPipe__pipe_set_buf_job_results_count(0);		
 	#endif
 	
 	#if defined(__CHIP_FREQUENCY_DETECT_AND_REPORT)
@@ -424,7 +521,7 @@ PROTOCOL_RESULT Protocol_info_request(void)
 			#endif 
 		}
 		
-		sprintf(szTemp,"THEORETICAL MAX %d MH/s\n", iTheoreticalMaxSpeed);
+		sprintf(szTemp,"THEORETICAL MAX: %d MH/s\n", iTheoreticalMaxSpeed);
 		strcat(szInfoReq, szTemp);
 	
 	#endif
@@ -1618,6 +1715,7 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK()
 	return res;
 }
 
+// ZQX
 PROTOCOL_RESULT  Protocol_PIPE_BUF_FLUSH(void)
 {
 	// Our result
@@ -1647,6 +1745,60 @@ PROTOCOL_RESULT  Protocol_PIPE_BUF_FLUSH(void)
 	// Return our result
 	return res;
 }
+
+// ZqX
+PROTOCOL_RESULT  Protocol_PIPE_BUF_FLUSH_EX(void)
+{
+	// Our result
+	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
+
+	// Reset the FIFO
+	volatile char iTotalJobsActuallyInBuffer = JobPipe__total_jobs_in_pipe();
+	JobPipe__pipe_flush_buffer();
+
+	// How many jobs being processed?
+	unsigned char iTotalJobsBeingProcessed = 0;
+	for (unsigned char iChipIndex = 0; iChipIndex < TOTAL_CHIPS_INSTALLED; iChipIndex++)
+	{
+		// Add it to stream
+		if (!CHIP_EXISTS(iChipIndex)) continue;
+		if (__inprocess_SCQ_chip_processing[iChipIndex] == TRUE) iTotalJobsBeingProcessed++;
+	}	
+
+	// Send OK first
+	char szFlshString[4096];
+	sprintf(szFlshString, "COUNT:%d FLUSHED:%d\n", iTotalJobsBeingProcessed, iTotalJobsActuallyInBuffer);
+
+	// Also add the remaining information
+	unsigned int iActualTerminationIndex = strlen(szFlshString);
+	for (unsigned char iChipIndex = 0; iChipIndex < TOTAL_CHIPS_INSTALLED; iChipIndex++)
+	{
+		// Add it to stream
+		if (!CHIP_EXISTS(iChipIndex)) continue;
+		if (__inprocess_SCQ_chip_processing[iChipIndex] == FALSE) continue;
+		__aux_PrintFlushResultToBuffer(szFlshString, iChipIndex, iActualTerminationIndex, &iActualTerminationIndex);				
+	}
+	
+	strcat(szFlshString,"OK\n");
+	
+	// Proceed...
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string(szFlshString);  // Send it to USB
+	}
+	else // We're a slave... send it by XLINK
+	{
+		unsigned int bXTimeoutDetected = 0;
+		XLINK_SLAVE_respond_transact(szFlshString, strlen(szFlshString),
+									__XLINK_TRANSACTION_TIMEOUT__,
+									&bXTimeoutDetected,
+									FALSE);
+	}
+
+	// Return our result
+	return res;
+}
+
 
 // Returns only the status of the last processed job
 // from the buffer, and will not initiate the next job process
@@ -1847,6 +1999,17 @@ volatile void __aux_PrintResultToBuffer(char* szBuffer, const void* pResult, con
 		iHoverPos += 2;
 	}
 	
+	// Add chip number if running one job per chip
+	#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+	
+		// Add comma
+		szBuffer[iHoverPos++] = ',';
+	
+		// Count of the nonces?
+		szBuffer[iHoverPos++] = __aux_CharMap[pjob_res->iProcessingChip];
+		
+	#endif
+	
 	// Add comma
 	szBuffer[iHoverPos++] = ',';
 	
@@ -1893,6 +2056,46 @@ volatile void __aux_PrintResultToBuffer(char* szBuffer, const void* pResult, con
 	
 }
 
+volatile void __aux_PrintFlushResultToBuffer(char* szBuffer, const int iChipIndex, const unsigned int iStartPosition, unsigned int* iEndPositionPlusOne)
+{
+	// Ok, we start by outputting the midstate, starting from position
+	volatile unsigned int iHoverPos = iStartPosition;
+	volatile unsigned int iTemp = 0;
+	
+	for (iTemp = 0; iTemp < 32; iTemp++)
+	{
+		szBuffer[iHoverPos]   = _AUX_LEFT_HEX(__inprocess_SCQ_midstate[iChipIndex][iTemp]);
+		szBuffer[iHoverPos+1] = _AUX_RIGHT_HEX(__inprocess_SCQ_midstate[iChipIndex][iTemp]);
+		// Increase iHover by 2
+		iHoverPos += 2;
+	}
+
+	// Add comma
+	szBuffer[iHoverPos++] = ',';
+	
+	// Proceed
+	for (iTemp = 0; iTemp < 12; iTemp++)
+	{
+		szBuffer[iHoverPos]   = _AUX_LEFT_HEX (__inprocess_SCQ_blockdata[iChipIndex][iTemp]);
+		szBuffer[iHoverPos+1] = _AUX_RIGHT_HEX(__inprocess_SCQ_blockdata[iChipIndex][iTemp]);
+		// Increase iHover by 2
+		iHoverPos += 2;
+	}
+	
+	// Add chip number if running one job per chip
+	#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
+		// Add comma
+		szBuffer[iHoverPos++] = ',';
+		// Count of the nonces?
+		szBuffer[iHoverPos++] = __aux_CharMap[iChipIndex];
+	#endif
+	
+	// Count of the nonces?
+	szBuffer[iHoverPos++] = '\n';
+	szBuffer[iHoverPos] = '\0';
+	*iEndPositionPlusOne = iHoverPos;
+	return;
+}
 
 
 

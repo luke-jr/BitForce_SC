@@ -190,21 +190,37 @@ volatile void Microkernel_Spin()
 					
 					// Ok, now check the information. If this engine
 					// is active mining and it has been running for more than ENGINE_MAXIMUM_BUSY_TIME then cut it off
-					if (GLOBAL_ENGINE_PROCESSING_STATUS[xChip][yEngine] == FALSE) continue; // No need to check, as this engine is IDLE
+					char bIsEngineProcessing = ASIC_is_engine_processing(xChip, yEngine);
 					
 					// Check operating time
-					if ((unsigned int)(MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[xChip][yEngine]) > __ENGINE_MAXIMUM_BUSY_TIME)
+					if (bIsEngineProcessing == TRUE)
 					{
-						// Deactivate it
-						DECOMMISSION_PROCESSOR(xChip, yEngine);
-						bWasAnyEngineModified = TRUE;
-					}					
+						if ((unsigned int)(MACRO_GetTickCountRet - GLOBAL_ENGINE_PROCESSING_START_TIMESTAMP[xChip][yEngine]) > GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[xChip][yEngine] + __ENGINE_OPERATING_TIME_OVERHEAD)
+						{
+							// Deactivate it
+							#if defined(DECOMMISSION_ENGINES_IF_LATE)
+								DECOMMISSION_PROCESSOR(xChip, yEngine);
+								
+								#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
+								char szTempEx[128];
+								sprintf(szTempEx,"CHIP %d ENGINE %d DECOMMISSIONED!\n", xChip, yEngine);
+								strcat(szDecommLog, szTempEx);
+								#endif
+								
+								bWasAnyEngineModified = TRUE;
+							#else
+								// Just reset it, but don't do anything bad :)
+								ASIC_reset_engine(xChip, yEngine);
+							#endif
+						}							
+					}
 				}
 				
 				// Decomission chips if they have zero processors left
 				if (ASIC_get_chip_processor_count(xChip) == 0)
 				{
 					__chip_existence_map[xChip] = 0;
+					__internal_global_iChipCount -= 1; // A chip was decommissioned
 				}
 			}
 			

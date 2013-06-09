@@ -48,6 +48,7 @@
 #define	PROTOCOL_REQ_BUF_PUSH_JOB_PACK		22+65 // W  (ZWX Pushes a Pack of jobs -- 5 to be exact)
 #define	PROTOCOL_REQ_BUF_STATUS			  	14+65 // O
 #define PROTOCOL_REQ_BUF_FLUSH				16+65 // Q ZQX
+#define PROTOCOL_REQ_BUF_FLUSH_EX			16+97 // q ZqX
 #define PROTOCOL_REQ_GET_VOLTAGES			19+65 // T
 #define PROTOCOL_REQ_PRESENCE_DETECTION		17+65 // R // Respond with something if we don't have an ID attached to us...
 #define PROTOCOL_REQ_GET_CHAIN_LENGTH		23+65 // X
@@ -102,8 +103,10 @@ PROTOCOL_RESULT Protocol_PIPE_BUF_PUSH_PACK(void);
 PROTOCOL_RESULT	Protocol_P2P_BUF_STATUS(void);
 volatile void __aux_PrintResultToBuffer(char* szBuffer, const void* pResult, const unsigned int iStartPosition, unsigned int* iEndPositionPlusOne);
 
-// This function flushes the P2P FIFO
+// This function flushes the FIFO
 PROTOCOL_RESULT Protocol_PIPE_BUF_FLUSH(void);
+PROTOCOL_RESULT Protocol_PIPE_BUF_FLUSH_EX(void);
+volatile void __aux_PrintFlushResultToBuffer(char* szBuffer, const int iChipIndex, const unsigned int iStartPosition, unsigned int* iEndPositionPlusOne);
 
 // This sets/gets our ASICs frequency
 PROTOCOL_RESULT Protocol_get_freq_factor(void);
