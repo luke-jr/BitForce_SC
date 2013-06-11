@@ -1785,7 +1785,7 @@ void ASIC_calculate_engines_nonce_range()
 				#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
 					if (ASIC_get_chip_processor_count(vChip) > 0)
 					{
-						GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[vChip][vEngine] = (((0xFFFFFFFF / GLOBAL_CHIP_FREQUENCY_INFO[vChip] / (ASIC_get_chip_processor_count(vChip))) * 180) / 100); // The result is in microseconds	(+20% overhead)	
+						GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[vChip][vEngine] = (((0xFFFFFFFF / GLOBAL_CHIP_FREQUENCY_INFO[vChip] / (ASIC_get_chip_processor_count(vChip))) * 120) / 100); // The result is in microseconds	(+20% overhead)	
 					}					
 				#else // One Job Per Board
 					GLOBAL_ENGINE_MAXIMUM_OPERATING_TIME[vChip][vEngine] = (iEngineShare / GLOBAL_CHIP_FREQUENCY_INFO[vChip]); // The result is in microseconds	

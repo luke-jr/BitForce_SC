@@ -88,7 +88,7 @@
 
 char __OUR_CPLD_ID = 0;
 char __OUR_CHAIN_LENGTH = 0;
-int  __internal_are_we_master = 0;
+int  __internal_are_we_master = FALSE;
 
 // This is the XLINK out box buffer
 char XLINK_Outbox[4096]; 

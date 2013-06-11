@@ -172,8 +172,8 @@ int main(void)
 	{
 		if (XLINK_is_cpld_present() == TRUE)
 		{
-			// Disable pass-through and set our cpld-address = 255
-			// We later will await enumeration
+			// Disable pass-through and set our cpld-address = 0x1E
+			// We will await enumeration
 			XLINK_set_cpld_id(XLINK_GENERAL_DISPATCH_ADDRESS);
 			XLINK_set_cpld_master(FALSE);
 			XLINK_set_cpld_passthrough(FALSE);

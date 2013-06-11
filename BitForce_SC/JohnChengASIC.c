@@ -2,7 +2,6 @@
  * JohnChengASIC.c
  *
  * Created: 24/03/2013 17:28:45
- *  Author: NASSER GHOSEIRI
  */ 
 
 #include "JohnChengASIC.h"

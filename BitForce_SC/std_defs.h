@@ -3,6 +3,8 @@
  *
  * Created: 09/10/2012 01:14:49
  *  Author: NASSER GHOSEIRI
+ *
+ * WARNING: Supported optimization is -O3
  */ 
 
 #ifndef STD_DEFS_H_
@@ -55,11 +57,11 @@
 /////////////////////////////////////////////////////////////////////////
 // -- This option will provide detailed information when PROTOCOL_REQ_INFO_REQ
 // -- regarding chips behavior
-//#define	__CHIP_DIAGNOSTICS_VERBOSE		
+//#define __CHIP_DIAGNOSTICS_VERBOSE		
 
 // -- Also this option enables chip by chip diagnostics
 //#define __CHIP_BY_CHIP_DIAGNOSTICS		
-// #define __ENGINE_BY_ENGINE_DIAGNOSTICS	
+//#define __ENGINE_BY_ENGINE_DIAGNOSTICS	
 //#define __EXPORT_ENGINE_RANGE_SPREADS	
 
 //-- Reports the busy engines on InfoRequest command
@@ -97,7 +99,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #if defined(__PRODUCT_MODEL_JALAPENO)
 	#define __ASIC_FREQUENCY_ACTUAL_INDEX   1 // 180MHz for Jalapeno
 #else	
-	#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 // 291MHz for the rest
+	#define __ASIC_FREQUENCY_ACTUAL_INDEX   5 
 #endif
 
 #define __MAXIMUM_FREQUENCY_INDEX       9
@@ -326,7 +328,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      44
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION		"1.2.0"	// This is firmware 1.2.0
+#define __FIRMWARE_VERSION		"1.2.0"	// This is firmware 1.2.0 [ CHIP PARALLELIZATION supported on this version and after ]
 
 /*************** UNIT ID STRING ********************/
 #define  UNIT_ID_STRING			"BitForce SHA256 SC 1.0\n"
@@ -374,12 +376,13 @@ typedef struct _tag_job_packet
 	char signature;	// 1 byte, it's 0xAA
 } job_packet, *pjob_packet;
 
+// DEPRECATED: Very Low Latency issues 
 typedef struct _tag_job_packet_p2p
 {
 	char midstate[32]; // 256Bits of midstate
 	char block_data[12]; // 12 Bytes of data
-	unsigned int  nonce_begin; // 4 Bytes of Nonce-Begin (Little-Endian)
-	unsigned int  nonce_end; // 4 Bytes of Nonce-End (Little-Endian)
+	unsigned int  nonce_begin; // 4 Bytes of Nonce-Begin 
+	unsigned int  nonce_end;   // 4 Bytes of Nonce-End
 	char signature; // 1 byte, it's 0xAA
 } job_packet_p2p, *pjob_packet_p2p;
 
