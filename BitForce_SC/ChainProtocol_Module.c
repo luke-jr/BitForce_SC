@@ -695,7 +695,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 	volatile char  iBC = 0; // BitCorrector
 	volatile char  iTotalRetryCount = 0;
 	
-	char sziMX[16] = {0,0,0,0,0};
+	volatile char sziMX[16] = {0,0,0,0,0};
 		
 	// What is our address?
 	volatile char  our_address = __OUR_CPLD_ID;
@@ -870,31 +870,31 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 	
 	// This is how we do it, we start sending packets and we wait for response.
 	// Each time we wait for 20us for reply. Should the device not respond, we abort the transaction
-	volatile unsigned int    iActualTickcount = MACRO_GetTickCountRet;
-	volatile unsigned short  iTotalSent = 0;
-	volatile unsigned short  iBytesToSend = 0;
-	volatile char  iBC = 1; // BitCorrector is ONE, since the previous part has already set it to one!
-	volatile char  iTotalRetryCount = 0;
+	volatile unsigned int   iActualTickcount = MACRO_GetTickCountRet;
+	volatile unsigned short iTotalSent = 0;
+	volatile unsigned short iBytesToSend = 0;
+	volatile char iBC = 1;	 // BitCorrector is ONE, since the previous part has already set it to one!
+	volatile char iTotalRetryCount = 0;
 	
-	volatile char  szPrevData[4];
-	volatile char  iPrevDataLen = 0;
-	volatile char  iPrevLP = 0;
-	volatile char  iPrevBC = 0;
+	volatile char szPrevData[4];
+	volatile char iPrevDataLen = 0;
+	volatile char iPrevLP = 0;
+	volatile char iPrevBC = 0;
 	
-	volatile UL32  vTemp1;
-	volatile UL32  vTemp2;
-	volatile UL32  vTemp3;
+	volatile UL32 vTemp1;
+	volatile UL32 vTemp2;
+	volatile UL32 vTemp3;
 	
 	// Now we have to wait for data
 	while (1)
 	{
 		// Wait for OK packet for 20us
-		char iTimeoutDetected = 0;
-		char szResp[4];
-		unsigned int  __iRespLen = 0;
-		char __senders_address = 0;
-		char __lp = 0;
-		char __bc = 0;
+		volatile char iTimeoutDetected = 0;
+		volatile char szResp[4];
+		volatile unsigned int  __iRespLen = 0;
+		volatile char __senders_address = 0;
+		volatile char __lp = 0;
+		volatile char __bc = 0;
 		
 RETRY_POINT_1:
 
@@ -1038,12 +1038,12 @@ RETRY_POINT_1:
 	while (1)
 	{
 		// Wait for OK packet for 20us
-		char iTimeoutDetected = 0;
-		char szResp[4];
-		unsigned int  __iRespLen = 0;
-		char __senders_address = 0;
-		char __lp = 0;
-		char __bc = 0;
+		volatile char iTimeoutDetected = 0;
+		volatile char szResp[4];
+		volatile unsigned int  __iRespLen = 0;
+		volatile char __senders_address = 0;
+		volatile char __lp = 0;
+		volatile char __bc = 0;
 		
 RETRY_POINT_2:
 		

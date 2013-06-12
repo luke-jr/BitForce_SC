@@ -207,9 +207,9 @@ PROTOCOL_RESULT Protocol_Echo(void)
 	// Send the OK back first
 	// All is good... sent the identifier and get out of here...
 	if (XLINK_ARE_WE_MASTER)
-	USB_send_string("ECHO");  // Send it to USB
+		USB_send_string("ECHO");  // Send it to USB
 	else // We're a slave... send it by XLINK
-	XLINK_send_packet(XLINK_get_cpld_id(), "ECHO", 4, TRUE, FALSE);
+		XLINK_send_packet(XLINK_get_cpld_id(), "ECHO", 4, TRUE, FALSE);
 	
 	// Return our result...
 	return res;
@@ -280,6 +280,21 @@ while(TRUE) \
 	}) 		
 */
 
+
+volatile UL32 OPTO_GetTickCountRet(void);
+volatile UL32 OPTO_GetTickCountRet(void){ return ((UL32)((UL32)(MAST_TICK_COUNTER) | (UL32)(AVR32_TC.channel[0].cv)) >> 1); }
+	
+volatile void CIPHER_X(void);
+volatile void CIPHER_X(void)
+{
+	for (unsigned int uss = 0; uss < 300000; uss++)
+	{
+		volatile char read_tx_status = 0x0FF; 
+		while ((read_tx_status & CPLD_TX_STATUS_TxInProg) != 0) { MACRO_XLINK_get_TX_status(read_tx_status);} 
+		MACRO_XLINK_set_target_address(1);
+		MACRO__AVR32_CPLD_WriteTxControlAndStart(0b00011110);		
+	}
+}
 
 PROTOCOL_RESULT Protocol_Test_Command(void)
 {
@@ -359,6 +374,7 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 	// Calculate single turn-around time
 	volatile UL32 iSecondaryTickTemp = 0;
 	volatile UL32 iActualTickTemp = 0;
+	volatile UL32 iTotalGoodDelay = 0;
 	
 	// Now we send message to XLINK_GENERAL_DISPATCH_ADDRESS for an ECHO and count the successful iterations
 	for (unsigned int x = 0; x < 100000; x++)
@@ -377,8 +393,6 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		szResponse[0] = 0; szResponse[1] = 0; szResponse[2] = 0; szResponse[3] = 0;
 		iRespLen = 0;	
 		
-		// Clear RX
-		MACRO_XLINK_clear_RX;
 		iActualTickTemp = MACRO_GetTickCountRet;
 	
 		// Send the command
@@ -398,13 +412,16 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		iTotalTimeTaken += iTempX;
 		
 		if ((iRespLen == 4) &&
-		(szResponse[0] == 'E') &&
-		(szResponse[1] == 'C') &&
-		(szResponse[2] == 'H') &&
-		(szResponse[3] == 'O'))
+			(szResponse[0] == 'E') &&
+			(szResponse[1] == 'C') &&
+			(szResponse[2] == 'H') &&
+			(szResponse[3] == 'O'))
 		{	
 			if (x == 0) iTurnaroundTime = (iSecondaryTickTemp - iActualTickTemp);
 			if (iTurnaroundTime > 0) iTurnaroundTime -= 1;
+			
+			// Increase good count
+			iTotalGoodDelay += (iTempX - 1);
 			
 			//  Update turnaround time
 			if (iSecondaryTickTemp - iActualTickTemp < iTurnaroundTime) 
@@ -426,9 +443,12 @@ PROTOCOL_RESULT Protocol_Test_Command(void)
 		strcat(szReportResult, szTempex);
 		
 	}*/	
-	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %u us\nLeast transact: %u us\n",
-			iSuccessCounter, 100000, (unsigned int)iTotalTimeTaken, (unsigned int)iTurnaroundTime );
+	sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %u us\nLeast transact: %u us, Total good delay: %u us\n",
+			iSuccessCounter, 100000, (unsigned int)iTotalTimeTaken, (unsigned int)iTurnaroundTime,(unsigned int)iTotalGoodDelay);
 
+	/*sprintf(szTempex, "\nTotal success: %d / %d\nTotal duration: %u us\nLeast transact: %u us\n",
+			iSuccessCounter, 100000, (unsigned int)iTotalTimeTaken, (unsigned int)iTurnaroundTime);
+	*/
 	strcat(szReportResult, szTempex);
 	
 	// Send the OK back first

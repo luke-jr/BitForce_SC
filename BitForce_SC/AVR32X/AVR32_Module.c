@@ -57,8 +57,21 @@ void __AVR32_LowLevelInitialize()
 		AVR32_PLL0 = 0b00011111000001110000010000000101; // PLL0 at 32MHz (same as the first mode here, as the PLL will not be used)
 	#endif
 
+	// Enable watchdog to reset the system if PLL fails
+	AVR32_WDT.ctrl = (0x055000000) | (0b1011000000000) | 0b01; // Timeout is set to 142ms
+	NOP_OPERATION;
+	AVR32_WDT.ctrl = (0x0AA000000) | (0b1011000000000) | 0b01;
+	NOP_OPERATION;
+	AVR32_WDT.clr = 0x0FFFFFFFF;
+
 	// Wait until PLL0 is stable (1 is PLL0 LOCK status bit)
 	while ((AVR32_POSCSR & (1)) == 0);
+	
+	// Disable watchdog to reset the system if PLL fails
+	/*AVR32_WDT.ctrl = (0x055000000) | (0b0101000000000) | 0b00;
+	NOP_OPERATION;
+	AVR32_WDT.ctrl = (0x0AA000000) | (0b0101000000000) | 0b00;
+	NOP_OPERATION;*/
 
 	// ********* Activate Generic clock
 	#if defined(__OPERATING_FREQUENCY_32MHz__)
@@ -85,9 +98,7 @@ void __AVR32_LowLevelInitialize()
 	#elif defined(__OPERATING_FREQUENCY_48MHz__)
 		AVR32_MCCTRL |= 0b010; 	// MCSEL = 1 -- PLL0 Selected			
 	#endif
-	
-	
-	
+			
 	// Wait a little, until everything is stable...
 	volatile int i_delay = 0;
 	while (i_delay < 8000) i_delay++;
@@ -289,7 +300,7 @@ volatile int __AVR32_A2D_GetPWR_MAIN()
 /////////////////////////////////////////////
 // USB Chip Functions
 /////////////////////////////////////////////
-void __AVR32_USB_Initialize()
+volatile void __AVR32_USB_Initialize()
 {
 	// Enable GPIOs on Port A
 	AVR32_GPIO.port[0].gpers =  __AVR32_USB_AD0 | __AVR32_USB_AD1 | __AVR32_USB_AD2 | __AVR32_USB_AD3 |
@@ -307,13 +318,13 @@ void __AVR32_USB_Initialize()
 	AVR32_GPIO.port[0].ovrc  =  __AVR32_USB_A0;
 }
 
-void __AVR32_USB_SetAccess()
+volatile void __AVR32_USB_SetAccess()
 {
 	// No conditional access here, we simply return...
 	return;
 }
 
-char __AVR32_USB_WriteData(char* iData, char iCount)
+volatile char __AVR32_USB_WriteData(char* iData, char iCount)
 {
 	// Return if we're zero
 	if (iCount == 0) return 0;
@@ -328,7 +339,19 @@ char __AVR32_USB_WriteData(char* iData, char iCount)
 		// Is there space available?
 		if ((__AVR32_USB_GetInformation() & 0b010) == FALSE) 
 		{
-			break;
+			// Activate Send Immediate and wait until data is sent
+			__AVR32_USB_FlushOutputData();
+			
+			
+			// Wait until there is space available (With a countdown)			
+			volatile unsigned int iRevCounter = 0x0010F0000;
+			while ((iRevCounter-- > 0) && ((__AVR32_USB_GetInformation() & 0b010) == FALSE))
+			{
+				// Do nothing
+			}
+		
+			// Did we timeout? If so, break
+			if (iRevCounter == 0) break;
 		}			
 		
 		// Write data
@@ -349,7 +372,7 @@ char __AVR32_USB_WriteData(char* iData, char iCount)
 	return iCount;
 }
 
-int  __AVR32_USB_GetInformation()
+volatile int  __AVR32_USB_GetInformation()
 {
 	// Save actual port state
 	volatile int iActualPortState = (AVR32_GPIO.port[0].oder & 0x0FF);
@@ -384,7 +407,7 @@ int  __AVR32_USB_GetInformation()
 	return iRetVal;
 }
 
-char __AVR32_USB_GetData(char* iData, char iMaxCount)
+volatile char __AVR32_USB_GetData(char* iData, char iMaxCount)
 {
 	// Return if we're zero
 	if (iMaxCount == 0) return 0;
@@ -419,7 +442,7 @@ char __AVR32_USB_GetData(char* iData, char iMaxCount)
 	return i_total_read;
 }
 
-void __AVR32_USB_FlushInputData()
+volatile void __AVR32_USB_FlushInputData()
 {
 	// Write data...
 	AVR32_GPIO.port[0].oderc =  __AVR32_USB_AD0 | __AVR32_USB_AD1 |	__AVR32_USB_AD2 | __AVR32_USB_AD3 |
@@ -436,7 +459,7 @@ void __AVR32_USB_FlushInputData()
 	}
 }
 
-void __AVR32_USB_FlushOutputData()
+volatile void __AVR32_USB_FlushOutputData()
 {
 	// Set A0
 	AVR32_GPIO.port[2].ovrs =  __AVR32_USB_SIWUA;
@@ -682,7 +705,7 @@ inline unsigned int	__AVR32_CPLD_Read (char iAdrs)
 	AVR32_GPIO.port[1].ovrs = __AVR32_CPLD_OE;
 	
 	// Get the result
-	volatile int iRetVal = (AVR32_GPIO.port[1].pvr & 0x000000FF);
+	volatile unsigned int iRetVal = (AVR32_GPIO.port[1].pvr & 0x000000FF);
 	
 	// Disable OE
 	AVR32_GPIO.port[1].ovrc = __AVR32_CPLD_OE;
@@ -697,7 +720,7 @@ inline unsigned int	__AVR32_CPLD_Read (char iAdrs)
 //////////////////////////////////////////////
 // SC Chips
 //////////////////////////////////////////////
-void	__AVR32_SC_Initialize()
+volatile void	__AVR32_SC_Initialize()
 {
 	////////////////// Set SPI1 GPIO settings (Function-A)
 	AVR32_GPIO.port[0].gperc = (AVR32_SPI0_PIN1)  |  (AVR32_SPI0_PIN2)  |  (AVR32_SPI0_PIN3);// SPI0_PIN_MISO;
@@ -721,35 +744,35 @@ void	__AVR32_SC_Initialize()
 							   (AVR32_SC_CHIP_DONE4)  |  (AVR32_SC_CHIP_DONE5)  |  (AVR32_SC_CHIP_DONE6) | (AVR32_SC_CHIP_DONE7) ;
 }
 
-void __AVR32_ASIC_Activate_CS()
+volatile void __AVR32_ASIC_Activate_CS()
 {
 	AVR32_GPIO.port[0].ovrc   = AVR32_SPI0_PIN_NPCS;
 }
 
-void __AVR32_ASIC_Deactivate_CS()
+volatile void __AVR32_ASIC_Deactivate_CS()
 {
 	AVR32_GPIO.port[0].ovrs   = AVR32_SPI0_PIN_NPCS;
 }
 
-void __AVR32_SPI0_SendWord(unsigned short data)
+volatile void __AVR32_SPI0_SendWord(unsigned short data)
 {
 	// Put data in register and wait until its sent
 	AVR32_SPI0_TDR = (data & 0x0FFFF);
 	while ((AVR32_SPI0_SR & (1 << 9)) == 0);
 }
 
-unsigned short __AVR32_SPI0_ReadWord()
+volatile unsigned short __AVR32_SPI0_ReadWord()
 {
 	__AVR32_SPI0_SendWord(0x0FF); // FF stands for no-care
 	return (AVR32_SPI0_RDR & 0x0FFFF);
 }
 
-void	__AVR32_SC_SetAccess()
+volatile void	__AVR32_SC_SetAccess()
 {
 	// Nothing, this is not multiplexed
 }
 
-unsigned int __AVR32_SC_GetDone  (char iChip)
+volatile unsigned int __AVR32_SC_GetDone  (char iChip)
 {
 	if (iChip == 0) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE0) != 0);
 	if (iChip == 1) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE1) != 0);
@@ -761,7 +784,7 @@ unsigned int __AVR32_SC_GetDone  (char iChip)
 	if (iChip == 7) return ((AVR32_GPIO.port[1].pvr & AVR32_SC_CHIP_DONE7) != 0);
 }
 
-unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs)
+volatile unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs)
 {
 	volatile unsigned short iCommand = 0;
 	
@@ -776,7 +799,7 @@ unsigned int __AVR32_SC_ReadData (char iChip, char iEngine, unsigned char iAdrs)
 	return (__AVR32_SPI0_ReadWord() & 0x0FFFF);
 }
 
-unsigned int __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
+volatile unsigned int __AVR32_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
 {
 	volatile unsigned short iCommand = 0;
 	

@@ -231,7 +231,7 @@ char MCU_CPLD_Read(char iAdrs)
 }
 
 // SC Chips
-void MCU_SC_Initialize()
+volatile void MCU_SC_Initialize()
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
 	__AVR32_SC_Initialize();
@@ -242,7 +242,7 @@ void MCU_SC_Initialize()
 	#endif
 }
 
-void MCU_SC_SetAccess()
+volatile void MCU_SC_SetAccess()
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
 	__AVR32_SC_SetAccess();
@@ -253,7 +253,7 @@ void MCU_SC_SetAccess()
 	#endif
 }
 
-unsigned int MCU_SC_GetDone(char iChip)
+volatile unsigned int MCU_SC_GetDone(char iChip)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
 		return __AVR32_SC_GetDone(iChip);
@@ -264,7 +264,7 @@ unsigned int MCU_SC_GetDone(char iChip)
 	#endif
 }
 
-void __MCU_ASIC_Activate_CS(void)
+volatile void __MCU_ASIC_Activate_CS(void)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
 		 __AVR32_ASIC_Activate_CS();
@@ -275,7 +275,7 @@ void __MCU_ASIC_Activate_CS(void)
 	#endif
 }
  
-void __MCU_ASIC_Deactivate_CS(void)
+volatile void __MCU_ASIC_Deactivate_CS(void)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
 		 __AVR32_ASIC_Deactivate_CS();
@@ -286,7 +286,7 @@ void __MCU_ASIC_Deactivate_CS(void)
 	#endif
 }
 
-unsigned int MCU_SC_ReadData(char iChip, char iEngine, unsigned char iAdrs)
+volatile unsigned int MCU_SC_ReadData(char iChip, char iEngine, unsigned char iAdrs)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
 		return __AVR32_SC_ReadData(iChip, iEngine, iAdrs);
@@ -297,7 +297,7 @@ unsigned int MCU_SC_ReadData(char iChip, char iEngine, unsigned char iAdrs)
 	#endif
 }
 
-unsigned int MCU_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
+volatile unsigned int MCU_SC_WriteData(char iChip, char iEngine, unsigned char iAdrs, unsigned int iData)
 {
 	#if   defined( __COMPILING_FOR_AVR32__)
 		return __AVR32_SC_WriteData(iChip, iEngine, iAdrs, iData);

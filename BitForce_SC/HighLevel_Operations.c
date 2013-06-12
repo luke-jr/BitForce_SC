@@ -20,10 +20,15 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <avr32/io.h>
 
-void HighLevel_Operations_Spin()
+
+volatile void HighLevel_Operations_Spin()
 {
 	// Nothing for the moment
+	// Reset Watchdog to prevent system reset. (Timeout for watchdog is 17ms)
+	AVR32_WDT.clr = 0x0FFFFFFFF;
+	
 	
 }
 

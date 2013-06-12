@@ -157,18 +157,18 @@ void MCU_Main_Loop()
 	// First things first, we must clear the FTDI chip
 	// Read all that you can..
 	volatile int i = 10000;
-	unsigned int intercepted_command_length = 0;
+	volatile unsigned int intercepted_command_length = 0;
 	
 	while (USB_inbound_USB_data() && i-- > 1) USB_read_byte();
 
 	// OK, now the memory on FTDI is empty,
 	// wait for standard packet size
-	char sz_cmd[1024];
-	unsigned short umx;
-	unsigned int  i_count = 0;
+	volatile char sz_cmd[1024];
+	volatile unsigned short umx;
+	volatile unsigned int  i_count = 0;
 	
-	char bTimeoutDetectedOnXLINK = 0;
-	char bDeviceNotRespondedOnXLINK = 0;			
+	volatile char bTimeoutDetectedOnXLINK = 0;
+	volatile char bDeviceNotRespondedOnXLINK = 0;			
 	
 	for (umx = 0; umx < 1024; umx++) sz_cmd[umx] = 0;
 	
@@ -211,10 +211,10 @@ void MCU_Main_Loop()
 			if (!USB_inbound_USB_data()) continue;
 			
 			// Was EndOfStream detected?
-			unsigned int bEOSDetected = FALSE;
+			volatile unsigned int bEOSDetected = FALSE;
 			intercepted_command_length = 0;
-			unsigned int iExpectedPacketLength = 0;
-			unsigned int bInterceptingChainForwardReq = FALSE;
+			volatile unsigned int iExpectedPacketLength = 0;
+			volatile unsigned int bInterceptingChainForwardReq = FALSE;
 
 			// Read all the data that has arrived
 			while (USB_inbound_USB_data() && i_count < 1024)
