@@ -433,6 +433,13 @@ void ASIC_run_heavy_diagnostics()
 						bWasAnyEngineDecommissioned = TRUE;
 						DECOMMISSION_PROCESSOR(cDiagChip, cDiagEngine);
 					}
+				#elif (__HEAVY_DIAGNOSTICS_MODERATE_3_NONCES)
+					if (iReadBackNonceCount < 4)
+					{
+						// This engine is DEAD!
+						bWasAnyEngineDecommissioned = TRUE;
+						DECOMMISSION_PROCESSOR(cDiagChip, cDiagEngine);
+					}					
 				#endif
 			}
 		}

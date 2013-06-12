@@ -34,6 +34,7 @@
 #include "AVR32X/AVR32_Module.h"
 #include "FAN_Subsystem.h"
 
+static const int FALSE_ZERO = 0;
 // Information about the result we're holding
 extern buf_job_result_packet  __buf_job_results[PIPE_MAX_BUFFER_DEPTH];
 extern char 		   __buf_job_results_count;  // Total of results in our __buf_job_results
@@ -82,9 +83,9 @@ int main(void)
 	
 	// Initialize A2D
 	a2d_init();
-	a2d_get_temp(0);    // This is to clear the first invalid conversion result...
+	a2d_get_temp(FALSE_ZERO); // This is to clear the first invalid conversion result...
 	a2d_get_temp(1);    // This is to clear the first invalid conversion result...
-	a2d_get_voltage(0); // This is to clear the first invalid conversion result...
+	a2d_get_voltage(FALSE_ZERO); // This is to clear the first invalid conversion result...
 	a2d_get_voltage(1); // This is to clear the first invalid conversion result...
 	a2d_get_voltage(2); // This is to clear the first invalid conversion result...
 	
@@ -104,20 +105,20 @@ int main(void)
 	FAN_SUBSYS_Initialize();
 	
 	// Initialize Global Activity Chip LEDs
-	GLOBAL_ChipActivityLEDCounter[0] = 0;
-	GLOBAL_ChipActivityLEDCounter[1] = 0;
-	GLOBAL_ChipActivityLEDCounter[2] = 0;
-	GLOBAL_ChipActivityLEDCounter[3] = 0;
-	GLOBAL_ChipActivityLEDCounter[4] = 0;
-	GLOBAL_ChipActivityLEDCounter[5] = 0;
-	GLOBAL_ChipActivityLEDCounter[6] = 0;
-	GLOBAL_ChipActivityLEDCounter[7] = 0;
+	GLOBAL_ChipActivityLEDCounter[FALSE_ZERO] = FALSE_ZERO;
+	GLOBAL_ChipActivityLEDCounter[1] = FALSE_ZERO;
+	GLOBAL_ChipActivityLEDCounter[2] = FALSE_ZERO;
+	GLOBAL_ChipActivityLEDCounter[3] = FALSE_ZERO;
+	GLOBAL_ChipActivityLEDCounter[4] = FALSE_ZERO;
+	GLOBAL_ChipActivityLEDCounter[5] = FALSE_ZERO;
+	GLOBAL_ChipActivityLEDCounter[6] = FALSE_ZERO;
+	GLOBAL_ChipActivityLEDCounter[7] = FALSE_ZERO;
 	
 	// Reset the total number of engines detected on startup
-	GLOBAL_TotalEnginesDetectedOnStartup = 0;
+	GLOBAL_TotalEnginesDetectedOnStartup = FALSE_ZERO;
 	
 	// Last time JobIssue was called. 
-	GLOBAL_LastJobIssueToAllEngines = 0;
+	GLOBAL_LastJobIssueToAllEngines = FALSE_ZERO;
 	
 	// Wait for 500ms before doing anything
 	volatile unsigned int iHolder = MACRO_GetTickCountRet;
@@ -127,7 +128,8 @@ int main(void)
 	init_ASIC();
 	
 	// Now set the side-led's accordingly
-	if (ASIC_does_chip_exist(0) == TRUE) MCU_LED_Set(1);
+	if (ASIC_does_chip_exist(FALSE_ZERO) == TRUE)
+		MCU_LED_Set(1);
 	if (ASIC_does_chip_exist(1) == TRUE) MCU_LED_Set(2);
 	if (ASIC_does_chip_exist(2) == TRUE) MCU_LED_Set(3);
 	if (ASIC_does_chip_exist(3) == TRUE) MCU_LED_Set(4);
@@ -158,7 +160,7 @@ int main(void)
 		if (XLINK_is_cpld_present() == TRUE)
 		{
 			// We're the master, set proper configuration
-			XLINK_set_cpld_id(0);
+			XLINK_set_cpld_id(FALSE_ZERO);
 			XLINK_set_cpld_master(TRUE);
 			XLINK_set_cpld_passthrough(FALSE);
 			
@@ -181,27 +183,27 @@ int main(void)
 	}
 	
 	// Reset global values
-	global_vals[0] = 0;
-	global_vals[1] = 0;
-	global_vals[2] = 0;
-	global_vals[3] = 0;
-	global_vals[4] = 0;
-	global_vals[5] = 0;
+	global_vals[FALSE_ZERO] = FALSE_ZERO;
+	global_vals[1] = FALSE_ZERO;
+	global_vals[2] = FALSE_ZERO;
+	global_vals[3] = FALSE_ZERO;
+	global_vals[4] = FALSE_ZERO;
+	global_vals[5] = FALSE_ZERO;
 
-	GLOBAL_BLINK_REQUEST = 0;
-	GLOBAL_PULSE_BLINK_REQUEST = 0;
+	GLOBAL_BLINK_REQUEST = FALSE_ZERO;
+	GLOBAL_PULSE_BLINK_REQUEST = FALSE_ZERO;
 	
 	// Clear ASIC Results... This will make sure the diagnostic nonces are cleared
 	unsigned int iNonceValues[16];
 	unsigned int iNonceCount;
-	ASIC_get_job_status(iNonceValues, &iNonceCount, FALSE, 0);
+	ASIC_get_job_status(iNonceValues, &iNonceCount, FALSE, FALSE_ZERO);
 	
 	// Did we reset the ASICs internally?
 	GLOBAL_INTERNAL_ASIC_RESET_EXECUTED = FALSE;
 	
 	// Go to our protocol main loop
 	MCU_Main_Loop();
-	return(0);
+	return (FALSE_ZERO);
 }
 
 //////////////////////////////////
@@ -225,7 +227,7 @@ void MCU_Main_Loop()
 	// First things first, we must clear the FTDI chip
 	// Read all that you can..
 	volatile int i = 10000;
-	unsigned int intercepted_command_length = 0;
+	unsigned int intercepted_command_length = FALSE_ZERO;
 	
 	while (USB_inbound_USB_data() && i-- > 1) USB_read_byte();
 
@@ -233,12 +235,13 @@ void MCU_Main_Loop()
 	// wait for standard packet size
 	char sz_cmd[1024];
 	unsigned int umx;
-	unsigned int  i_count = 0;
+	unsigned int i_count = FALSE_ZERO;
 	
-	char bTimeoutDetectedOnXLINK = 0;
-	char bDeviceNotRespondedOnXLINK = 0;			
+	char bTimeoutDetectedOnXLINK = FALSE_ZERO;
+	char bDeviceNotRespondedOnXLINK = FALSE_ZERO;			
 	
-	for (umx = 0; umx < 1024; umx++) sz_cmd[umx] = 0;
+	for (umx = FALSE_ZERO; umx < 1024; umx++)
+		sz_cmd[umx] = FALSE_ZERO;
 	
 	// Clear logg buffer if needed
 	#if defined(__SHOW_DECOMMISSIONED_ENGINES_LOG)
@@ -268,10 +271,10 @@ void MCU_Main_Loop()
 			if (i <= 1)
 			{
 				// Clear buffer, something is wrong...
-				i_count = 0;
-				sz_cmd[0] = 0;
-				sz_cmd[1] = 0;
-				sz_cmd[2] = 0;
+				i_count = FALSE_ZERO;
+				sz_cmd[FALSE_ZERO] = FALSE_ZERO;
+				sz_cmd[1] = FALSE_ZERO;
+				sz_cmd[2] = FALSE_ZERO;
 			}
 
 			// We've reduced timeout counter to 5000, so we can run this function periodically
@@ -285,8 +288,8 @@ void MCU_Main_Loop()
 			
 			// Was EndOfStream detected?
 			unsigned int bEOSDetected = FALSE;
-			intercepted_command_length = 0;
-			unsigned int iExpectedPacketLength = 0;
+			intercepted_command_length = FALSE_ZERO;
+			unsigned int iExpectedPacketLength = FALSE_ZERO;
 			unsigned int bInterceptingChainForwardReq = FALSE;
 			unsigned char bSingleStageJobIssueCommand = FALSE;
 
@@ -297,10 +300,13 @@ void MCU_Main_Loop()
 				sz_cmd[i_count] = USB_read_byte();
 				
 				// Are we a single-cycle job issue?
-				bSingleStageJobIssueCommand = ((sz_cmd[0] == 'S') && (sz_cmd[1] == 48)) ? TRUE : FALSE;
+				bSingleStageJobIssueCommand =
+						((sz_cmd[FALSE_ZERO] == 'S') && (sz_cmd[1] == 48)) ?
+								TRUE : FALSE;
 				
 				// Are we expecting 
-				bInterceptingChainForwardReq = (sz_cmd[0] == 64) ? TRUE : FALSE;
+				bInterceptingChainForwardReq =
+						(sz_cmd[FALSE_ZERO] == 64) ? TRUE : FALSE;
 				
 				if (bInterceptingChainForwardReq) 
 				{
@@ -334,10 +340,10 @@ void MCU_Main_Loop()
 				if (i_count > 256)							
 				{
 					// Clear buffer, something is wrong...
-					i_count = 0;
-					sz_cmd[0] = 0;
-					sz_cmd[1] = 0;
-					sz_cmd[2] = 0;
+					i_count = FALSE_ZERO;
+					sz_cmd[FALSE_ZERO] = FALSE_ZERO;
+					sz_cmd[1] = FALSE_ZERO;
+					sz_cmd[2] = FALSE_ZERO;
 					continue;
 				}
 				
@@ -350,10 +356,10 @@ void MCU_Main_Loop()
 				if (bEOSDetected == TRUE)
 				{
 					// Clear buffer, something is wrong...
-					i_count = 0;
-					sz_cmd[0] = 0;
-					sz_cmd[1] = 0;
-					sz_cmd[2] = 0;
+					i_count = FALSE_ZERO;
+					sz_cmd[FALSE_ZERO] = FALSE_ZERO;
+					sz_cmd[1] = FALSE_ZERO;
+					sz_cmd[2] = FALSE_ZERO;
 					continue;
 				}
 				else 
@@ -380,14 +386,16 @@ void MCU_Main_Loop()
 									  FALSE, TRUE); // Note: WE ARE WAITING FOR COMMAND
 			
 			// Check for sz_cmd, if it's PUSH then we have an invalid command
-			if ((sz_cmd[0] == 'P') && (sz_cmd[1] == 'U') && (sz_cmd[2] == 'S') && (sz_cmd[3] == 'H'))
+			if ((sz_cmd[FALSE_ZERO] == 'P') && (sz_cmd[1] == 'U')
+					&& (sz_cmd[2] == 'S') && (sz_cmd[3] == 'H'))
 			{
 				MACRO_XLINK_send_packet(XLINK_get_cpld_id(), "INVA", 4, TRUE, FALSE);
 				continue;
 			}
 			
 			// Check for sz_cmd, AA BB C4 <ID>, then we set CPLD ID and enable pass-through
-			if ((sz_cmd[0] == 0xAA) && (sz_cmd[1] == 0xBB) && (sz_cmd[2] == 0xC4) && (i_count == 4))
+			if ((sz_cmd[FALSE_ZERO] == 0xAA) && (sz_cmd[1] == 0xBB)
+					&& (sz_cmd[2] == 0xC4) && (i_count == 4))
 			{
 				// We respond with 'ACK' and then change the address
 				XLINK_SLAVE_respond_transact("ACK", 
@@ -406,24 +414,29 @@ void MCU_Main_Loop()
 		}		
 		
 		// Are we a single-stage job-issue command?
-		char bSingleStageJobIssueCommand = ((sz_cmd[0] == 'S') && (sz_cmd[1] == 48)) ? TRUE : FALSE; 
+		char bSingleStageJobIssueCommand =
+				((sz_cmd[FALSE_ZERO] == 'S') && (sz_cmd[1] == 48)) ?
+						TRUE : FALSE; 
 
 		// Check number of bytes received so far.
 		// If they are 3, we may have a command here (4 for the AMUX Read)...
 		if (TRUE)
 		{
 			// Reset the count anyway
-			i_count = 0;
+			i_count = FALSE_ZERO;
 
 			// Check for packet integrity
-			if (((sz_cmd[0] != 'Z' || sz_cmd[2] != 'X') && (sz_cmd[0] != '@')) && (bSingleStageJobIssueCommand == FALSE)) // @XX means forward to XX (X must be between '0' and '9')
+			if (((sz_cmd[FALSE_ZERO] != 'Z' || sz_cmd[2] != 'X')
+					&& (sz_cmd[FALSE_ZERO] != '@'))
+					&& (bSingleStageJobIssueCommand == FALSE)) // @XX means forward to XX (X must be between '0' and '9')
 			{
 				continue;
 			}
 			else
 			{
 				// We have a command. Check for validity
-				if ((sz_cmd[0] != '@') &&
+				if ((sz_cmd[FALSE_ZERO] != '@')
+						&&
 					(bSingleStageJobIssueCommand == FALSE) && 
 					(sz_cmd[1] != PROTOCOL_REQ_INFO_REQUEST) &&
 					(sz_cmd[1] != PROTOCOL_REQ_BUF_FLUSH_EX) &&
@@ -468,7 +481,7 @@ void MCU_Main_Loop()
 				}
 				
 				// Do we have a Chain-Forward request?
-				if ((sz_cmd[0] == '@') && (XLINK_ARE_WE_MASTER))
+				if ((sz_cmd[FALSE_ZERO] == '@') && (XLINK_ARE_WE_MASTER))
 				{
 					// Forward command to the device in chain...
 					Protocol_chain_forward((char)sz_cmd[2], 
@@ -522,7 +535,7 @@ void MCU_Main_Loop()
 		}
 		else
 		{
-			i_count = 0;
+			i_count = FALSE_ZERO;
 			continue;
 		}		
 	}

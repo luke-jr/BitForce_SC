@@ -88,7 +88,7 @@
 /////////////////////////////////////////////////////////////////////////
 // This MACRO disables the kernel from trying to increase frequency on ASICS
 // on startup if their actual frequency is less than what it should be...
-// #define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
+#define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
 
 /////////////////////////////////////////////////////////////////////////
 // ASIC Frequency settings
@@ -99,7 +99,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #if defined(__PRODUCT_MODEL_JALAPENO)
 	#define __ASIC_FREQUENCY_ACTUAL_INDEX   1 // 180MHz for Jalapeno
 #else	
-	#define __ASIC_FREQUENCY_ACTUAL_INDEX   5 
+	#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 
 #endif
 
 #define __MAXIMUM_FREQUENCY_INDEX       9
@@ -140,7 +140,8 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 //// BEGIN
 #define __RUN_HEAVY_DIAGNOSTICS_ON_EACH_ENGINE	1
 //#define __HEAVY_DIAGNOSTICS_STRICT_8_NONCES	1
-#define __HEAVY_DIAGNOSTICS_MODERATE_7_NONCES	1
+//#define __HEAVY_DIAGNOSTICS_MODERATE_7_NONCES	1
+#define __HEAVY_DIAGNOSTICS_MODERATE_3_NONCES	1
 //// END
 
 //// BEGIN
