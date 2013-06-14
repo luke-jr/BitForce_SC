@@ -2343,7 +2343,9 @@ PROTOCOL_RESULT Protocol_handle_job_p2p(void)
 	
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &bInvalidData);
+	}		
 	else
 	{
 		char bTimeoutDetected = FALSE;
@@ -2533,9 +2535,13 @@ PROTOCOL_RESULT Protocol_temperature()
 	 sprintf(sz_resp,"Temp1: %d, Temp2: %d\n", temp_val1, temp_val2); // .1f means 1 digit after decimal point, format=floating
 	 
 	 if (XLINK_ARE_WE_MASTER)
+	 {
 		 USB_send_string(sz_resp);  // Send it to USB
+	 }		 
 	 else // We're a slave... send it by XLINK
+	 {
 	 	 XLINK_SLAVE_respond_string(sz_resp);
+	 }		  
 	 
 	 // Return our result...
 	 return res;
@@ -2556,9 +2562,13 @@ PROTOCOL_RESULT Protocol_get_voltages()
 	 sprintf(sz_resp,"%d,%d,%d\n", temp_val1, temp_val2, temp_val3); // .1f means 1 digit after decimal point, format=floating
 	 
 	 if (XLINK_ARE_WE_MASTER)
+	 {
 		 USB_send_string(sz_resp);  // Send it to USB
+	 }		 
 	 else // We're a slave... send it by XLINK
+	 {
 	 	 XLINK_SLAVE_respond_string(sz_resp);
+	 }		  
 	 
 	 // Return our result...
 	 return res;
@@ -2571,9 +2581,13 @@ PROTOCOL_RESULT Protocol_get_firmware_version()
 
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string(__FIRMWARE_VERSION);  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string(__FIRMWARE_VERSION);
+	}		
 
 	// Return our result
 	return res;
@@ -2591,9 +2605,13 @@ PROTOCOL_RESULT  Protocol_get_freq_factor()
 	
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string(szResp);  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string(szResp);	
+	}		
 		
 	// We have our frequency factor sent, exit 
 	return result;	
@@ -2660,10 +2678,14 @@ PROTOCOL_RESULT  Protocol_set_freq_factor()
 	
 	// Say we're ok
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{	
 		XLINK_SLAVE_respond_string("OK\n");	
-	
+	}
+		
 	// We have our frequency factor sent, exit
 	return result;
 }
@@ -2679,17 +2701,25 @@ PROTOCOL_RESULT  Protocol_set_xlink_address()
 	{
 		// Send OK first
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string("ERROR: XLINK NOT PRESENT\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{
 			XLINK_SLAVE_respond_string("ERROR: XLINK NOT PRESENT\n");
+		}			
 	}
 	
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string("OK\n");
-		
+	}
+			
 	// Wait for 4bytes of frequency factor
 	char sz_buf[1024];
 	unsigned int i_read;
@@ -2698,7 +2728,9 @@ PROTOCOL_RESULT  Protocol_set_xlink_address()
 	
 	// This packet contains Mid-State, Merkel-Data and Nonce Begin/End
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_wait_stream(sz_buf, &i_read, 1024, &i_timeout, &bInvalidData);
+	}	
 	else
 	{
 		char bTimeoutDetected = FALSE;
@@ -2710,9 +2742,13 @@ PROTOCOL_RESULT  Protocol_set_xlink_address()
 	if (i_timeout < 2)
 	{
 		if (XLINK_ARE_WE_MASTER)
-		USB_send_string("ERR:TIMEOUT\n");  // Send it to USB
+		{
+			USB_send_string("ERR:TIMEOUT\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
-		XLINK_SLAVE_respond_string("ERR:TIMEOUT\n");
+		{
+			XLINK_SLAVE_respond_string("ERR:TIMEOUT\n");
+		}			
 	
 		return PROTOCOL_TIMEOUT;
 	}
@@ -2721,19 +2757,27 @@ PROTOCOL_RESULT  Protocol_set_xlink_address()
 	if ((bInvalidData) || (i_read != 4))
 	{
 		if (XLINK_ARE_WE_MASTER)
-		USB_send_string("ERR:INVALID DATA\n");  // Send it to USB
+		{
+			USB_send_string("ERR:INVALID DATA\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
-		XLINK_SLAVE_respond_string("ERR:INVALID DATA\n");
+		{
+			XLINK_SLAVE_respond_string("ERR:INVALID DATA\n");
+		}			
 	
 		return PROTOCOL_FAILED;
 	}
 	
 	// Say we're ok
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string("OK\n");	
-		
+	}
+			
 	// Set the CPLD address (we'll do it after the transaction is over)
 	XLINK_set_cpld_id(sz_buf[0]);		
 		
@@ -2759,7 +2803,9 @@ PROTOCOL_RESULT Protocol_xlink_presence_detection()
 	
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("PRSN");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
 	{
 		// XLINK_SLAVE_respond_string("OK\n");
@@ -2781,9 +2827,13 @@ PROTOCOL_RESULT  Protocol_xlink_allow_pass()
 	{
 		// Send OK first
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string("ERROR: XLINK NOT PRESENT\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{
 			XLINK_SLAVE_respond_string("ERROR: XLINK NOT PRESENT\n");		
+		}			
 	}
 	
 	// Allow pass through
@@ -2791,9 +2841,13 @@ PROTOCOL_RESULT  Protocol_xlink_allow_pass()
 
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string("OK\n");
+	}		
 	
 	// We have our frequency factor sent, exit
 	return result;	
@@ -2809,9 +2863,13 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 	{
 		// Send OK first
 		if (XLINK_ARE_WE_MASTER)
+		{
 			USB_send_string("ERROR: XLINK NOT PRESENT\n");  // Send it to USB
+		}			
 		else // We're a slave... send it by XLINK
+		{
 			XLINK_SLAVE_respond_string("ERROR: XLINK NOT PRESENT\n");
+		}			
 	}
 	
 	// Allow passthrough
@@ -2819,9 +2877,13 @@ PROTOCOL_RESULT  Protocol_xlink_deny_pass()
 	
 	// Send OK first
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string("OK\n");
+	}		
 
 	// We have our frequency factor sent, exit
 	return result;	
