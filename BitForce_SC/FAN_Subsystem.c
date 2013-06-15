@@ -42,7 +42,7 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 	volatile int iTemp2 = __AVR32_A2D_GetTemp2();
 	volatile int iTempAveraged = (iTemp1 > iTemp2) ? iTemp1 : iTemp2; // (iTemp2 + iTemp1) / 2;
 	
-	if (iTempAveraged > 100)
+	if (iTempAveraged > 90)
 	{
 		// Holy jesus! We're in a critical situation...
 		GLOBAL_CRITICAL_TEMPERATURE = TRUE;

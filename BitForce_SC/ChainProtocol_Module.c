@@ -813,7 +813,14 @@ void XLINK_MASTER_transact(char   iAdrs,
 	volatile UL32 vTemp3 = 0;
 	
 	volatile unsigned int iExpectedChecksum = 0;
+	
+	// TODO: Remove after debugging
+	volatile char iVID_BCHistory[15];
+	volatile char iVID_LPHistory[15];
+	volatile int iVID_LENHistory[15];
+	volatile char iVID_Pos = 0;
 		
+	// Proceed...
 	while (iTotalSent < iLen)
 	{
 		// Preliminary calculations
@@ -936,9 +943,29 @@ RETRY_POINT_1:
 	volatile UL32 imrActualHolder = 0;
 	volatile UL32 imrActualTime = 0;
 	
+		
+	volatile int iUTR_TO_RetryCount = 0;
+	volatile int iUTR_OTHER_RetryCount = 0;
+	
+	volatile int iUTR_TO_BeforeData_RetryCount = 0;
+	volatile int iUTR_OTHER_BeforeData_RetryCount = 0;
+	
+	volatile int iUTR_GVAR1 = 0;
+	volatile int iUTR_GVAR2 = 0;
+	volatile int iUTR_GVAR3 = 0;	
+		
+	volatile int iUTR_OLD_BC = 0;
+	volatile int iUTR_OLD_LEN = 0;
+	volatile int iUTR_OLD_LP = 0;
+	
 	// We have to reset the BitCorrector, as it will start from 0 for the PUSH part
 	iBC = TRUE; // Push must be set to one
-	char iExpectedBC = TRUE; // This is what we expect from the slave as BitCorrector
+	volatile char iExpectedBC = TRUE; // This is what we expect from the slave as BitCorrector
+	
+		
+	// TODO: Remove this feature when debug finished
+	volatile char szVirtualResponse[128];
+	volatile char bEnteringFinalStage = FALSE;
 		
 	// Now we have to wait for data
 	while (iTotalReceived < iMaxRespLen)
@@ -948,6 +975,11 @@ RETRY_POINT_1:
 		
 		// Proceed
 		MACRO_XLINK_send_packet(iAdrs,"PUSH", 4, iLP, iBC);
+		
+		// Save old variables
+		iUTR_OLD_LP = __lp;
+		iUTR_OLD_LEN = __iRespLen;
+		iUTR_OLD_BC = __bc;
 		
 		// Reset variables
 		iTimeoutDetected = 0;
@@ -972,6 +1004,12 @@ RETRY_POINT_1:
 								__senders_address,
 								__lp,
 								__bc);
+								
+		// TODO: Remove after debug
+		if (iTotalReceived >= 0x15)								
+		{
+			bEnteringFinalStage = TRUE;
+		}
 		
 		// Check master timeout
 		vTemp1 = MACRO_GetTickCountRet;
@@ -1004,9 +1042,22 @@ RETRY_POINT_1:
 			else
 			{
 				iTotalRetryCount++;
+				if ((iTotalReceived < 0x15) && (iTotalReceived > 0)) iUTR_TO_RetryCount++;
+				if (iTotalReceived == 0) iUTR_TO_BeforeData_RetryCount++;
 				continue;
 			}
 		}
+		
+		// TODO: Remove afer debugging done
+		iVID_BCHistory[iVID_Pos] = __bc;
+		iVID_LENHistory[iVID_Pos] = __iRespLen;
+		iVID_LPHistory[iVID_Pos] = __lp;
+		iVID_Pos++;
+		
+		if (iVID_Pos == 6)
+		{
+			iVID_Pos++;
+		}		
 		
 		// No timeout was detected, check resp. If it was not ok, try again
 		if (__senders_address != iAdrs || __iRespLen == 0 || iExpectedBC != __bc) // Check both for address-match, response-length and bit-corrector
@@ -1016,14 +1067,12 @@ RETRY_POINT_1:
 			{
 				// We've failed
 				if (__senders_address != iAdrs)
+				{
 						*bTimeoutDetected = 5;
+				}						
 				else if (iExpectedBC != __bc)
 				{
 						*bTimeoutDetected = 50;
-						GLOBAL_InterProcChars[0] = szDevResponse[0];
-						GLOBAL_InterProcChars[1] = szDevResponse[1];
-						GLOBAL_InterProcChars[2] = szDevResponse[2];
-						GLOBAL_InterProcChars[3] = szDevResponse[3];
 				}						
 				else *bTimeoutDetected = 51;
 						
@@ -1036,6 +1085,14 @@ RETRY_POINT_1:
 			else
 			{
 				iTotalRetryCount++;
+				if ((iTotalReceived < 0x15) && (iTotalReceived > 0)) iUTR_OTHER_RetryCount++;				
+				if (iTotalReceived == 0) iUTR_OTHER_BeforeData_RetryCount++;
+				if (iTotalReceived >= 0x15)
+				{
+					if (iExpectedBC != __bc) iUTR_GVAR1++;
+					if (__iRespLen == 0) iUTR_GVAR2++;
+					if (__senders_address != iAdrs) iUTR_GVAR3++;
+				}
 				continue;
 			}
 		}
@@ -1044,11 +1101,15 @@ RETRY_POINT_1:
 		// Reset retry count
 		iTotalRetryCount = 0;
 		
+		// TODO: Correct after debugging is done
 		// Resp was OK... Take the data
-		if (__iRespLen >= 1 && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[0];
-		if (__iRespLen >= 2 && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[1];
-		if (__iRespLen >= 3 && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[2];
-		if (__iRespLen >= 4 && (iTotalReceived + 1 <= iMaxRespLen)) szResp[iTotalReceived++] = szDevResponse[3];
+		if (__iRespLen >= 1 && (iTotalReceived + 1 <= iMaxRespLen)) { szResp[iTotalReceived++] = szDevResponse[0]; szVirtualResponse[iTotalReceived - 1] = szDevResponse[0]; }
+		if (__iRespLen >= 2 && (iTotalReceived + 1 <= iMaxRespLen)) { szResp[iTotalReceived++] = szDevResponse[1]; szVirtualResponse[iTotalReceived - 1] = szDevResponse[1]; }
+		if (__iRespLen >= 3 && (iTotalReceived + 1 <= iMaxRespLen)) { szResp[iTotalReceived++] = szDevResponse[2]; szVirtualResponse[iTotalReceived - 1] = szDevResponse[2]; }
+		if (__iRespLen >= 4 && (iTotalReceived + 1 <= iMaxRespLen)) { szResp[iTotalReceived++] = szDevResponse[3]; szVirtualResponse[iTotalReceived - 1] = szDevResponse[3]; }
+			
+
+
 		
 		// We've sent 4 more bytes
 		iBC = (iBC == 0) ? 1 : 0; // Flip BitCorrector
@@ -1234,7 +1295,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 		szResp[1] = 0;
 		szResp[2] = 0;
 		szResp[3] = 0;
-			
+		
 		MACRO_XLINK_wait_packet(szResp,
 								__iRespLen,
 								__XLINK_WAIT_PACKET_TIMEOUT__,  // For the first packet (only), we allow 120us delay
@@ -1415,6 +1476,14 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 	volatile UL32 vTemp2;
 	volatile UL32 vTemp3;
 	
+	// TODO: Remove these after debugging
+	volatile char szVID[8];
+	volatile char iVIDLenArray[16];
+	volatile char iVIDBCArray[16];
+	volatile char iVIDLPArray[16];
+	volatile char iVIDPos = 0;
+	
+	
 	// Now we have to wait for data
 	while (1)
 	{
@@ -1531,6 +1600,38 @@ RETRY_POINT_1:
 		}
 		else // We send new data
 		{
+			// TODO: Remove after debugging
+			if (iVIDPos == 0)
+			{
+				szVID[0] = 1;
+			}
+			else if (iVIDPos == 1)
+			{
+				szVID[1] = 2;
+			}
+			else if (iVIDPos == 2)
+			{
+				szVID[2] = 3;
+			}
+			else if (iVIDPos == 3)
+			{
+				szVID[3] = 4;
+			}
+			else if (iVIDPos == 4)
+			{
+				szVID[4] = 5;
+			}
+			else if (iVIDPos == 5)
+			{
+				szVID[5] = 6;
+			}
+			else if (iVIDPos == 6)
+			{
+				szVID[6] = 7;
+			}
+			
+			
+			
 			// OK we send new data
 			iBytesToSend = length - iTotalSent;
 			if (iBytesToSend > 4) iBytesToSend = 4;
@@ -1550,6 +1651,12 @@ RETRY_POINT_1:
 			// Now send the data
 			MACRO_XLINK_send_packet(iAddressToUseForTransactions,szPrevData, iBytesToSend, iPrevLP, iBC);				
 			
+			// TODO: Remove after debug
+			iVIDBCArray[iVIDPos] = iBC;
+			iVIDLenArray[iVIDPos] = iBytesToSend;
+			iVIDLPArray[iVIDPos] = iPrevLP;
+			iVIDPos++;
+			
 			// Flip the BitCorrector
 			iBC = (iBC == 1) ? 0 : 1;
 			iTotalSent += iBytesToSend;
@@ -1561,7 +1668,7 @@ RETRY_POINT_1:
 	
 	// Reset the retry count
 	iTotalRetryCount = 0;
-	
+
 	// OK, we now here wait for TERM signal
 	// Now we have to wait for data
 	while (1)
@@ -1678,7 +1785,7 @@ RETRY_POINT_2:
 		// Before doing anything, clear the CPLD
 		MACRO_XLINK_clear_RX;	
 		
-		// OK we've received our 
+		// OK we've received our 'TERM'
 		MACRO_XLINK_send_packet(iAddressToUseForTransactions, "TERM", 4, 1, 0);
 		break; 
 				

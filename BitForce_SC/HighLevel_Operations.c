@@ -33,20 +33,21 @@ volatile void Microkernel_Spin()
 	PipeKernel_Spin();	
 	
 	// Scan XLINK Chain, to be executed every 1.2 seconds
-	/*
+	
 	if (XLINK_ARE_WE_MASTER == TRUE)
-	{
+	{		
 		// We refresh the chain every 1.2 seconds
 		static volatile UL32 iInitialTimeHolder = 0;
 		volatile UL32 iActualTickHolder = MACRO_GetTickCountRet;
 		
-		if (iActualTickHolder - iInitialTimeHolder > 1200000) // 1,200,000 us = 1.2sec
+		if (iActualTickHolder - iInitialTimeHolder > __XLINK_CHAIN_REFRESH_INTERVAL) 
 		{
 			iInitialTimeHolder = iActualTickHolder;
 			XLINK_MASTER_Refresh_Chain();
 		}		
-	}
-	*/		
+	}	
+	
+
 	
 	// Fan-Spin must be executed every 0.5 seconds
 	{

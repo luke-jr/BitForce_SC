@@ -22,9 +22,9 @@
 #define __OPERATING_FREQUENCY_64MHz__
 
 /*************** Product Model *********************/
-// #define __PRODUCT_MODEL_JALAPENO__
-//#define    __PRODUCT_MODEL_LITTLE_SINGLE__
-#define __PRODUCT_MODEL_SINGLE__
+//#define __PRODUCT_MODEL_JALAPENO__
+#define    __PRODUCT_MODEL_LITTLE_SINGLE__
+//#define __PRODUCT_MODEL_SINGLE__
 //#define __PRODUCT_MODEL_MINIRIG__
 
 /********* TOTAL CHIPS INSTALLED ON BOARD **********/
@@ -88,7 +88,7 @@
 /////////////////////////////////////////////////////////////////////////
 // This MACRO disables the kernel from trying to increase frequency on ASICS
 // on startup if their actual frequency is less than what it should be...
-// #define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
+#define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
 
 /////////////////////////////////////////////////////////////////////////
 // ASIC Frequency settings
@@ -171,7 +171,6 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 // -- Once activated, device will process parallel jobs at nearly the same speed.
 // -- This also impacts the ZOX response, where the processor that got the job done will be added to the response list
 #define QUEUE_OPERATE_ONE_JOB_PER_CHIP	 
-
   
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // -- This macro enforces the queue to use one engine per board ( verses one engine per chip )
@@ -251,6 +250,10 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 
 
 /////////////////////////////////////////////////////////////////////////
+// XLINK Related
+#define __XLINK_CHAIN_REFRESH_INTERVAL  120000000 
+
+/////////////////////////////////////////////////////////////////////////
 // Error detection
 #if defined(ENABLED_SINGLE_JOB_ISSUE_MONITORING) && !defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)
 	#error The feature ENABLED_SINGLE_JOB_ISSUE_MONITORING can only be used with __ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION
@@ -325,17 +328,23 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 /*************** XLINK Operations Timeout ***********/
 #define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
 #define __XLINK_TRANSACTION_TIMEOUT__	     20000   // 20ms. No transaction should take longer. 
-#define __XLINK_WAIT_PACKET_TIMEOUT__        440
+#define __XLINK_WAIT_PACKET_TIMEOUT__        880
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      44
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION		"1.2.2"	// This is firmware 1.2.0 [ CHIP PARALLELIZATION supported on this version and after ]
+#define __FIRMWARE_VERSION		"1.2.4"	// This is firmware 1.2.0 [ CHIP PARALLELIZATION supported on this version and after ]
+
+// **** Change log Vs 1.2.3
+// - High-Temp recovery threshold changed to 90 Degrees from 100 Degrees
+
+// **** Change log Vs 1.2.2
+// - XLINK enabled
 
 // **** Change log Vs 1.2.1
-// 1) Chip frequency auto-tune enabled in this version
+// - Chip frequency auto-tune enabled in this version
 
 // **** Change log Vs 1.2.0
-// 1) Less restrictive engine validation (checking 3 nonces instead of 7)
+// - Less restrictive engine validation (checking 3 nonces instead of 7)
 
 
 /*************** UNIT ID STRING ********************/

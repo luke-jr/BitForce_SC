@@ -73,6 +73,9 @@ PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned int 
 				return PROTOCOL_FAILED;				
 			}
 		}		
+		
+		// Ok break, since we're all ok
+		break;
 	}
 		
 	// Send the response back to our host
@@ -918,9 +921,13 @@ PROTOCOL_RESULT Protocol_Blink(void)
 	// Send the OK back first
 	// All is good... sent the identifier and get out of here...
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("OK\n");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_SLAVE_respond_string("OK\n");
+	}		
 	
 	// All is good... sent the identifier and get out of here...
 	GLOBAL_BLINK_REQUEST = 30;
@@ -937,10 +944,14 @@ PROTOCOL_RESULT Protocol_Echo(void)
 	// Send the OK back first
 	// All is good... sent the identifier and get out of here...
 	if (XLINK_ARE_WE_MASTER)
+	{
 		USB_send_string("ECHO");  // Send it to USB
+	}		
 	else // We're a slave... send it by XLINK
+	{
 		XLINK_send_packet(XLINK_get_cpld_id(), "ECHO", 4, TRUE, FALSE);
-	
+	}
+		
 	// Return our result...
 	return res;
 }
