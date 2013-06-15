@@ -3,8 +3,6 @@
  *
  * Created: 09/10/2012 01:14:49
  *  Author: NASSER GHOSEIRI
- *
- * WARNING: Supported optimization is -O3
  */ 
 
 #ifndef STD_DEFS_H_
@@ -248,11 +246,6 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 // #define ENFORCE_USAGE_CHIP_1				1
 // #define ENFORCE_USAGE_CHIP_0				1
 
-
-/////////////////////////////////////////////////////////////////////////
-// XLINK Related
-#define __XLINK_CHAIN_REFRESH_INTERVAL  120000000 
-
 /////////////////////////////////////////////////////////////////////////
 // Error detection
 #if defined(ENABLED_SINGLE_JOB_ISSUE_MONITORING) && !defined(__ENGINE_PROGRESSIVE_ACTIVITY_SUPERVISION)
@@ -319,20 +312,21 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 	#error With __PROGRESSIVE_PER_ENGINE_JOB_SUBMISSION, __ACTIVATE_JOB_LOAD_BALANCING must be defined as well
 #endif
 
-
-
-
 /*************** Used for debugging ****************/
 #define CHIP_TO_TEST 0
 
 /*************** XLINK Operations Timeout ***********/
-#define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   10000   // 10ms
+#define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   2000000 // 2 Seconds for device response
 #define __XLINK_TRANSACTION_TIMEOUT__	     20000   // 20ms. No transaction should take longer. 
 #define __XLINK_WAIT_PACKET_TIMEOUT__        880
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      44
+#define __XLINK_CHAIN_REFRESH_INTERVAL		 10000000 // 10 seconds
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION		"1.2.4"	// This is firmware 1.2.0 [ CHIP PARALLELIZATION supported on this version and after ]
+#define __FIRMWARE_VERSION		"1.2.5"	// This is firmware 1.2.0 [ CHIP PARALLELIZATION supported on this version and after ]
+
+// **** Change log Vs 1.2.4
+// - XLINK Operational now
 
 // **** Change log Vs 1.2.3
 // - High-Temp recovery threshold changed to 90 Degrees from 100 Degrees
@@ -510,11 +504,14 @@ volatile unsigned int GLOBAL_LastJobIssueToAllEngines;
 #define FAN_CTRL3	 0b01000
 
 // For Debug
+// TODO: Remove when debugging done
 volatile unsigned int DEBUG_TraceTimer0;
 volatile unsigned int DEBUG_TraceTimer1;
 volatile unsigned int DEBUG_TraceTimer2;
 volatile unsigned int DEBUG_TraceTimers[8];
 volatile unsigned int DEBUG_TraceTimersIndex;
+
+volatile unsigned int DEBUG_LastXLINKTransTook;
 
 // Assembly NOP operation
 #ifdef __OPERATING_FREQUENCY_64MHz__

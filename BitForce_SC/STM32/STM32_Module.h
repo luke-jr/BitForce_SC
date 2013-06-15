@@ -2,7 +2,7 @@
  * STM32_Module.h
  *
  * Created: 11/10/2012 23:20:21
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 

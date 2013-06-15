@@ -3,6 +3,7 @@
  *
  * Created: 12/10/2012 00:10:54
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs 
  */ 
 #ifndef GENERIC_MODULE_H_
 #define GENERIC_MODULE_H_

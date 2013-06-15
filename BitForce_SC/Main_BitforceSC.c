@@ -1,9 +1,4 @@
 /*
- * MainFile.C
- * -----------
- * Main MCU firmware code for A2GX and ST3 card series
- *
- *
  *  Created on: Nov 8, 2011
  *  Author: NASSER GHOSEIRI
  */
@@ -475,9 +470,13 @@ void MCU_Main_Loop()
 				if ((sz_cmd[0] == '@') && (XLINK_ARE_WE_MASTER))
 				{
 					// Forward command to the device in chain...
+					DEBUG_LastXLINKTransTook = MACRO_GetTickCountRet;
+					
 					Protocol_chain_forward((char)sz_cmd[2], 
 										   (char*)(sz_cmd+3), 
 										   intercepted_command_length); // Length is always 3	
+										   
+					DEBUG_LastXLINKTransTook = MACRO_GetTickCountRet - DEBUG_LastXLINKTransTook;
 				}					
 				else
 				{

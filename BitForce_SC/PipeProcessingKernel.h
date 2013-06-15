@@ -2,7 +2,7 @@
  * PipeProcessingKernel.h
  *
  * Created: 03/06/2013 16:36:07
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
  */ 
 
 #ifndef PIPEPROCESSINGKERNEL_H_

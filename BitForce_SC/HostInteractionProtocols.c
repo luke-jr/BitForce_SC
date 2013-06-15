@@ -185,6 +185,12 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"QUEUE DEPTH:%d\n", PIPE_MAX_BUFFER_DEPTH);
 	strcat(szInfoReq, szTemp);
 	
+	// TODO: Remove after debugging done
+	/*
+	sprintf(szTemp,"LAST XLINK TRANS. LATENCY: %d us\n", DEBUG_LastXLINKTransTook);
+	strcat(szInfoReq, szTemp);
+	*/
+	
 	// Scattered operation took?
 	// Issue jobs to the queue
 	/*
@@ -668,11 +674,11 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	if ((XLINK_ARE_WE_MASTER == TRUE) && (XLINK_is_cpld_present() == TRUE))
 	{
 		// Show total devices
-		sprintf(szTemp,"--DEVICES IN CHAIN: %d\n", XLINK_MASTER_getChainLength());
+		sprintf(szTemp,"DEVICES IN CHAIN: %d\n", XLINK_MASTER_getChainLength() + 1); // +1 is the for master (meaning us!)
 		strcat (szInfoReq, szTemp);
 		
 		// Show device bit-mask
-		sprintf(szTemp,"--CHAIN PRESENCE MASK: %08X\n", GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK);
+		sprintf(szTemp,"CHAIN PRESENCE MASK: %08X\n", GLOBAL_XLINK_DEVICE_AVAILABILITY_BITMASK | 0b01); // Bit zero is always set, which is the master
 		strcat (szInfoReq, szTemp);
 		
 	}

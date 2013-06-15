@@ -2,7 +2,7 @@
  * JobPipe_Module.h
  *
  * Created: 08/10/2012 21:38:56
-  *  Author: NASSER GHOSEIRI
+ *  Author: NASSER GHOSEIRI
  */ 
 #ifndef JOBPIPE_MODULE_H_
 #define JOBPIPE_MODULE_H_
