@@ -3,6 +3,7 @@
  *
  * Created: 20/11/2012 23:17:01
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #ifndef ASIC_ENGINE_H_

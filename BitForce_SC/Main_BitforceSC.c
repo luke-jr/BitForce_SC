@@ -1,6 +1,7 @@
 /*
  *  Created on: Nov 8, 2011
  *  Author: NASSER GHOSEIRI
+ *  Company: Butterfly Labs
  */
 
 /* BUG FIX LOG

@@ -3,6 +3,7 @@
  *
  * Created: 03/06/2013 16:36:21
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 #include "std_defs.h"
 #include "MCU_Initialization.h"

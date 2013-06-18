@@ -3,6 +3,7 @@
  *
  * Created: 11/10/2012 21:59:40
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 #ifndef AVR32_MODULE_H_
 #define AVR32_MODULE_H_

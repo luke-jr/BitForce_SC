@@ -3,6 +3,7 @@
  *
  * Created: 13/10/2012 00:55:37
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #include "USBProtocol_Module.h"

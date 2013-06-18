@@ -3,6 +3,7 @@
  *
  * Created: 21/11/2012 20:58:33
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #include <avr32/io.h>

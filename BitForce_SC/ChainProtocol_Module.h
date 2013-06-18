@@ -3,6 +3,7 @@
  *
  * Created: 08/10/2012 21:39:56
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 #ifndef CHAINPROTOCOL_MODULE_H_
 #define CHAINPROTOCOL_MODULE_H_

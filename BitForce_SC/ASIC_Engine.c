@@ -1,9 +1,9 @@
-
 /*
  * ASIC_Engine.c
  *
  * Created: 20/11/2012 23:17:15
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #include "ASIC_Engine.h"

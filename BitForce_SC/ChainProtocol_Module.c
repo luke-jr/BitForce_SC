@@ -3,6 +3,7 @@
  *
  * Created: 08/10/2012 21:40:04
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 // Include standard definitions

@@ -2,6 +2,7 @@
  * JohnChengASIC.h
  *
  * Created: 24/03/2013 17:28:32
+ * Company: Butterfly Labs
  */ 
 
 

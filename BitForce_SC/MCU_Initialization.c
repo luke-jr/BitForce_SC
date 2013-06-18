@@ -3,6 +3,7 @@
  *
  * Created: 08/10/2012 21:47:25
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #include "AVR32X\AVR32_Module.h"

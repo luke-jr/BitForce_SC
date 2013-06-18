@@ -3,6 +3,7 @@
  *
  * Created: 08/10/2012 21:38:35
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #include "A2D_Module.h"

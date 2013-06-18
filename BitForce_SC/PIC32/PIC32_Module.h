@@ -3,6 +3,7 @@
  *
  * Created: 11/10/2012 23:20:37
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 #ifndef PIC32_MODULE_H_
 #define PIC32_MODULE_H_

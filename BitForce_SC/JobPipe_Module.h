@@ -3,6 +3,7 @@
  *
  * Created: 08/10/2012 21:38:56
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 #ifndef JOBPIPE_MODULE_H_
 #define JOBPIPE_MODULE_H_

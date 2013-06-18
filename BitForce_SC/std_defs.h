@@ -3,6 +3,7 @@
  *
  * Created: 09/10/2012 01:14:49
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #ifndef STD_DEFS_H_

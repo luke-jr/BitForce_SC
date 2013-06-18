@@ -3,6 +3,7 @@
  *
  * Created: 08/10/2012 21:47:12
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #ifndef MCU_INITIALIZATION_H_

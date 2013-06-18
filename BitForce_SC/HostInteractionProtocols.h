@@ -2,7 +2,8 @@
  * OperationProtocols.h
  *
  * Created: 06/01/2013 17:24:48
- *  Author: NASSER
+ *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 

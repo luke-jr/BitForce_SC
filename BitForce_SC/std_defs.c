@@ -3,6 +3,7 @@
  *
  * Created: 21/11/2012 20:56:46
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #include "std_defs.h"

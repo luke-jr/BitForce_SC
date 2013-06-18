@@ -3,6 +3,7 @@
  *
  * Created: 03/06/2013 16:36:07
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #ifndef PIPEPROCESSINGKERNEL_H_

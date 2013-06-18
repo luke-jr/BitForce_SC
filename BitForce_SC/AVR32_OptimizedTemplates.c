@@ -3,6 +3,7 @@
  *
  * Created: 20/01/2013 01:40:20
  *  Author: NASSER GHOSEIRI
+ * Company: Butterfly Labs
  */ 
 
 #include "AVR32_OptimizedTemplates.h"
