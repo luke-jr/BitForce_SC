@@ -1,0 +1,7 @@
+*.c	text
+*.h	text
+*.S	text
+*.s82	text
+*.atsln	text
+*.atsuo	binary
+*.cproj	text

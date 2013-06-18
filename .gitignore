@@ -1,0 +1,8 @@
+?
+*~
+*.bak
+*.swp
+*.kate-swp
+
+BitForce_SC/Debug
+BitForce_SC/Release
