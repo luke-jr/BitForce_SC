@@ -10,7 +10,7 @@ LDFLAGS = -lm -Wl,--gc-sections -Wl,--direct-data
 PART=uc3a1128
 
 PROGNAME = BitForce_SC
-xCFLAGS = -std=gnu99 -mpart=$(PART)
+xCPPFLAGS = -std=gnu99 -mpart=$(PART)
 xASPPFLAGS = -x assembler-with-cpp -mpart=$(PART)
 xASFLAGS = -mpart=$(PART)
 xLDFLAGS = -mpart=$(PART)
@@ -47,6 +47,8 @@ SOURCES = \
 
 OBJECTS = $(addprefix $(OUTDIR)/,$(patsubst %.S,%.o,$(patsubst %.c,%.o,$(SOURCES))))
 
+DEPINFO = $(OBJECTS:.o=.d)
+
 all: $(OUTDIR)/$(PROGNAME).hex
 
 $(OUTDIR)/$(PROGNAME).hex: $(OUTDIR)/$(PROGNAME).elf
@@ -55,16 +57,27 @@ $(OUTDIR)/$(PROGNAME).elf: $(OBJECTS)
 	$(LINK.o) $^ $(xLDFLAGS) $(LDFLAGS) -o $@
 
 $(OUTDIR)/%.o: %.c
-	mkdir -p "$(dir $@)"
-	$(CC) -c $(xCFLAGS) $(CFLAGS) $< -o $@
+	@mkdir -p "$(dir $@)"
+	$(CC) -c $(xCPPFLAGS) $(CPPFLAGS) $(CFLAGS) $< -o $@
+
+$(OUTDIR)/%.d: %.c
+	@mkdir -p "$(dir $@)"
+	@rm -f $@
+	@set -e; \
+		$(CPP) -M $(xCPPFLAGS) $(CPPFLAGS) $< > $@.$$$$; \
+		sed 's,\($*\)\.o[ :]*,$(OUTDIR)/\1.o $@ : ,g' < $@.$$$$ > $@; \
+		rm -f $@.$$$$
 
 %.o: %.s
 	$(AS) $(xASFLAGS) $(ASFLAGS) $< -o $@
 
 $(OUTDIR)/%.s: %.S
+	@mkdir -p "$(dir $@)"
 	$(CPP) $(xASPPFLAGS) $(CPPFLAGS) $(ASPPFLAGS) $< > $@
 
 clean:
-	rm -f $(OBJECTS) $(OUTDIR)/$(PROGNAME).elf $(OUTDIR)/$(PROGNAME).hex
+	rm -f $(OBJECTS) $(DEPINFO) $(OUTDIR)/$(PROGNAME).elf $(OUTDIR)/$(PROGNAME).hex
+
+-include $(DEPINFO)
 
 .PHONY: clean
