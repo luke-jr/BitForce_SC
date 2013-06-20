@@ -11,9 +11,9 @@
 #include "std_defs.h"
 
 // Include all headers
-#include "AVR32X\AVR32_Module.h"
-#include "PIC32\PIC32_Module.h"
-#include "STM32\STM32_Module.h"
+#include "AVR32X/AVR32_Module.h"
+#include "PIC32/PIC32_Module.h"
+#include "STM32/STM32_Module.h"
 
 
 // Now it depends which MCU we have chosen
