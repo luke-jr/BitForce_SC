@@ -41,12 +41,16 @@ void __AVR32_LowLevelInitialize()
 		// ********* Enable PLL0
 		// Value for PLL0 is 00011111    00000111    00000100   -----------00000101----------
 		//                   PLLCNT=31   PLLMUL=7+1  PLLDIV=4   PLLOPT=001, PLLOSC=1, PLLEN=1
-		AVR32_PLL0 = 0b00011111000001110000010000000101; // PLL0 at 32MHz
+		#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__) // Remember, here the XTAL is 12MHz
+			AVR32_PLL0 = 0b00011111000010100000010000000101; // PLL0 at 32MHz
+		#else
+			AVR32_PLL0 = 0b00011111000001110000010000000101; // PLL0 at 32MHz
+		#endif
 	#elif defined(__OPERATING_FREQUENCY_64MHz__)
 		// ********* Enable PLL0
 		// Value for PLL0 is 00011111    00000111    0000010   -----------00000101----------
 		//                   PLLCNT=31   PLLMUL=7+1  PLLDIV=2   PLLOPT=001, PLLOSC=0, PLLEN=1
-		#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
+		#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__) // Remember, here the XTAL is 12MHz
 			AVR32_PLL0 = 0b00011111000010100000001000000101; // PLL0 at 64MHz
 		#else
 			AVR32_PLL0 = 0b00011111000001110000001000000101; // PLL0 at 64MHz

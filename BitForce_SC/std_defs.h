@@ -1,4 +1,4 @@
-/*
+/*//
  * std_defs.h
  *
  * Created: 09/10/2012 01:14:49
@@ -16,14 +16,14 @@
 
 /*************** Operating Frequency ******************/
 //#define __OPERATING_FREQUENCY_16MHz__
-//#define __OPERATING_FREQUENCY_32MHz__ 
+#define __OPERATING_FREQUENCY_32MHz__ 
 //#define __OPERATING_FREQUENCY_48MHz__
-#define __OPERATING_FREQUENCY_64MHz__
+//#define __OPERATING_FREQUENCY_64MHz__
 
 /*************** Product Model *********************/
 //#define __PRODUCT_MODEL_JALAPENO__
-#define    __PRODUCT_MODEL_LITTLE_SINGLE__
-//#define __PRODUCT_MODEL_SINGLE__
+//#define    __PRODUCT_MODEL_LITTLE_SINGLE__
+#define __PRODUCT_MODEL_SINGLE__
 //#define __PRODUCT_MODEL_MINIRIG__
 
 /********* TOTAL CHIPS INSTALLED ON BOARD **********/
@@ -87,7 +87,7 @@
 /////////////////////////////////////////////////////////////////////////
 // This MACRO disables the kernel from trying to increase frequency on ASICS
 // on startup if their actual frequency is less than what it should be...
-#define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
+// #define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
 
 /////////////////////////////////////////////////////////////////////////
 // ASIC Frequency settings
@@ -98,7 +98,7 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #if defined(__PRODUCT_MODEL_JALAPENO)
 	#define __ASIC_FREQUENCY_ACTUAL_INDEX   1 // 180MHz for Jalapeno
 #else	
-	#define __ASIC_FREQUENCY_ACTUAL_INDEX   7 
+	#define __ASIC_FREQUENCY_ACTUAL_INDEX   7
 #endif
 
 #define __MAXIMUM_FREQUENCY_INDEX       9
@@ -209,6 +209,10 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 */
 
 ///////////////////////////////////////////////////////////////////////// 
+// XLINK Chain live scan
+// #define XLINK_CHAIN_LIVE_SCAN_ENABLED // Scans the XLINK chain if master, every __XLINK_CHAIN_REFRESH_INTERVAL microseconds
+
+///////////////////////////////////////////////////////////////////////// 
 // Reinitialize the ASICs after high-temp recovery
 #define __ASICS_RESTART_AFTER_HIGH_TEMP_RECOVERY 1
 
@@ -317,17 +321,24 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #define CHIP_TO_TEST 0
 
 /*************** XLINK Operations Timeout ***********/
-#define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   2000000 // 2 Seconds for device response
-#define __XLINK_TRANSACTION_TIMEOUT__	     20000   // 20ms. No transaction should take longer. 
+#define __XLINK_WAIT_FOR_DEVICE_RESPONSE__   90000   // 90ms - For device response
+#define __XLINK_TRANSACTION_TIMEOUT__	     90000   // 80ms - No transaction should take longer. 
 #define __XLINK_WAIT_PACKET_TIMEOUT__        880
 #define __XLINK_ATTEMPT_RETRY_MAXIMUM__      44
-#define __XLINK_CHAIN_REFRESH_INTERVAL		 10000000 // 10 seconds
+#define __XLINK_CHAIN_REFRESH_INTERVAL		 9000000 // 9 seconds
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION		"1.2.5"	// This is firmware 1.2.0 [ CHIP PARALLELIZATION supported on this version and after ]
+#define __FIRMWARE_VERSION		"1.2.6"	// This is firmware 1.2.0 [ CHIP PARALLELIZATION supported on this version and after ]
+
+// **** Change log Vs 1.2.5
+// - Total thermal cycles was added to 'Info Request' command
+// - Initialize heavy diagnostics removed
+// - MCU frequency changed to 32MHz, hence SPI is now 8MHz, which is supposed to be more stable
+// - Fast-blinking now stays for 5 minutes, then the board is fully reset, hence increasing the chance of
+//   automatic revival after a disaster
 
 // **** Change log Vs 1.2.4
-// - XLINK Operational now
+// - XLINK Operational now <but not fully reliable>
 
 // **** Change log Vs 1.2.3
 // - High-Temp recovery threshold changed to 90 Degrees from 100 Degrees
@@ -468,6 +479,9 @@ volatile unsigned int iMark1;
 volatile unsigned int iMark2;
 volatile unsigned int GLOBAL_LAST_ASIC_IS_PROCESSING_LATENCY;
 
+// Thermal Cycle Counter
+volatile unsigned int GLOBAL_TOTAL_THERMAL_CYCLES;
+
 // Basic boolean definition
 #define TRUE	1
 #define FALSE	0
@@ -511,8 +525,8 @@ volatile unsigned int DEBUG_TraceTimer1;
 volatile unsigned int DEBUG_TraceTimer2;
 volatile unsigned int DEBUG_TraceTimers[8];
 volatile unsigned int DEBUG_TraceTimersIndex;
-
 volatile unsigned int DEBUG_LastXLINKTransTook;
+volatile unsigned int DEBUG_TotalRIMA_Count;
 
 // Assembly NOP operation
 #ifdef __OPERATING_FREQUENCY_64MHz__

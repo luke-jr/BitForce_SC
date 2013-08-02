@@ -135,6 +135,57 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	unsigned int  iLM[16];
 	unsigned char ilmCounter = 0;
 	unsigned int  iNonceCount;
+	
+	// Perform 1000 CPLD tests
+	
+	// TODO: Remove after debugging
+	/*
+	uL1 = MACRO_GetTickCountRet;
+	Microkernel_Spin();
+	uL2 = MACRO_GetTickCountRet - uL1;
+	sprintf(szTemp,"Microkernel takes minimum: %d us\n", uL2);
+	strcat(szInfoReq, szTemp);
+	*/
+	
+	/*
+	// TODO: Remove after debugging
+	UL32 iTotalCorrectReads = 0;
+	unsigned char iActualChar = 0;
+	
+	
+	for (unsigned int imrr = 0; imrr < 1000; imrr++)
+	{
+		__AVR32_CPLD_SetAccess();
+		char iValueToSet = 0;
+		MACRO__AVR32_CPLD_Write(CPLD_ADDRESS_ECHO, iActualChar);
+		MACRO__AVR32_CPLD_Read(iValueToSet,CPLD_ADDRESS_ECHO);
+		if (iValueToSet == iActualChar) iTotalCorrectReads++;
+		iActualChar++;
+	}
+	
+	sprintf(szTemp,"Total CPLD Correct Reads: %d / 1000\n",iTotalCorrectReads);
+	strcat(szInfoReq, szTemp);
+	*/
+	
+	// Send 1000 packets of RIMA to Unit1 in the chain if we are master...
+	// TODO: Remove after debugging 
+	/*if (XLINK_ARE_WE_MASTER == TRUE)
+	{
+		for (int uSurge = 0; uSurge < 1000; uSurge++)
+		{
+			MACRO_XLINK_send_packet(1,"RIMA", 4, TRUE, FALSE); // LP, #BC, LEN = 4
+			UL32 iActualTimeX = MACRO_GetTickCountRet;
+			
+			// Wait for 150us
+			while ((MACRO_GetTickCountRet + 4 - iActualTimeX) < 550) WATCHDOG_RESET;
+																																
+		}
+	}	
+	else
+	{
+		sprintf(szTemp,"Total RIMA Packets: %d\n", DEBUG_TotalRIMA_Count);
+		strcat(szInfoReq, szTemp);		
+	}*/			
 		
 	/*
 	unsigned int iTMTX = MACRO_GetTickCountRet;
@@ -658,14 +709,17 @@ PROTOCOL_RESULT Protocol_info_request(void)
 	sprintf(szTemp,"FREQUENCY: %d MHz\n", __ASIC_FREQUENCY_VALUES[__ASIC_FREQUENCY_ACTUAL_INDEX]);
 	strcat(szInfoReq, szTemp);
 		
-	// Add Chain Status
-	sprintf(szTemp,"XLINK MODE: %s\n", XLINK_ARE_WE_MASTER ? "MASTER" : "SLAVE" );
-	strcat(szInfoReq, szTemp);
-	
 	// Critical Temperature
 	sprintf(szTemp,"CRITICAL TEMPERATURE: %d\n", (GLOBAL_CRITICAL_TEMPERATURE == TRUE) ? 1 : 0);
 	strcat(szInfoReq, szTemp);
-		
+	
+	// OK,we show total thermal cycles
+	sprintf(szTemp,"TOTAL THERMAL CYCLES: %d\n",GLOBAL_TOTAL_THERMAL_CYCLES);
+	strcat(szInfoReq, szTemp);
+
+	// Add Chain Status
+	sprintf(szTemp,"XLINK MODE: %s\n", XLINK_ARE_WE_MASTER ? "MASTER" : "SLAVE" );
+	strcat(szInfoReq, szTemp);
 	
 	// Add XLINK chip installed status
 	sprintf(szTemp,"XLINK PRESENT: %s\n", (XLINK_is_cpld_present() == TRUE) ? "YES" : "NO");
@@ -1890,55 +1944,6 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 			
 			// Add it to stream
 			__aux_PrintResultToBuffer(sz_rep, pjob_res, iActualTerminationIndex, &iActualTerminationIndex);
-			
-			// Also say which midstate and nonce-range is in process
-			/*
-			stream_to_hex(pjob_res->midstate , sz_temp2, 32, &istream_len);
-			sz_temp2[istream_len] = 0;
-			stream_to_hex(pjob_res->block_data, sz_temp3, 12, &istream_len);
-			sz_temp3[istream_len] = 0;		
-			
-			// Add nonce-count...
-			volatile unsigned char iNonceCount = pjob_res->i_nonce_count;
-			
-			#if defined(QUEUE_OPERATE_ONE_JOB_PER_CHIP)
-				//sprintf(sz_temp,"%s,%s,%X,%d", sz_temp2, sz_temp3, pjob_res->iProcessingChip, iNonceCount); // Add midstate, block-data, count and nonces...
-				//strcat(sz_rep, sz_temp);
-				sprintf(sz_temp,"%s,%s,%d", sz_temp2, sz_temp3, iNonceCount); // Add midstate, block-data, count and nonces...
-				strcat(sz_rep, sz_temp);				
-			#else
-				sprintf(sz_temp,"%s,%s,%d", sz_temp2, sz_temp3, iNonceCount); // Add midstate, block-data, count and nonces...
-				strcat(sz_rep, sz_temp);			
-			#endif
-			
-			// If there are nonces, add a comma here
-			if (iNonceCount > 0)
-			{
-				 strcat(sz_rep,",");
-			}				 
-					
-			// Nonces found...
-			if ( pjob_res->i_nonce_count > 0)
-			{
-				// Our loop counter
-				unsigned char ix = 0;
-				
-				for (ix = 0; ix < pjob_res->i_nonce_count; ix++)
-				{
-					sprintf(sz_temp2, "%08X", pjob_res->nonce_list[ix]);
-					strcat(sz_rep, sz_temp2);
-
-					// Add a comma if it's not the last nonce
-					if (ix != pjob_res->i_nonce_count - 1) strcat(sz_rep,",");
-				}
-
-				// Add the 'Enter' character
-				strcat(sz_temp, "\n");
-			}
-
-			// In the end, add the <LF>
-			strcat(sz_rep,"\n");
-			*/
 		}
 	}
 
@@ -1957,19 +1962,27 @@ PROTOCOL_RESULT	Protocol_PIPE_BUF_STATUS(void)
 		GLOBAL_USBToHostLatency = MACRO_GetTickCountRet;
 		USB_send_string(sz_rep);  // Send it to USB
 		GLOBAL_USBToHostLatency = MACRO_GetTickCountRet - GLOBAL_USBToHostLatency;
+		
+		// Also, we clear the results buffer
+		JobPipe__pipe_skip_buf_job_results(iTotalResultsToTake);
 	}		
 	else // We're a slave... send it by XLINK
 	{
 		unsigned int bXTimeoutDetected = 0;
 		XLINK_SLAVE_respond_transact(sz_rep,
 									 strlen(sz_rep),
-									 __XLINK_TRANSACTION_TIMEOUT__,
+									 __XLINK_TRANSACTION_TIMEOUT__, 
 									 &bXTimeoutDetected,
 									 FALSE);
+									 
+		// Also, we clear the results buffer (ONLY IF SUCCEEDED)
+		if (bXTimeoutDetected == FALSE) 
+		{
+			JobPipe__pipe_skip_buf_job_results(iTotalResultsToTake);									 
+		}			
 	}		
 
-	// Also, we clear the results buffer
-	JobPipe__pipe_skip_buf_job_results(iTotalResultsToTake);
+
 	
 	// Also say how long it has taken
 	GLOBAL_BufResultToUSBLatency = MACRO_GetTickCountRet - GLOBAL_BufResultToUSBLatency;
@@ -2071,7 +2084,6 @@ volatile void __aux_PrintResultToBuffer(char* szBuffer, const void* pResult, con
 		*iEndPositionPlusOne = iHoverPos;
 		return;
 	}
-	
 }
 
 volatile void __aux_PrintFlushResultToBuffer(char* szBuffer, const int iChipIndex, const unsigned int iStartPosition, unsigned int* iEndPositionPlusOne)
@@ -2315,6 +2327,224 @@ PROTOCOL_RESULT Protocol_handle_job_single_stage(char* szStream)
 	return res;
 }
 
+PROTOCOL_RESULT Protocol_MultiJob_single_stage(const char* szStream, const unsigned int iPayloadSize)
+{
+	// Our result
+	PROTOCOL_RESULT res = PROTOCOL_SUCCESS;
+
+	// Send data to ASIC and wait for response...
+	// BTW, our actual timeout is 16 seconds... (1GH/s)
+	// Also, we do expect a packet which is 64 Bytes data, 16 Bytes Midstate, 16 Bytes difficulty (totaling 96 Bytes)
+	
+	// Are we at high-temperature, waiting to cool down?
+	if (GLOBAL_CRITICAL_TEMPERATURE == TRUE)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:HIGH TEMPERATURE RECOVERY\n");  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:HIGH TEMPERATURE RECOVERY\n",
+										 sizeof("ERR:HIGH TEMPERATURE RECOVERY\n"),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bXTimeoutDetected,
+										 FALSE);
+		}
+		
+		return PROTOCOL_FAILED;
+	}
+
+	// Our small buffer
+	volatile char szBuffer64[64];
+	volatile char iTotalAccepted = 0;
+	
+	// We've received the ZX command, can we take this job now?
+	if (!JobPipe__pipe_ok_to_push())
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:QUEUE FULL\n");  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:QUEUE FULL\n",
+										sizeof("ERR:QUEUE FULL\n"),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
+		}
+		
+		return PROTOCOL_FAILED;
+	}
+	
+		
+	// Wait for job data (96 Bytes)
+	volatile char* sz_buf = szStream;
+	unsigned int iDataStreamLength;
+	unsigned int i_timeout = 1000000000;
+	unsigned char bInvalidData = FALSE;
+	unsigned char iDetectedPayloadSize = 0;
+	
+	// Increment sz_buf since header byte does exist in XLINK and we don't need it
+	iDetectedPayloadSize = sz_buf[0];
+	iDataStreamLength = iPayloadSize - 1; 
+	sz_buf = sz_buf + 1;       // We advance the pointer so that the <SIGNATURE> is the index-0 of the stream
+							   // As a result, we say iDataStreamLength =  Payload-size - 1 
+							   
+	// Timeout?
+	if (i_timeout < 2)
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:TIMEOUT\n");  // Send it to USB	
+		}		
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:TIMEOUT\n",
+										sizeof("ERR:TIMEOUT\n"),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
+		}
+		
+		return PROTOCOL_TIMEOUT;
+	}
+	
+	// THIS IS THE STRUCTURE OF THE JOB PACK
+	// --------------------------------------
+	// unsigned __int8 payloadSize; // NOT SEEN IN OUR RESULT
+	// unsigned __int8 signature;   == 0x0C1
+	// unsigned __int8 jobsInArray;
+	// job_packets[<jobsInArray>];
+	// unsigned __int8 endOfWrapper == 0x0FE
+	// --------------------------------------	
+	
+	// Received length should not be greater than 255. Check for it...
+	if (iDataStreamLength > 255)
+	{
+		// Some fault
+		sprintf(sz_buf, "ERR:INVALID DATA\n");
+
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string(sz_buf);  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact(sz_buf,
+										 strlen(sz_buf),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bXTimeoutDetected,
+										 FALSE);
+		}
+
+		return PROTOCOL_INVALID_USB_DATA;
+	}
+
+	// Check integrity
+	if ((bInvalidData) || (iDataStreamLength < sizeof(job_packet) + 1 + 1 + 1 + 1)) // sizeof(job_packet) + payloadSize + signature + jobsInArray + endOfWrapper
+	{
+		sprintf(sz_buf, "ERR:INVALID DATA\n");
+		
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string(sz_buf);  // Send it to USB	
+		}		
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact(sz_buf,
+										strlen(sz_buf),
+										__XLINK_TRANSACTION_TIMEOUT__,
+										&bXTimeoutDetected,
+										FALSE);
+		}
+		
+		return PROTOCOL_INVALID_USB_DATA;
+	}
+
+	// All is OK, send data to ASIC for processing, and respond with OK
+	volatile unsigned short stream__payloadSize  = iDetectedPayloadSize;
+	volatile unsigned char stream__signature    = sz_buf[0];
+	volatile unsigned char stream__jobsInArray  = sz_buf[1];
+	volatile unsigned char stream__endOfWrapper = sz_buf[iDataStreamLength - 1];
+		
+	// SIGNATURE CHECK
+	// Respond with 'ERR:SIGNATURE' if not matched
+	if ((stream__payloadSize  > 255+3)  ||
+		(stream__signature    != 0x0C1) || // Initial Signature
+		(stream__jobsInArray  > 5)		||
+		(stream__jobsInArray  == 0)		|| // Terminating Signature
+		(stream__endOfWrapper != 0x0FE))
+	{
+		if (XLINK_ARE_WE_MASTER)
+		{
+			USB_send_string("ERR:SIGNATURE\n");  // Send it to USB
+		}
+		else // We're a slave... send it by XLINK
+		{
+			unsigned int bXTimeoutDetected = 0;
+			XLINK_SLAVE_respond_transact("ERR:SIGNATURE\n",
+										 sizeof("ERR:SIGNATURE\n"),
+										 __XLINK_TRANSACTION_TIMEOUT__,
+										 &bXTimeoutDetected,
+										 FALSE);
+		}
+		
+		return PROTOCOL_INVALID_USB_DATA;
+	}
+	
+	// Now our famous JobPackets
+	volatile pjob_packet pointer_to_jobs_0 = (pjob_packet)((void*)(sz_buf + 2 + (0*(sizeof(job_packet) + 1)) +1 ));
+	volatile pjob_packet pointer_to_jobs_1 = (pjob_packet)((void*)(sz_buf + 2 + (1*(sizeof(job_packet) + 1)) +1 ));
+	volatile pjob_packet pointer_to_jobs_2 = (pjob_packet)((void*)(sz_buf + 2 + (2*(sizeof(job_packet) + 1)) +1 ));
+	volatile pjob_packet pointer_to_jobs_3 = (pjob_packet)((void*)(sz_buf + 2 + (3*(sizeof(job_packet) + 1)) +1 ));
+	volatile pjob_packet pointer_to_jobs_4 = (pjob_packet)((void*)(sz_buf + 2 + (4*(sizeof(job_packet) + 1)) +1 )); // Last +1 is to skip the sigunature
+	
+	// Now check how many jobs we can take...
+	volatile char total_space_available = JobPipe__available_space();
+	volatile char total_jobs_to_take    = (total_space_available > stream__jobsInArray) ? stream__jobsInArray : total_space_available;
+		
+	// Push the job...
+	if  (total_jobs_to_take >= 1) JobPipe__pipe_push_job((void*)(pointer_to_jobs_0));
+	if ((total_jobs_to_take >= 2) && (stream__jobsInArray > 1)) JobPipe__pipe_push_job((void*)(pointer_to_jobs_1));
+	if ((total_jobs_to_take >= 3) && (stream__jobsInArray > 2)) JobPipe__pipe_push_job((void*)(pointer_to_jobs_2));
+	if ((total_jobs_to_take >= 4) && (stream__jobsInArray > 3)) JobPipe__pipe_push_job((void*)(pointer_to_jobs_3));
+	if ((total_jobs_to_take == 5) && (stream__jobsInArray > 4)) JobPipe__pipe_push_job((void*)(pointer_to_jobs_4));
+	
+	// Job was pushed into buffer, let the host know
+	// Generate the message
+	sprintf(szBuffer64,"OK:QUEUED %d\n", total_jobs_to_take);
+	
+	if (XLINK_ARE_WE_MASTER)
+	{
+		USB_send_string(szBuffer64);  // Send it to USB	
+	}	
+	else // We're a slave... send it by XLINK
+	{
+		unsigned int bXTimeoutDetected = 0;
+		XLINK_SLAVE_respond_transact(szBuffer64,
+									strlen(szBuffer64),
+									__XLINK_TRANSACTION_TIMEOUT__,
+									&bXTimeoutDetected,
+									FALSE);
+	}
+
+	// Increase the number of BUF-P2P jobs ever received
+	__total_buf_pipe_jobs_ever_received++;
+	
+	// Set Mark1
+	if (iMark1 == 0) iMark1 = MACRO_GetTickCountRet;
+	
+	
+	// Return our result...
+	return res;
+}
 
 
 PROTOCOL_RESULT Protocol_handle_job_p2p(void)

@@ -67,6 +67,9 @@ void MCU_Main_Loop(void);
  */
 int main(void)
 {
+	// Reset RIMA counter
+	DEBUG_TotalRIMA_Count = 0;
+		
 	// Initialize everything here...
 	init_mcu();
 
@@ -112,6 +115,9 @@ int main(void)
 	// Reset the total number of engines detected on startup
 	GLOBAL_TotalEnginesDetectedOnStartup = 0;
 	
+	// Initialize total thermal cycles
+	GLOBAL_TOTAL_THERMAL_CYCLES = 0;	
+	
 	// Last time JobIssue was called. 
 	GLOBAL_LastJobIssueToAllEngines = 0;
 	
@@ -133,8 +139,6 @@ int main(void)
 		if (ASIC_does_chip_exist(6) == TRUE) MCU_LED_Set(7);
 		if (ASIC_does_chip_exist(7) == TRUE) MCU_LED_Set(8);	
 	#endif
-	
-
 	
 	// Detect if we're chain master or not [MODIFY]
 	XLINK_ARE_WE_MASTER = XLINK_detect_if_we_are_master(); // For the moment we're the chain master [MODIFY]
@@ -231,9 +235,9 @@ void MCU_Main_Loop()
 
 	// OK, now the memory on FTDI is empty,
 	// wait for standard packet size
-	char sz_cmd[1024];
-	unsigned int umx;
-	unsigned int  i_count = 0;
+	char sz_cmd[2048];
+	volatile unsigned int umx;
+	volatile unsigned int  i_count = 0;
 	
 	char bTimeoutDetectedOnXLINK = 0;
 	char bDeviceNotRespondedOnXLINK = 0;			
@@ -284,20 +288,24 @@ void MCU_Main_Loop()
 			if (!USB_inbound_USB_data()) continue;
 			
 			// Was EndOfStream detected?
-			unsigned int bEOSDetected = FALSE;
 			intercepted_command_length = 0;
-			unsigned int iExpectedPacketLength = 0;
-			unsigned int bInterceptingChainForwardReq = FALSE;
-			unsigned char bSingleStageJobIssueCommand = FALSE;
+			
+			volatile unsigned int bEOSDetected = FALSE;
+			volatile unsigned int iExpectedPacketLength = 0;
+			volatile unsigned int bInterceptingChainForwardReq = FALSE;
+			volatile unsigned char bSingleStageJobIssueCommand = FALSE;
+			volatile unsigned char bSingleStageMultiJobIssueCommand = FALSE;
+			volatile unsigned char __expected_singlestage_multijob_length = 0xFF;
 
 			// Read all the data that has arrived
-			while (USB_inbound_USB_data() && i_count < 1024)
+			while (USB_inbound_USB_data() && i_count < 2048)
 			{
 				// Read byte
 				sz_cmd[i_count] = USB_read_byte();
 				
 				// Are we a single-cycle job issue?
 				bSingleStageJobIssueCommand = ((sz_cmd[0] == 'S') && (sz_cmd[1] == 48)) ? TRUE : FALSE;
+				bSingleStageMultiJobIssueCommand = ((sz_cmd[0] == 'W') && (sz_cmd[1] == 'X')) ? TRUE : FALSE;
 				
 				// Are we expecting 
 				bInterceptingChainForwardReq = (sz_cmd[0] == 64) ? TRUE : FALSE;
@@ -311,8 +319,18 @@ void MCU_Main_Loop()
 				// Increase Count				 
 				i_count++;
 				
+				// Determine single-stage multi-job command length
+				if (i_count >= 3)
+				{
+					__expected_singlestage_multijob_length = sz_cmd[2] + 1 + 2; // +1 because this length does not include the stream-length byte itself
+																				// +2 because it doesn't include the initial 'WX' either
+				}
+								
+				
 				// Check if 3-byte packet is done
-				if ((i_count == 3) && (bInterceptingChainForwardReq == FALSE) && (bSingleStageJobIssueCommand == FALSE))
+				if ((i_count == 3) && (bInterceptingChainForwardReq == FALSE) && 
+					(bSingleStageJobIssueCommand == FALSE) && 
+					(bSingleStageMultiJobIssueCommand == FALSE))
 				{
 					bEOSDetected = TRUE;
 					break;
@@ -330,11 +348,20 @@ void MCU_Main_Loop()
 					break;
 				}
 				
+				if ((bSingleStageMultiJobIssueCommand == TRUE) && (i_count == __expected_singlestage_multijob_length))
+				{
+					bEOSDetected = TRUE;
+					// Set the correct intercepted_Command_length
+					intercepted_command_length = i_count - 2; // Minus 2 because you need to include Field
+					break;
+				}				
+				
 				// Check if we've overlapped
 				if (i_count > 256)							
 				{
 					// Clear buffer, something is wrong...
 					i_count = 0;
+					__expected_singlestage_multijob_length = 0xFF;
 					sz_cmd[0] = 0;
 					sz_cmd[1] = 0;
 					sz_cmd[2] = 0;
@@ -351,6 +378,7 @@ void MCU_Main_Loop()
 				{
 					// Clear buffer, something is wrong...
 					i_count = 0;
+					__expected_singlestage_multijob_length = 0xFF;
 					sz_cmd[0] = 0;
 					sz_cmd[1] = 0;
 					sz_cmd[2] = 0;
@@ -361,6 +389,8 @@ void MCU_Main_Loop()
 					continue; // We'll continue...			
 				}					
 			}
+			
+
 		}
 		else 
 		{
@@ -374,8 +404,8 @@ void MCU_Main_Loop()
 			// Run the procedure
 			XLINK_SLAVE_wait_transact(sz_cmd, 
 									  &i_count, 
-									  256, 
-									  1000,  // 1000us, or 1ms
+									  2048, 
+									  __XLINK_TRANSACTION_TIMEOUT__,  // 1000us, or 1ms
 									  &bTimeoutDetectedOnXLINK, 
 									  FALSE, TRUE); // Note: WE ARE WAITING FOR COMMAND
 			
@@ -384,6 +414,13 @@ void MCU_Main_Loop()
 			{
 				MACRO_XLINK_send_packet(XLINK_get_cpld_id(), "INVA", 4, TRUE, FALSE);
 				continue;
+			}
+			
+			// Is it a RIMA packet verification call?
+			if ((sz_cmd[0] == 'R') && (sz_cmd[1] == 'I') && (sz_cmd[2] == 'M') && (sz_cmd[3] == 'A'))
+			{
+				DEBUG_TotalRIMA_Count++;
+				continue;				
 			}
 			
 			// Check for sz_cmd, AA BB C4 <ID>, then we set CPLD ID and enable pass-through
@@ -401,13 +438,17 @@ void MCU_Main_Loop()
 				continue;
 			}
 			
+			// How many bytes did we receive?
+			intercepted_command_length = i_count;
+			
 			// Check 
 			if (bTimeoutDetectedOnXLINK) continue;			
 		}		
 		
 		// Are we a single-stage job-issue command?
 		char bSingleStageJobIssueCommand = ((sz_cmd[0] == 'S') && (sz_cmd[1] == 48)) ? TRUE : FALSE; 
-
+		char bSingleStageMultiJobIssueCommand = ((sz_cmd[0] == 'W') && (sz_cmd[1] == 'X')) ? TRUE : FALSE;
+		
 		// Check number of bytes received so far.
 		// If they are 3, we may have a command here (4 for the AMUX Read)...
 		if (TRUE)
@@ -416,7 +457,10 @@ void MCU_Main_Loop()
 			i_count = 0;
 
 			// Check for packet integrity
-			if (((sz_cmd[0] != 'Z' || sz_cmd[2] != 'X') && (sz_cmd[0] != '@')) && (bSingleStageJobIssueCommand == FALSE)) // @XX means forward to XX (X must be between '0' and '9')
+			if (((sz_cmd[0] != 'Z' || sz_cmd[2] != 'X') && 
+				(sz_cmd[0] != '@')) && 
+				(bSingleStageJobIssueCommand == FALSE) && 
+				(bSingleStageMultiJobIssueCommand == FALSE)) // @XX means forward to XX (X must be between '0' and '9')
 			{
 				continue;
 			}
@@ -425,6 +469,7 @@ void MCU_Main_Loop()
 				// We have a command. Check for validity
 				if ((sz_cmd[0] != '@') &&
 					(bSingleStageJobIssueCommand == FALSE) && 
+					(bSingleStageMultiJobIssueCommand == FALSE) && 
 					(sz_cmd[1] != PROTOCOL_REQ_INFO_REQUEST) &&
 					(sz_cmd[1] != PROTOCOL_REQ_BUF_FLUSH_EX) &&
 					(sz_cmd[1] != PROTOCOL_REQ_HANDLE_JOB) &&
@@ -486,6 +531,11 @@ void MCU_Main_Loop()
 					{
 						Protocol_handle_job_single_stage(sz_cmd);
 					}
+					else if (bSingleStageMultiJobIssueCommand)
+					{
+						Protocol_MultiJob_single_stage((const char*)(sz_cmd + 2), 
+													   (XLINK_ARE_WE_MASTER) ? (intercepted_command_length) : (intercepted_command_length - 2)); // +2 because the first two characters are 'W','X'
+					}
 					else
 					{
 						// Job-Issuing commands
@@ -517,8 +567,6 @@ void MCU_Main_Loop()
 						if (sz_cmd[1] == PROTOCOL_REQ_TEST_COMMAND)			Protocol_Test_Command();
 						if (sz_cmd[1] == PROTOCOL_REQ_PRESENCE_DETECTION)   Protocol_xlink_presence_detection();
 					}
-					
-					
 				}	
 				
 				// Once we reach here, our procedure has run and we're back to standby...

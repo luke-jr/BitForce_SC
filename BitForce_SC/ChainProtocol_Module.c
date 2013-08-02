@@ -222,7 +222,13 @@ char XLINK_MASTER_Is_Device_Present(char aID)
 	// Check response errors
 	if (bTimedOut || bDevNotResponded)
 	{
-		return FALSE;
+		// Check again (we do check twice actually)
+		XLINK_MASTER_transact(aID, sz_cmd, 3, szResponse, &iRespLen, 128, __XLINK_TRANSACTION_TIMEOUT__, &bDevNotResponded, &bTimedOut, TRUE);
+		
+		if (bTimedOut || bDevNotResponded)
+		{
+			return FALSE;
+		}	
 	}	
 	
 	// Device did respond, now was it correct?
@@ -773,6 +779,7 @@ void XLINK_wait_packet (char  *data,
 
 }
 
+
 // This is used by master only...
 void XLINK_MASTER_transact(char   iAdrs, 
 					       char*  szData, 
@@ -812,8 +819,13 @@ void XLINK_MASTER_transact(char   iAdrs,
 	volatile UL32 vTemp1 = 0;
 	volatile UL32 vTemp2 = 0;
 	volatile UL32 vTemp3 = 0;
+	volatile UL32 vTemp4 = 0;
 	
 	volatile unsigned int iExpectedChecksum = 0;
+	
+	// This is for debugging only (XLINK i mean)
+	volatile struct cs_debug cssDebg[512];
+	volatile int cssDebgIndex = 0;
 
 	// Proceed...
 	while (iTotalSent < iLen)
@@ -826,12 +838,15 @@ void XLINK_MASTER_transact(char   iAdrs,
 		iLP = ((iTotalSent + iBytesToSend >= iLen) ? 1 : 0);
 		iTotalRetryCount = 0;
 
-RETRY_POINT_1:
-		// Before doing anything, clear the CPLD
-		MACRO_XLINK_clear_RX;
-		
 		// Send these bytes
-		char* szDest = (char*)(szData + iTotalSent);
+		char* szDest;
+		
+RETRY_POINT_1:		
+		// Save the time
+		vTemp4 = MACRO_GetTickCountRet;
+		
+		// Proceed
+		szDest = (char*)(szData + iTotalSent);
 		MACRO_XLINK_send_packet(iAdrs, szDest, iBytesToSend, iLP, iBC);
 		
 		
@@ -857,20 +872,42 @@ RETRY_POINT_1:
 		// Wait for response
 		MACRO_XLINK_wait_packet(szDevResponse, 
 							    __iRespLen, 
-							    (__XLINK_WAIT_PACKET_TIMEOUT__ >> 3),  // We operate on reduced timeout... This is to make sure we try more than the slave waits...
+							    (__XLINK_WAIT_PACKET_TIMEOUT__),  // We operate on reduced timeout... This is to make sure we try more than the slave waits...
 								iTimeoutDetected, 
 								__senders_address, 
 								__lp, 
 								__bc);
-						  
+								
+		// Ok, record all in cssDbg: TODO: Remove after debugging finished
+		vTemp4 = MACRO_GetTickCountRet - vTemp4;
+		
+		cssDebg[cssDebgIndex].iTotalDuration = vTemp4;
+		cssDebg[cssDebgIndex].iRecBC = __bc;
+		cssDebg[cssDebgIndex].iSentBC = iBC;
+		cssDebg[cssDebgIndex].iSentLen = iBytesToSend;
+		cssDebg[cssDebgIndex].iSentLP = iLP;
+		cssDebg[cssDebgIndex].iRecTimeout = iTimeoutDetected;
+		
+		cssDebg[cssDebgIndex].szRecv[0] = szDevResponse[0];
+		cssDebg[cssDebgIndex].szRecv[1] = szDevResponse[1];
+		cssDebg[cssDebgIndex].szRecv[2] = szDevResponse[2];
+		cssDebg[cssDebgIndex].szRecv[3] = szDevResponse[3];
+		
+		cssDebg[cssDebgIndex].szSent[0] = szDest[0];
+		cssDebg[cssDebgIndex].szSent[1] = szDest[1];
+		cssDebg[cssDebgIndex].szSent[2] = szDest[2];
+		cssDebg[cssDebgIndex].szSent[3] = szDest[3];
+		
+		cssDebgIndex++;
+		
 		// Check master timeout
 		vTemp1 = MACRO_GetTickCountRet;
 		vTemp3 = vTemp1 - iTransactionStartTickcount;
 		
 		if (vTemp3 > transaction_timeout) 
 		{
-			*bTimeoutDetected = 1;
-			if (iTotalSent == 0) *bDeviceNotResponded = 1;
+			*bTimeoutDetected = 16;
+			if (iTotalSent == 0) { *bDeviceNotResponded = 1; *bTimeoutDetected = 13; }
 			
 			// Before doing anything, clear the CPLD
 			MACRO_XLINK_clear_RX;			
@@ -881,14 +918,11 @@ RETRY_POINT_1:
 		if (iTimeoutDetected)
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount ==  (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
+			if (iTotalRetryCount ==  (__XLINK_ATTEMPT_RETRY_MAXIMUM__))
 			{
 				// We've failed
-				*bTimeoutDetected = 1;
+				*bTimeoutDetected = 14;
 				*bDeviceNotResponded = (iTotalSent == 0) ? 1 : 0;
-				
-				// Before doing anything, clear the CPLD
-				MACRO_XLINK_clear_RX;
 				return;
 			}
 			else
@@ -907,14 +941,11 @@ RETRY_POINT_1:
 			(__senders_address != iAdrs)) // Check both for address-match and 'OK' response
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount ==  (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
+			if (iTotalRetryCount ==  (__XLINK_ATTEMPT_RETRY_MAXIMUM__))
 			{
 				// We've failed
 				*bTimeoutDetected = 2;
 				*bDeviceNotResponded = (iTotalSent == 0) ? 1 : 0;
-				
-				// Before doing anything, clear the CPLD
-				MACRO_XLINK_clear_RX;				
 				return;
 			}
 			else
@@ -956,18 +987,20 @@ RETRY_POINT_1:
 	volatile int iUTR_OLD_LEN = 0;
 	volatile int iUTR_OLD_LP = 0;
 	
+	
+	
 	// We have to reset the BitCorrector, as it will start from 0 for the PUSH part
 	iBC = TRUE; // Push must be set to one
 	volatile char iExpectedBC = TRUE; // This is what we expect from the slave as BitCorrector
+	
+	// Reset transaction start point
+	iTransactionStartTickcount = MACRO_GetTickCountRet;
 	
 	// Now we have to wait for data
 	while (iTotalReceived < iMaxRespLen)
 	{
 		// We need to reset watchdog
 		WATCHDOG_RESET;
-		
-		// Before doing anything, clear the CPLD
-		MACRO_XLINK_clear_RX;
 		
 		// Proceed
 		MACRO_XLINK_send_packet(iAdrs,"PUSH", 4, iLP, iBC);
@@ -995,7 +1028,7 @@ RETRY_POINT_1:
 		// Wait for response		
 		MACRO_XLINK_wait_packet(szDevResponse, 
 							    __iRespLen,
-								(__XLINK_WAIT_PACKET_TIMEOUT__ >> 2),  // For the first packet (only) we wait UL32 time. For the rest, we'll be fast...
+								(__XLINK_WAIT_PACKET_TIMEOUT__),  // For the first packet (only) we wait UL32 time. For the rest, we'll be fast...
 								iTimeoutDetected,
 								__senders_address,
 								__lp,
@@ -1005,28 +1038,39 @@ RETRY_POINT_1:
 		vTemp1 = MACRO_GetTickCountRet;
 		vTemp3 = vTemp1 - iTransactionStartTickcount;
 		
+		// Continue
 		if (vTemp3 > transaction_timeout + __XLINK_WAIT_FOR_DEVICE_RESPONSE__)
 		{
 			*bTimeoutDetected = (iTotalReceived == 0) ? 3 : 77;
 			if (iTotalSent == 0) *bDeviceNotResponded = 1;
-			
-			// Before doing anything, clear the CPLD
-			MACRO_XLINK_clear_RX;
 			return;
+		}
+		
+		// Set start of our time if no timeout was detected
+		// TODO: REMOVE, this is only for debug
+		if (iTimeoutDetected == FALSE) 
+		{
+			iUTR_GVAR1 = MACRO_GetTickCountRet;
 		}
 		
 		// Check for issues
 		if (iTimeoutDetected)
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 2))
+			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__))
 			{
 				// We've failed
-				*bTimeoutDetected = 4;
+				if (iTotalReceived == 0)
+				{ 
+					*bTimeoutDetected = 4;
+				}					
+				else
+				{
+					iUTR_GVAR1 = MACRO_GetTickCountRet - iUTR_GVAR1; // We know how long it took...
+					*bTimeoutDetected = 41;
+				}					
+					
 				*bDeviceNotResponded = (iTotalSent == 0) ? 1 : 0;
-				
-				// Before doing anything, clear the CPLD
-				MACRO_XLINK_clear_RX;				
 				return;
 			}
 			else
@@ -1046,7 +1090,7 @@ RETRY_POINT_1:
 		if (__senders_address != iAdrs || __iRespLen == 0 || iExpectedBC != __bc) // Check both for address-match, response-length and bit-corrector
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 2))
+			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__))
 			{
 				// We've failed
 				if (__senders_address != iAdrs)
@@ -1060,9 +1104,6 @@ RETRY_POINT_1:
 				else *bTimeoutDetected = 51;
 						
 				*bDeviceNotResponded = (iTotalSent == 0) ? 1 : 0;
-				
-				// Before doing anything, clear the CPLD
-				MACRO_XLINK_clear_RX;				
 				return;
 			}
 			else
@@ -1105,6 +1146,11 @@ RETRY_POINT_1:
 	
 	// Reset TotalRetryCount
 	iTotalRetryCount = 0;
+	
+	// We also reset the iTransactionStartTickcount.
+	// Because the 'wait for response' stage has finished. So now we need to wait for valid 'TERM' signal
+	// for maximum duration of transaction_timeout
+	iTransactionStartTickcount = MACRO_GetTickCountRet;
 						
 	// We've received data, LP was detected. So now we send the TERM signal until we receive it, and then we're done...
 	// Send TERM signal
@@ -1115,8 +1161,6 @@ RETRY_POINT_1:
 		
 		// .................. ..... ...... .. .... ....
 RETRY_POINT_3:
-		// Before doing anything, clear the CPLD
-		MACRO_XLINK_clear_RX;
 		
 		// Proceed
 		MACRO_XLINK_send_packet(iAdrs,"TERM", 4, iLP, 0);
@@ -1136,7 +1180,7 @@ RETRY_POINT_3:
 		// Wait for response
 		MACRO_XLINK_wait_packet(szDevResponse,
 								__iRespLen,
-								(__XLINK_WAIT_PACKET_TIMEOUT__ >> 3),  // We wait an 4th of the maximum allowed, since we're master
+								(__XLINK_WAIT_PACKET_TIMEOUT__),  // We wait an 4th of the maximum allowed, since we're master
 								iTimeoutDetected,
 								__senders_address,
 								__lp,
@@ -1146,13 +1190,10 @@ RETRY_POINT_3:
 		vTemp1 = MACRO_GetTickCountRet;
 		vTemp3 = vTemp1 - iTransactionStartTickcount;
 		
-		if (vTemp3 > transaction_timeout + __XLINK_WAIT_FOR_DEVICE_RESPONSE__)
+		if (vTemp3 > transaction_timeout)
 		{
 			*bTimeoutDetected = 6;
 			if (iTotalSent == 0) *bDeviceNotResponded = 1;
-			
-			// Before doing anything, clear the CPLD
-			MACRO_XLINK_clear_RX;
 			return;
 		}
 
@@ -1160,14 +1201,11 @@ RETRY_POINT_3:
 		if (iTimeoutDetected)
 		{
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
+			if (iTotalRetryCount == (__XLINK_ATTEMPT_RETRY_MAXIMUM__))
 			{
 				// We've failed
 				*bTimeoutDetected = 7;
 				*bDeviceNotResponded = (iTotalSent == 0) ? 1 : 0;
-				
-				// Before doing anything, clear the CPLD
-				MACRO_XLINK_clear_RX;			
 				return;
 			}
 			else
@@ -1187,14 +1225,11 @@ RETRY_POINT_3:
 			(szDevResponse[3] != 'M')) // Check both for address-match and response-length
 		{ 
 			// Ok we've timed out, try for 3 times
-			if (iTotalRetryCount ==  (__XLINK_ATTEMPT_RETRY_MAXIMUM__ << 3))
+			if (iTotalRetryCount ==  (__XLINK_ATTEMPT_RETRY_MAXIMUM__))
 			{
 				// We've failed
 				*bTimeoutDetected = 8;
 				*bDeviceNotResponded = (iTotalSent == 0) ? 1 : 0;
-				
-				// Before doing anything, clear the CPLD
-				MACRO_XLINK_clear_RX;				
 				return;
 			}
 			else
@@ -1207,9 +1242,6 @@ RETRY_POINT_3:
 		// If we've reached here it means we've successfully received 'TERM' response, so we're ok
 		break;						  
 	}
-
-	// Clear RX
-	MACRO_XLINK_clear_RX;
 
 	// Reset errors and exit
 	*bTimeoutDetected = 0;
@@ -1256,6 +1288,9 @@ void XLINK_SLAVE_wait_transact (char  *data,
 	// Now we have to wait for data
 	while (iTotalReceived < max_len)
 	{
+		// Reset Watchdog
+		WATCHDOG_RESET;
+		
 		// Wait for OK packet for 20us
 		volatile unsigned char iTimeoutDetected = 0;
 		volatile unsigned char szResp[4];
@@ -1287,14 +1322,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 			return;
 		}
 			
-		// Check for issues
-		if (iTimeoutDetected)
-		{
-			// Ok we've timed out, try for 3 times
-			*bTimeoutDetected = 1;
-			return;
-		}
-			
+	
 		// No timeout was detected, check resp. If it was not ok, try again
 		if (__iRespLen == 0) // Check both for address-match and response-length
 		{
@@ -1333,9 +1361,7 @@ void XLINK_SLAVE_wait_transact (char  *data,
 				(szResp[2] == 'R') &&
 				(szResp[3] == 'M'))
 			{
-				// Clear the Input buffer first
-				MACRO_XLINK_clear_RX;				
-				
+			
 				// Reply with TERM and repeat the loop
 				MACRO_XLINK_send_packet(__OUR_CPLD_ID,"TERM",4, 1, 0);
 				continue;
@@ -1346,8 +1372,6 @@ void XLINK_SLAVE_wait_transact (char  *data,
 				(szResp[1] == 'A') &&
 				(szResp[2] == 'X'))
 			{
-				// Clear the Input buffer first
-				MACRO_XLINK_clear_RX;
 							
 				// Reply with TERM and repeat the loop
 				MACRO_XLINK_send_packet(__OUR_CPLD_ID,"ECHO",4, TRUE, FALSE);
@@ -1357,48 +1381,76 @@ void XLINK_SLAVE_wait_transact (char  *data,
 		
 		// Check the BitCorrector:
 		// If it's not what we expected it to be, then we need to go back and rewrite the bytes. We won't ignore it however
-		/*if (__bc != iBC) // Bit corrector not matched. If we can, we need to roll-back the address
+		char bDoNoTakeData = FALSE;
+		
+		if (__bc != iBC) // Bit corrector not matched. If we can, we need to roll-back the address
 		{
-			if (iTotalReceived > 3) iTotalReceived -= 4;
-		}*/	
+			bDoNoTakeData = TRUE;
+		}
 		
 		// Reset the Checksum
 		iGeneratedChecksum = 0;		
 			
 		// Resp was OK... Take the data
-		if ((__iRespLen >= 1) && (iTotalReceived + 1 <= max_len))
+		if (bDoNoTakeData == FALSE) // Normal Operation
 		{
-			 data[iTotalReceived] = szResp[0];
-			 iGeneratedChecksum += szResp[0];			 
-			 iTotalReceived += 1;
-		}			 
+			if ((__iRespLen >= 1) && (iTotalReceived + 1 <= max_len))
+			{
+				 iGeneratedChecksum += szResp[0];
+				 data[iTotalReceived] = szResp[0];
+				 iTotalReceived += 1;
+			}			 
 		
-		if ((__iRespLen >= 2) && (iTotalReceived + 1 <= max_len)) 
-		{
-			data[iTotalReceived] = szResp[1];
-			iGeneratedChecksum  += szResp[1];			
-			iTotalReceived += 1;
-		}
+			if ((__iRespLen >= 2) && (iTotalReceived + 1 <= max_len)) 
+			{
+				data[iTotalReceived] = szResp[1];
+				iTotalReceived += 1;
+				iGeneratedChecksum  += szResp[1];
+			}
 					
-		if ((__iRespLen >= 3) && (iTotalReceived + 1 <= max_len)) 
+			if ((__iRespLen >= 3) && (iTotalReceived + 1 <= max_len)) 
+			{
+				data[iTotalReceived] = szResp[2];
+				iGeneratedChecksum  += szResp[2];			
+				iTotalReceived += 1;
+			}			
+		
+			if ((__iRespLen >= 4) && (iTotalReceived + 1 <= max_len)) 
+			{
+				data[iTotalReceived] = szResp[3];
+				iGeneratedChecksum  += szResp[3];			
+				iTotalReceived += 1;
+			}			
+		
+			// We only switch the bit-corrector if the actual transaction has been correct
+			if (__bc == iBC) 
+			{
+				iBC = (iBC == 0) ? 1 : 0; // Flip BitCorrector	
+			}				 
+		}
+		else // BitCorrector Incorrect!! Just calculate the checksum
 		{
-			data[iTotalReceived] = szResp[2];
-			iGeneratedChecksum  += szResp[2];			
-			iTotalReceived += 1;
+			if ((__iRespLen >= 1))
+			{
+				iGeneratedChecksum += szResp[0];
+			}
+
+			if ((__iRespLen >= 2))
+			{
+				data[iTotalReceived] = szResp[1];
+			}
+
+			if ((__iRespLen >= 3))
+			{
+				data[iTotalReceived] = szResp[2];
+			}
+
+			if ((__iRespLen >= 4))
+			{
+				data[iTotalReceived] = szResp[3];
+			}
 		}			
-		
-		if ((__iRespLen >= 4) && (iTotalReceived + 1 <= max_len)) 
-		{
-			data[iTotalReceived] = szResp[3];
-			iGeneratedChecksum  += szResp[3];			
-			iTotalReceived += 1;
-		}			
-		// We've sent 4 more bytes
-		iBC = (iBC == 0) ? 1 : 0; // Flip BitCorrector
-		
-		// Clear the input buffer first
-		MACRO_XLINK_clear_RX;
-		
+			
 		// At this point, sent an OK back to sender
 		sziMX[0] = 'A';
 		sziMX[1] = 'R';
@@ -1407,10 +1459,19 @@ void XLINK_SLAVE_wait_transact (char  *data,
 		//sziMX[2] = 'T';
 		//sziMX[3] = 'X';
 		
-		MACRO_XLINK_send_packet(__OUR_CPLD_ID,sziMX, 4, 1, 0);
+		if ((sziMX[2] == 0) && (sziMX[3] == 0))
+		{
+			iGeneratedChecksum += 1;
+		}
+		
+		MACRO_XLINK_send_packet(__OUR_CPLD_ID,sziMX, 4, 1, (iBC == 1) ? 0 : 1);
 		
 		// Was it the last packet? if so, exit the loop
-		if (__lp == 1) break;
+		// (Provided of course that the BitCorrector had no problems, i.e. __bc should not be equal to iBC)
+		if ((__lp == 1) && (__bc != iBC))
+		{
+			 break;
+		}			 
 	}		
 		
 	// OK, We've come out
@@ -1486,7 +1547,6 @@ RETRY_POINT_1:
 		if (vTemp3 > transaction_timeout)
 		{
 			*bTimeoutDetected = 1;
-			MACRO_XLINK_clear_RX;			
 			return;
 		}
 		
@@ -1498,7 +1558,6 @@ RETRY_POINT_1:
 			{
 				// Ok we've timed out, try for 3 times
 				*bTimeoutDetected = 1;
-				MACRO_XLINK_clear_RX;
 				return;	
 			}
 			else
@@ -1517,7 +1576,6 @@ RETRY_POINT_1:
 			{
 				// We've failed
 				*bTimeoutDetected = 2;
-				MACRO_XLINK_clear_RX;				
 				return;			
 			}
 			else
@@ -1541,13 +1599,12 @@ RETRY_POINT_1:
 			{
 				// We've failed
 				*bTimeoutDetected = 3;
-				MACRO_XLINK_clear_RX;				
 				return;		
 			}
 			else
 			{
 				// Before doing anything, clear the CPLD
-				MACRO_XLINK_clear_RX;
+
 				
 				// We will respond with 'OK' (perhaps the host has not received the OK from the time the first command was executed)
 				MACRO_XLINK_send_packet(iAddressToUseForTransactions, "AR99", 4, TRUE, !iBC); // BitCorrector must never be correct for this				
@@ -1561,9 +1618,6 @@ RETRY_POINT_1:
 		// OK, we either have to send new data, or old data (if BitCorrector doesn't match actual)
 		if (__bc != iBC)
 		{
-			// Before doing anything, clear the CPLD
-			MACRO_XLINK_clear_RX;
-			
 			// This means we have to send old data and continue the loop
 			MACRO_XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
 		}
@@ -1583,9 +1637,6 @@ RETRY_POINT_1:
 			if (iBytesToSend >= 3) szPrevData[2] = data[iTotalSent+2];
 			if (iBytesToSend == 4) szPrevData[3] = data[iTotalSent+3];
 		
-			// Before doing anything, clear the CPLD
-			MACRO_XLINK_clear_RX;	
-			
 			// Now send the data
 			MACRO_XLINK_send_packet(iAddressToUseForTransactions,szPrevData, iBytesToSend, iPrevLP, iBC);				
 			
@@ -1636,7 +1687,6 @@ RETRY_POINT_2:
 		if (vTemp3 > transaction_timeout)
 		{
 			*bTimeoutDetected = 4;
-			MACRO_XLINK_clear_RX;
 			return;
 		}
 		
@@ -1645,7 +1695,6 @@ RETRY_POINT_2:
 		{
 			// Ok we've timed out, try for 3 times
 			*bTimeoutDetected = 5;
-			MACRO_XLINK_clear_RX;
 			return;
 		}
 		
@@ -1658,7 +1707,6 @@ RETRY_POINT_2:
 			{
 				// We've failed
 				*bTimeoutDetected = 6;
-				MACRO_XLINK_clear_RX;				
 				return;
 			}
 			else
@@ -1685,13 +1733,11 @@ RETRY_POINT_2:
 				{
 					// We've failed
 					*bTimeoutDetected = 7;
-					MACRO_XLINK_clear_RX;					
 					return;
 				}
 				else
 				{
 					// Resend the packet
-					MACRO_XLINK_clear_RX;					
 					MACRO_XLINK_send_packet(iAddressToUseForTransactions, szPrevData, iPrevDataLen, iPrevLP, iPrevBC);
 					
 					// We will try again
@@ -1705,7 +1751,6 @@ RETRY_POINT_2:
 				{
 					// We've failed
 					*bTimeoutDetected = 8;
-					MACRO_XLINK_clear_RX;						
 					return;
 				}
 				else
@@ -1716,9 +1761,6 @@ RETRY_POINT_2:
 				}
 			}
 		}
-		
-		// Before doing anything, clear the CPLD
-		MACRO_XLINK_clear_RX;	
 		
 		// OK we've received our 'TERM'
 		MACRO_XLINK_send_packet(iAddressToUseForTransactions, "TERM", 4, 1, 0);

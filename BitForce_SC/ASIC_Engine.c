@@ -319,7 +319,7 @@ void ASIC_run_heavy_diagnostics()
 			if (!IS_PROCESSOR_OK(cDiagChip, cDiagEngine)) continue;
 				
 			//submit the job to this engine
-			ASIC_job_issue_to_specified_engine(cDiagChip, cDiagEngine, &jpDiag, TRUE, TRUE, TRUE, 0, 0xFFFFFFFF);
+			ASIC_job_issue_to_specified_engine(cDiagChip, cDiagEngine, &jpDiag, TRUE, TRUE, TRUE, 0xC78E0D8E, 0xF9C1BC01);
 		}
 	}
 		
@@ -1733,6 +1733,12 @@ void ASIC_calculate_engines_nonce_range()
 			else
 			{
 				MCU_MainLED_Reset();
+			}
+			
+			// Also, if we've waited like 5 minutes, restart the board
+			if (MACRO_GetTickCountRet - iVFR > 300000000) // We need to restart
+			{
+				while (TRUE); // This will cause a hard reset by Watchdog in ~143ms
 			}
 		}
 	}

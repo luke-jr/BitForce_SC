@@ -27,18 +27,18 @@
  float __STM32_A2D_GetPWR_MAIN();
 
 // USB Chip Functions
- void			 __STM32_USB_Initialize();
- void			 __STM32_USB_SetAccess(); // This function prepares access to USB device (may contain nothing)
- char		 __STM32_USB_WriteData(char* iData, unsigned int iCount);
- char		 __STM32_USB_GetData  (char* iData, unsigned int iMaxCount);
- char		 __STM32_USB_GetInformation();
- void			 __STM32_USB_FlushInputData();
- void			 __STM32_USB_FlushOutputData();
+ void	__STM32_USB_Initialize();
+ void	__STM32_USB_SetAccess(); // This function prepares access to USB device (may contain nothing)
+ char	__STM32_USB_WriteData(char* iData, unsigned int iCount);
+ char	__STM32_USB_GetData  (char* iData, unsigned int iMaxCount);
+ char	__STM32_USB_GetInformation();
+ void	__STM32_USB_FlushInputData();
+ void	__STM32_USB_FlushOutputData();
 
 // XLINK Functions
- void		__STM32_CPLD_Initialize();
- void		__STM32_CPLD_SetAccess();
- void		__STM32_CPLD_Write    (char iAdrs, char iData);
+ void	__STM32_CPLD_Initialize();
+ void	__STM32_CPLD_SetAccess();
+ void	__STM32_CPLD_Write    (char iAdrs, char iData);
  char	__STM32_CPLD_Read     (char iAdrs);
 
 // SC Chips

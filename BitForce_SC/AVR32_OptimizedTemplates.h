@@ -6,7 +6,6 @@
  * Company: Butterfly Labs
  */ 
 
-
 #ifndef AVR32_OPTIMIZEDTEMPLATES_H_
 #define AVR32_OPTIMIZEDTEMPLATES_H_
 

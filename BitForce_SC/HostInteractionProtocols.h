@@ -72,7 +72,7 @@
 #define PROTOCOL_REQ_FAN_VERY_FAST			48+4  // 4
 #define PROTOCOL_REQ_FAN_AUTO				48+9  // 9
 
-// ***** Functions
+// Functions
 PROTOCOL_RESULT Protocol_Echo			 (void);
 PROTOCOL_RESULT Protocol_Test_Command	 (void);
 PROTOCOL_RESULT Protocol_handle_job		 (void);
@@ -87,8 +87,9 @@ PROTOCOL_RESULT Protocol_temperature	 (void);
 PROTOCOL_RESULT Protocol_chain_forward   (char iTarget, char* sz_cmd, unsigned int iCmdLen);
 PROTOCOL_RESULT Protocol_fan_set		 (char iValue);
 
-// Exceptional High-Speed Single-Stage operation
+// Exceptional High-Speed Single-Stage operations
 PROTOCOL_RESULT Protocol_handle_job_single_stage(char* szStream);
+PROTOCOL_RESULT Protocol_MultiJob_single_stage(const char* szStream, const unsigned int iPayloadSize);
 
 // Load string / Save string
 PROTOCOL_RESULT Protocol_save_string(void);

@@ -42,6 +42,7 @@
 #define CPLD_ADDRESS_RX_BUF_END		 17
 #define CPLD_ADDRESS_IDENTIFICATION	 25
 #define CPLD_ADDRESS_SENDERS_ADRS	 26
+#define CPLD_ADDRESS_ECHO			 31
 
 #define CPLD_ADDRESS_TX_START		35
 #define CPLD_ADDRESS_TX_START_SEND	0b01
@@ -53,6 +54,25 @@
 // Detect if we are real master or not?
 #define CHAIN_IN_BIT	0b0000010
 #define CHAIN_OUT_BIT	0b0000001
+
+
+// Debugging
+// For debugging
+struct cs_debug
+{
+	char szSent[4];
+	char iSentBC;
+	char iSentLP;
+	char iSentLen;
+	
+	char szRecv[4];
+	char iRecBC;
+	char iRecLEN;
+	
+	UL32 iTotalDuration;
+	char iRecTimeout;
+};
+
 
 // Addressing is as following:
 // 'XLNK' returns the total bytes in XLink General Buffer

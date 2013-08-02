@@ -56,6 +56,9 @@ volatile void FAN_SUBSYS_IntelligentFanSystem_Spin(void)
 			{ 
 				GLOBAL_CRITICAL_TEMPERATURE = FALSE;
 				
+				// Increase thermal cycle counter
+				GLOBAL_TOTAL_THERMAL_CYCLES++;
+				
 				// Also, restart the ASICs
 				#if defined(__ASICS_RESTART_AFTER_HIGH_TEMP_RECOVERY)
 					init_ASIC();				
