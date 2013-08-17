@@ -17,6 +17,9 @@
   static volatile unsigned int __ActualRegister0Value = (1<<13);
 //static volatile unsigned int __ActualRegister0Value = (1);
 
+#define FLAGS_TO_SET_FOR_ENGINE0_CONTROL ((1<<8) | (1<<13) | (1))
+
+
 // Midstate for SHA2-Core, this is static and must be hard-coded in the chip
 static const unsigned int STATIC_H1[8] = {
 	0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
@@ -129,6 +132,15 @@ void init_ASIC(void)
 				if (ASIC_diagnose_processor(iHoveringChip, iHoveringEngine) == FALSE)
 				{
 					__chip_existence_map[iHoveringChip] &= ~(1<<iHoveringEngine);
+					
+					// Was it engine zero? If so, it may be one of the old generation chips, so keep it in reset
+					if (iHoveringEngine == 0)
+					{
+						// Keep engine 0 in reset state if it didn't start working
+						__MCU_ASIC_Activate_CS((iHoveringChip < 8) ? (1) : (2));
+						__Write_SPI(iHoveringChip,0,0,((ASIC_SPI_WRITE_WRITE_RESET_BIT) | FLAGS_TO_SET_FOR_ENGINE0_CONTROL)); // 1<<12 is the reset bit in register
+						__MCU_ASIC_Deactivate_CS((iHoveringChip < 8) ? (1) : (2));
+					}
 				}
 				else
 				{
@@ -324,7 +336,7 @@ void ASIC_run_heavy_diagnostics()
 	}
 		
 	// What is the desired frequency? We'll wait for that much + 40%
-	unsigned int iTimeToWait = (4294 / __ASIC_FREQUENCY_VALUES[__ASIC_FREQUENCY_ACTUAL_INDEX]);
+	unsigned int iTimeToWait = (950 / __ASIC_FREQUENCY_VALUES[__ASIC_FREQUENCY_ACTUAL_INDEX]);
 	iTimeToWait += (iTimeToWait * 3) / 10;
 	
 	MCU_MainLED_Set();
@@ -1221,8 +1233,8 @@ void ASIC_ReadComplete(char iChip, char iEngine)
 	__MCU_ASIC_Activate_CS((iChip < 8) ? (1) : (2));
 	if (iEngine == 0)
 	{
-		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | __ActualRegister0Value));	
-		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value));	
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));	
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL));	
 	}
 	else
 	{
@@ -1315,15 +1327,30 @@ void __initEngines(int CHIP)
 
 void __Reset_Engine(int CHIP, int ENGINE)
 {
-	__ActualRegister0Value |= (MASK_RESET_ENGINE_0);
-	DATAIN    = __ActualRegister0Value;
+	if (ENGINE != 0)
+	{
+		unsigned int uVAL = (MASK_RESET_ENGINE_0 | FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
+		DATAIN    = uVAL;
+		__AVR32_SC_WriteData(CHIP, ENGINE, 0x00, DATAIN);
+		
+		uVAL = (FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
+		DATAIN = uVAL;
 
-	__AVR32_SC_WriteData(CHIP, ENGINE, 0x00, DATAIN);
-	__ActualRegister0Value &= ~(MASK_RESET_ENGINE_0);
-	DATAIN    = __ActualRegister0Value;
+		// For engine zero, do not clear the reset
+		__AVR32_SC_WriteData(CHIP, ENGINE, 0x00, DATAIN);		
+	}
+	else
+	{
+		unsigned int uVAL = (MASK_RESET_ENGINE_0 | FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
+		DATAIN = uVAL;
 
-	// For engine zero, do not clear the reset
-	__AVR32_SC_WriteData(CHIP, ENGINE, 0x00, DATAIN);
+		__AVR32_SC_WriteData(CHIP, ENGINE, 0x00, DATAIN);
+		uVAL = FLAGS_TO_SET_FOR_ENGINE0_CONTROL;
+		
+		DATAIN = uVAL;
+		// For engine zero, do not clear the reset
+		__AVR32_SC_WriteData(CHIP, ENGINE, 0x00, DATAIN);		
+	}
 }
 
 
@@ -1425,8 +1452,6 @@ void ASIC_Bootup_Chips()
 	// --------------------------------
 	
 	// Operates at 250MHz, all Engines ACTIVE
-	#if !defined(FIVE_HUNDRED_MHZ_TEST)
-	
 		for (CHIP = 0; CHIP < TOTAL_CHIPS_INSTALLED; CHIP++)
 		{
 			//Select ExtClk mode div1
@@ -1446,9 +1471,13 @@ void ASIC_Bootup_Chips()
 		
 			//Reset instances 1-15:
 			DATAIN=0x1000;// bit[12]==reset
-			for(c=1;c<16;c++)
+			for(c=0;c<16;c++)
 			{
-				__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
+				#if defined(DO_NO_USE_ENGINE_ZERO)
+					if (c == 0) continue;
+				#endif 
+				
+				__Write_SPI(CHIP,c,0,DATAIN | FLAGS_TO_SET_FOR_ENGINE0_CONTROL);//int caddr, int engine, int reg, int data
 			}
 		
 			//Enable Clock Out, all instances:
@@ -1456,7 +1485,9 @@ void ASIC_Bootup_Chips()
 			__Write_SPI(CHIP,0,0x61, DATAIN);//int caddr, int engine, int reg, int data
 
 			//Set Osc Control to slowest frequency:0000 (highest=0xCD55)
+			
 			/*
+			
 			#if defined(ASICS_OPERATE_AT_264MHZ)
 				DATAIN = 0xD555; // Operates 250MHz
 			#elif defined(ASICS_OPERATE_AT_250MHZ)
@@ -1476,96 +1507,41 @@ void ASIC_Bootup_Chips()
 			#else
 				DATAIN = 0x5555; // INVALID STATE
 			#endif
+			
 			*/
-						
-			//DATAIN = 0xFFDF; // Operates 250MHz
-			//DATAIN = 0x0000; // Operates 170MHz
-			//DATAIN = 0xCDFF; // Operates 280MHz
-			//DATAIN = 0xFFFF; // Operates Less than 250MHz			
+	
 			DATAIN = __ASIC_FREQUENCY_WORDS[__ASIC_FREQUENCY_ACTUAL_INDEX];
-			__Write_SPI(CHIP,0,0x60,DATAIN);
+			__Write_SPI(CHIP,0,0x60,DATAIN);	
 
 			//Clear the Reset engine 1-15
 			DATAIN=0x0000;
-			for(c=1;c<16;c++){
-				__Write_SPI(CHIP,c,0,DATAIN);
-			}
-
-			//Disable Clock Out, all engines
-			/*
-			#if defined(DISABLE_CLOCK_TO_ALL_ENGINES)
-				DATAIN = 0; // Disable all clocks
+			#if defined(DO_NOT_USE_ENGINE_ZERO)
+				for(c=1;c<16;c++){
+					__Write_SPI(CHIP,c,0,DATAIN);
+				}
 			#else
-				DATAIN = 0x0FFFE;
+				for(c=0;c<16;c++)
+				{
+					if (c == 0)
+					{
+						__Write_SPI(CHIP,c,0,(DATAIN | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));	
+					}
+					else
+					{
+						__Write_SPI(CHIP,c,0,DATAIN);
+					}					
+				}
 			#endif
-			*/
 			
 			// is this chip disabled?			
-			DATAIN= ((iDisableFlag & (1<<CHIP)) == 0) ? 0xFFFE : 0x0; // Engine 0 clock is not enabled here			
-			__Write_SPI(CHIP,0,0x61,DATAIN);//int caddr, int engine, int reg, int data
-		}	
-	
-	#else
-	
-		// Operates at 500MHz, engine 0 is active
-		for (CHIP = 0; CHIP < TOTAL_CHIPS_INSTALLED; CHIP++)
-		{
-			//Select ExtClk mode div1
-			//DATAREG0[15]='0';//0=INT_CLK
-			//DATAREG0[14]='0';//0=div2
-			//DATAREG0[13]='1';//0=div4
-			//DATAREG0[12]='0';//1=RESET
-			//DATAREG0[0]='1' ;//0=div 1
-			DATAIN=(1 << 13) | (1<<14);//INT_CLK, (div/2 & div/4)
-			__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
-
-			//Reset all instances (0-15):
-			//Reset engine 0:
-			//DATAREG0[12]='1';
-			DATAIN=(1 << 13) | (1<<14) | (1<<12) ;//INT_CLK, (div/2 & div/4), reset
-			__Write_SPI(CHIP,0,0x00,DATAIN);//int caddr, int engine, int reg, int data
-		
-			//Reset instances 1-15:
-			DATAIN=0x1000;// bit[12]==reset
-			for(c=1;c<16;c++)
-			{
-				__Write_SPI(CHIP,c,0,DATAIN);//int caddr, int engine, int reg, int data
-			}
-		
-			//Enable Clock Out, all instances:
-			DATAIN=0xFFFF; 
-			__Write_SPI(CHIP,0,0x61, DATAIN);//int caddr, int engine, int reg, int data
-
-			//Set Osc Control to slowest frequency:0000 (highest=0xCD55)
-			/*
-			#if defined(ASICS_OPERATE_AT_250MHZ)
-				DATAIN = 0xFFD5; // Operates 250MHz
-			#elif defined(ASICS_OPERATE_AT_280MHZ)
-				DATAIN = 0x5555; // 280MHz
-			#elif defined(ASICS_OPERATE_AT_170MHZ)
-				DATAIN = 0x0000;
+			#if defined(DO_NOT_USE_ENGINE_ZERO)
+				DATAIN= ((iDisableFlag & (1<<CHIP)) == 0) ? 0xFFFE : 0x0; // Engine 0 clock is not enabled here			
 			#else
-				DATAIN = 0x5555; // INVALID STATE
-			#endif 
-			*/
-					
-			DATAIN = __ASIC_FREQUENCY_WORDS[__ASIC_FREQUENCY_ACTUAL_INDEX];						
-			__Write_SPI(CHIP,0,0x60,DATAIN);
-
-			//Clear the Reset engine 1-15
-			DATAIN=0x0000;
-			for(c=1;c<16;c++){
-				__Write_SPI(CHIP,c,0,DATAIN);
-			}
-
-			DATAIN = ((iDisableFlag & (1<<CHIP)) == 0) ? 0xFFFE : 0x0; // Engine 0 clock is not enabled here
-			
-			// DATAIN = 0x0FFFE;
-			__Write_SPI(CHIP,0,0x61,DATAIN);
-		}
+				DATAIN= ((iDisableFlag & (1<<CHIP)) == 0) ? 0xFFFF : 0x0; // Engine 0 clock is ENABLED here
+			#endif
+			__Write_SPI(CHIP,0,0x61,DATAIN);//int caddr, int engine, int reg, int data
+		}		
 	
-	#endif
-
 	//CHIP STATE: Internal Clock, All Registers Reset,All BUT 0 Resets=0,
 	//All clocks Disabled				
 	return;				
@@ -1615,8 +1591,8 @@ void ASIC_WriteComplete(char iChip, char iEngine)
 	// We're all set, for this chips... Tell the engine to start
 	if (iEngine == 0)
 	{
-		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));
-		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL)); // Clear Write-Register Valid Bit
 	}
 	else
 	{
@@ -1970,8 +1946,8 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, con
 				// Clear FIFO for this engine
 				if (y_engine == 0)
 				{
-					__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | __ActualRegister0Value));
-					__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value));
+					__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
+					__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
 				}
 				else
 				{
@@ -2077,8 +2053,8 @@ int ASIC_get_job_status(unsigned int *iNonceList, unsigned int *iNonceCount, con
 			// Clear the engine [ NOTE : CORRECT !!!!!!!!!!!! ]
 			if (y_engine == 0)
 			{
-				__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | __ActualRegister0Value));
-				__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value));
+				__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
+				__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
 			}
 			else
 			{
@@ -2176,8 +2152,8 @@ int ASIC_get_job_status_from_engine(unsigned int *iNonceList,
 		// Clear FIFO for this engine
 		if (iEngine == 0)
 		{
-			__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | __ActualRegister0Value));
-			__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value));
+			__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
+			__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
 		}
 		else
 		{
@@ -2259,8 +2235,8 @@ int ASIC_get_job_status_from_engine(unsigned int *iNonceList,
 	// Clear the engine [ NOTE : CORRECT !!!!!!!!!!!! ]
 	if (iEngine == 0)
 	{
-		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | __ActualRegister0Value));
-		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value));
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_READ_REGISTERS_DONE_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
+		__ASIC_WriteEngine(iChip, iEngine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
 	}
 	else
 	{
@@ -2374,8 +2350,8 @@ void ASIC_job_issue(void* pJobPacket,
 				#endif
 			
 				// Reset the engine
-				MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, (1<<9) | (1<<12));
-				MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, 0);
+				MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, (1<<9) | (1<<12) | FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
+				MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
 			
 				// Set limit register
 				MACRO__ASIC_WriteEngineExpress(x_chip, y_engine, ASIC_SPI_MAP_LIMITS_LWORD, 0x82);
@@ -2515,8 +2491,8 @@ void ASIC_job_issue(void* pJobPacket,
 				// We're all set, for this chips... Tell the engine to start
 				if ((y_engine == 0))
 				{
-					MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));			
-					MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+					MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));			
+					MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL)); // Clear Write-Register Valid Bit
 					
 					// This info is useful for Engine activity supervision
 					#if defined(__ENGINE_ENABLE_TIMESTAMPING)
@@ -2565,8 +2541,8 @@ void ASIC_job_issue(void* pJobPacket,
 					#endif
 					
 					// Reset the engine
-					MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2,y_engine, 0, (1<<9) | (1<<12));
-					MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2,y_engine, 0, 0);
+					MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2,y_engine, 0, (1<<9) | (1<<12) | FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
+					MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2,y_engine, 0, FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
 					
 					// Set limit register
 					MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2, y_engine, ASIC_SPI_MAP_LIMITS_LWORD, 0x82);
@@ -2704,8 +2680,8 @@ void ASIC_job_issue(void* pJobPacket,
 					// We're all set, for this chips... Tell the engine to start
 					if ((y_engine == 0))
 					{
-						MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));
-						MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+						MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
+						MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL)); // Clear Write-Register Valid Bit
 						
 						// This info is useful for Engine activity supervision
 						#if defined(__ENGINE_ENABLE_TIMESTAMPING)
@@ -2788,8 +2764,8 @@ void ASIC_job_start_processing(char iChip, char iEngine, char bForcedStart)
 	// We're all set, for this chips... Tell the engine to start
 	if ((y_engine == 0))
 	{
-		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));
-		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
+		MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL)); // Clear Write-Register Valid Bit
 	}
 	else
 	{
@@ -2842,8 +2818,8 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 		// Reset the engine
 		if (bResetBeforStart == TRUE)
 		{
-			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, (1<<9) | (1<<12));
-			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, 0);
+			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, (1<<9) | (1<<12) | FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
+			MACRO__ASIC_WriteEngineExpress(x_chip,y_engine, 0, FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
 		}
 	
 		// Set static H values [0..7]
@@ -2962,8 +2938,8 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 			// We're all set, for this chips... Tell the engine to start
 			if ((y_engine == 0))
 			{
-				MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));
-				MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+				MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
+				MACRO__ASIC_WriteEngine(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL)); // Clear Write-Register Valid Bit
 				
 				// This info is useful for Engine activity supervision
 				#if defined(__ENGINE_ENABLE_TIMESTAMPING)
@@ -2994,7 +2970,7 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 		// Reset the engine
 		if (bResetBeforStart == TRUE)
 		{
-			MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2,y_engine, 0, (1<<9) | (1<<12));
+			MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2,y_engine, 0, (1<<9) | (1<<12) | FLAGS_TO_SET_FOR_ENGINE0_CONTROL);
 			MACRO__ASIC_WriteEngineExpress_SecondBank(x_chip_b2,y_engine, 0, 0);
 		}
 		
@@ -3115,8 +3091,8 @@ void ASIC_job_issue_to_specified_engine(char  iChip,
 			// We're all set, for this chips... Tell the engine to start
 			if ((y_engine == 0))
 			{
-				MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | __ActualRegister0Value));
-				MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (__ActualRegister0Value)); // Clear Write-Register Valid Bit
+				MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (ASIC_SPI_WRITE_WRITE_REGISTERS_VALID_BIT | FLAGS_TO_SET_FOR_ENGINE0_CONTROL));
+				MACRO__ASIC_WriteEngine_SecondBank(x_chip, y_engine, ASIC_SPI_WRITE_REGISTER, (FLAGS_TO_SET_FOR_ENGINE0_CONTROL)); // Clear Write-Register Valid Bit
 					
 				// This info is useful for Engine activity supervision
 				#if defined(__ENGINE_ENABLE_TIMESTAMPING)

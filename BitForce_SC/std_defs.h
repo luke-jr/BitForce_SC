@@ -40,7 +40,7 @@
 
 /////////////////////////////////////////////////////////////////////////
 // This means DO NOT USE ENGINE 0. It's needed for the actual Version
-#define DO_NOT_USE_ENGINE_ZERO				1
+// #define DO_NOT_USE_ENGINE_ZERO				
 
 /////////////////////////////////////////////////////////////////////////
 // -- DO NOT SET THIS MACRO
@@ -83,6 +83,10 @@
 #define __LIVE_FREQ_DETECTION			   1	 // If set, it'll force the report to be a live detection instead of initial results found
 //#define __EXPORT_ENGINE_TIMEOUT_DETAIL	   1	 // ASIC_tune_chip_frequency log will be exported
 //#define __PERFORM_CHIP_BY_CHIP_TEST		   1	 // Send job to each chip, get the result and measure speed
+
+/////////////////////////////////////////////////////////////////////////
+// This MACRO disables XLINK altogether
+#define NO_XLINK
 
 /////////////////////////////////////////////////////////////////////////
 // This MACRO disables the kernel from trying to increase frequency on ASICS
@@ -328,7 +332,12 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #define __XLINK_CHAIN_REFRESH_INTERVAL		 9000000 // 9 seconds
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION		"1.2.6"	// This is firmware 1.2.0 [ CHIP PARALLELIZATION supported on this version and after ]
+#define __FIRMWARE_VERSION		"1.2.7"	
+
+// **** Change log Vs 1.2.6
+// - Engine 0 operation supported
+// - Auto detect if chip is Revision B or A (Revision B has engine 0 functional)
+// - Blink issue resolved. Now it blinks for 30seconds instead of 300ms
 
 // **** Change log Vs 1.2.5
 // - Total thermal cycles was added to 'Info Request' command

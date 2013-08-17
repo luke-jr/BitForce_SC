@@ -25,6 +25,11 @@
 
 PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned int iCmdLen)
 {
+	// Do not use XLINK? we return in this case
+	#if defined(NO_XLINK)
+		return;
+	#endif
+		
 	// OK We've detected a ChainForward request. First Send 'OK' to the host
 	char szRespData[2048];
 	unsigned int iRespLen = 0;
@@ -42,15 +47,15 @@ PROTOCOL_RESULT Protocol_chain_forward(char iTarget, char* sz_cmd, unsigned int 
 		
 		// Proceed
 		XLINK_MASTER_transact(iTarget,
-						  sz_cmd,
-						  iCmdLen,
-						  szRespData,
-						  &iRespLen,
-						  2048,					// Maximum response length
-						  __XLINK_TRANSACTION_TIMEOUT__,
-						  &bDeviceNotResponded,
-						  &bTimeoutDetected,
-						  TRUE);
+							  sz_cmd,
+							  iCmdLen,
+							  szRespData,
+							  &iRespLen,
+							  2048,					// Maximum response length
+							  __XLINK_TRANSACTION_TIMEOUT__,
+							  &bDeviceNotResponded,
+							  &bTimeoutDetected,
+							  TRUE);
 	
 		// Check response errors
 		if (bDeviceNotResponded)
@@ -991,7 +996,7 @@ PROTOCOL_RESULT Protocol_Blink(void)
 	}		
 	
 	// All is good... sent the identifier and get out of here...
-	GLOBAL_BLINK_REQUEST = 30;
+	GLOBAL_BLINK_REQUEST = 900;
 
 	// Return our result...
 	return res;

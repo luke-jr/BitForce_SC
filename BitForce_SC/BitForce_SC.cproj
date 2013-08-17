@@ -5,7 +5,7 @@
     <ProjectVersion>6.0</ProjectVersion>
     <ToolchainName>com.Atmel.AVRGCC32</ToolchainName>
     <ProjectGuid>{9f8b22bb-744a-4d6f-83b5-780561e4126a}</ProjectGuid>
-    <avrdevice>AT32UC3A1128</avrdevice>
+    <avrdevice>AT32UC3A1256</avrdevice>
     <avrdeviceseries>none</avrdeviceseries>
     <OutputType>Executable</OutputType>
     <Language>C</Language>
@@ -21,8 +21,7 @@
     <OverrideVtorValue />
     <eraseonlaunchrule>0</eraseonlaunchrule>
     <AsfVersion>2.11.1</AsfVersion>
-    <avrtool>
-    </avrtool>
+    <avrtool>com.atmel.avrdbg.tool.jtagicemk3</avrtool>
     <avrtoolinterface>JTAG</avrtoolinterface>
     <com_atmel_avrdbg_tool_jtagicemkii>
       <ToolType>com.atmel.avrdbg.tool.jtagicemkii</ToolType>
@@ -62,7 +61,7 @@
       </OverrideVtorValue>
       <Channel>
         <host>127.0.0.1</host>
-        <port>59099</port>
+        <port>60994</port>
         <ssl>False</ssl>
       </Channel>
       <ToolOptions>
@@ -107,31 +106,30 @@
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <ToolchainSettings>
       <Avr32Gcc>
-        <avr32gcc.common.outputfiles.hex>True</avr32gcc.common.outputfiles.hex>
-        <avr32gcc.common.outputfiles.lss>True</avr32gcc.common.outputfiles.lss>
-        <avr32gcc.common.outputfiles.eep>True</avr32gcc.common.outputfiles.eep>
-        <avr32gcc.common.outputfiles.srec>True</avr32gcc.common.outputfiles.srec>
-        <avr32gcc.compiler.optimization.level>Optimize (-O1)</avr32gcc.compiler.optimization.level>
-        <avr32gcc.compiler.optimization.EnableUnsafeMatchOptimizations>True</avr32gcc.compiler.optimization.EnableUnsafeMatchOptimizations>
-        <avr32gcc.compiler.optimization.EnableFastMath>True</avr32gcc.compiler.optimization.EnableFastMath>
-        <avr32gcc.compiler.optimization.GeneratePositionIndependentCode>True</avr32gcc.compiler.optimization.GeneratePositionIndependentCode>
-        <avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>True</avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>
-        <avr32gcc.compiler.optimization.ForceDoubleWordAlignment>True</avr32gcc.compiler.optimization.ForceDoubleWordAlignment>
-        <avr32gcc.compiler.optimization.DebugLevel>Maximum (-g3)</avr32gcc.compiler.optimization.DebugLevel>
-        <avr32gcc.compiler.optimization.GenerateGprofInformation>True</avr32gcc.compiler.optimization.GenerateGprofInformation>
-        <avr32gcc.compiler.optimization.GenerateProfInformation>True</avr32gcc.compiler.optimization.GenerateProfInformation>
-        <avr32gcc.compiler.warnings.AllWarnings>True</avr32gcc.compiler.warnings.AllWarnings>
-        <avr32gcc.linker.libraries.Libraries>
-          <ListValues>
-            <Value>m</Value>
-          </ListValues>
-        </avr32gcc.linker.libraries.Libraries>
-        <avr32gcc.linker.optimization.GarbageCollectUnusedSections>True</avr32gcc.linker.optimization.GarbageCollectUnusedSections>
-        <avr32gcc.linker.optimization.GeneratePositionIndependentCode>True</avr32gcc.linker.optimization.GeneratePositionIndependentCode>
-        <avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>True</avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>
-        <avr32gcc.assembler.debugging.DebugLevel>Default (-g)</avr32gcc.assembler.debugging.DebugLevel>
-        <avr32gcc.preprocessingassembler.debugging.DebugLevel>Default (-Wa,-g)</avr32gcc.preprocessingassembler.debugging.DebugLevel>
-      </Avr32Gcc>
+  <avr32gcc.common.outputfiles.hex>True</avr32gcc.common.outputfiles.hex>
+  <avr32gcc.common.outputfiles.lss>True</avr32gcc.common.outputfiles.lss>
+  <avr32gcc.common.outputfiles.eep>True</avr32gcc.common.outputfiles.eep>
+  <avr32gcc.common.outputfiles.srec>True</avr32gcc.common.outputfiles.srec>
+  <avr32gcc.compiler.optimization.EnableUnsafeMatchOptimizations>True</avr32gcc.compiler.optimization.EnableUnsafeMatchOptimizations>
+  <avr32gcc.compiler.optimization.EnableFastMath>True</avr32gcc.compiler.optimization.EnableFastMath>
+  <avr32gcc.compiler.optimization.GeneratePositionIndependentCode>True</avr32gcc.compiler.optimization.GeneratePositionIndependentCode>
+  <avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>True</avr32gcc.compiler.optimization.UseAssemblerForPseudoInstructions>
+  <avr32gcc.compiler.optimization.ForceDoubleWordAlignment>True</avr32gcc.compiler.optimization.ForceDoubleWordAlignment>
+  <avr32gcc.compiler.optimization.DebugLevel>Maximum (-g3)</avr32gcc.compiler.optimization.DebugLevel>
+  <avr32gcc.compiler.optimization.GenerateGprofInformation>True</avr32gcc.compiler.optimization.GenerateGprofInformation>
+  <avr32gcc.compiler.optimization.GenerateProfInformation>True</avr32gcc.compiler.optimization.GenerateProfInformation>
+  <avr32gcc.compiler.warnings.AllWarnings>True</avr32gcc.compiler.warnings.AllWarnings>
+  <avr32gcc.linker.libraries.Libraries>
+    <ListValues>
+      <Value>m</Value>
+    </ListValues>
+  </avr32gcc.linker.libraries.Libraries>
+  <avr32gcc.linker.optimization.GarbageCollectUnusedSections>True</avr32gcc.linker.optimization.GarbageCollectUnusedSections>
+  <avr32gcc.linker.optimization.GeneratePositionIndependentCode>True</avr32gcc.linker.optimization.GeneratePositionIndependentCode>
+  <avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>True</avr32gcc.linker.optimization.AllowDirectReferencesToDataSection>
+  <avr32gcc.assembler.debugging.DebugLevel>Default (-g)</avr32gcc.assembler.debugging.DebugLevel>
+  <avr32gcc.preprocessingassembler.debugging.DebugLevel>Default (-Wa,-g)</avr32gcc.preprocessingassembler.debugging.DebugLevel>
+</Avr32Gcc>
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>

@@ -312,6 +312,11 @@ volatile int XLINK_MASTER_Start_Chain()
 // XLINK Refresh chain
 void XLINK_MASTER_Refresh_Chain()
 {
+	// Do not use XLINK? we return in this case
+	#if defined(NO_XLINK)
+		return;
+	#endif
+		
 	// What we do here is we check each device in the flag.
 	// If they don't respond then we issue a chain-scan.
 	// Should the device respond to chain-scan then we set the address
@@ -792,6 +797,11 @@ void XLINK_MASTER_transact(char   iAdrs,
 						   char   *bTimeoutDetected, // Was a timeout detected?
 					       char   bWeAreMaster)
 {
+	// Do not use XLINK? we return in this case
+	#if defined(NO_XLINK)
+		return;
+	#endif
+	
 	// Reset this value
 	*bDeviceNotResponded = 0;
 	*bTimeoutDetected = 0;
@@ -1258,6 +1268,11 @@ void XLINK_SLAVE_wait_transact (char  *data,
 							    char  bWeAreMaster,
 								char  bWaitingForCommand)
 {
+	// Do not use XLINK? we return in this case
+	#if defined(NO_XLINK)
+		return;
+	#endif
+		
 	// This is used by slave only, make sure we are slave..
 	if (bWeAreMaster == 1) return;	
 	
@@ -1487,6 +1502,11 @@ void XLINK_SLAVE_respond_transact  (char  *data,
 									char  *bTimeoutDetected,
 									char  bWeAreMaster)
 {
+	// Do not use XLINK? we return in this case
+	#if defined(NO_XLINK)
+		return;
+	#endif
+		
 	// Wait for PUSH Command. Also remember, the first PUSH must have BitCorrector 0.
 	// This is used by slave only, make sure we are slave..
 	if (bWeAreMaster == 1) return;
