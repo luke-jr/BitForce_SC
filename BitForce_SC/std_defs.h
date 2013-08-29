@@ -68,6 +68,9 @@
 //#define __SHOW_DECOMMISSIONED_ENGINES_LOG	
 //#define __SHOW_PIPE_TO_USB_LOG			
 
+
+
+
 #if defined(__EXPORT_ENGINE_RANGE_SPREADS)
 	volatile unsigned int __ENGINE_LOWRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
 	volatile unsigned int __ENGINE_HIGHRANGE_SPREADS[TOTAL_CHIPS_INSTALLED][16];
@@ -87,6 +90,10 @@
 /////////////////////////////////////////////////////////////////////////
 // This MACRO disables XLINK altogether
 #define NO_XLINK
+
+/////////////////////////////////////////////////////////////////////////
+// -- Reduce speed by engine de-activation
+// #define DISABLE_ENGINE_ZERO_AND_ONE_ON_ALL_CHIPS
 
 /////////////////////////////////////////////////////////////////////////
 // This MACRO disables the kernel from trying to increase frequency on ASICS
@@ -332,7 +339,11 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #define __XLINK_CHAIN_REFRESH_INTERVAL		 9000000 // 9 seconds
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION		"1.2.7"	
+#define __FIRMWARE_VERSION		"1.2.8"	
+
+// **** Change log Vs 1.2.7
+// - An option introduced that disables Engines 0 and 1 on all chips. This is to throttle the speed so the unit won't overheat
+//   ( in std_defs.h named as DISABLE_ENGINE_ZERO_AND_ONE_ON_ALL_CHIPS)
 
 // **** Change log Vs 1.2.6
 // - Engine 0 operation supported

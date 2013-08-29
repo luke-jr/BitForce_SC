@@ -274,7 +274,18 @@ void init_ASIC(void)
 		}
 	#endif
 	
-
+	// Should we disable all engine zeros?
+	#if !defined(DO_NOT_USE_ENGINE_ZERO)
+		#if defined(DISABLE_ENGINE_ZERO_AND_ONE_ON_ALL_CHIPS)
+			#if defined(__PRODUCT_MODE_MINIRIG__) || defined(__PRODUCT_MODEL_SINGLE__)
+				for (iHoveringChip = 0; iHoveringChip < TOTAL_CHIPS_INSTALLED; iHoveringChip++)
+				{
+					__chip_existence_map[iHoveringChip] &= 0xFFFFFFFC; // Disable engine zero and one on all chips
+					ASIC_set_clock_mask(iHoveringChip, __chip_existence_map[iHoveringChip]);				
+				}	
+			#endif		
+		#endif	
+	#endif
 	
 	// Ok, now we calculate nonce-range for the engines
 	#if defined(__ACTIVATE_JOB_LOAD_BALANCING)
