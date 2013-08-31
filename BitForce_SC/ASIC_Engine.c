@@ -287,6 +287,142 @@ void init_ASIC(void)
 		#endif	
 	#endif
 	
+	// Should we tune down?
+	#if defined(TUNE_DOWN_TO_60GH) 
+		#if defined(__PRODUCT_MODEL_SINGLE__) || defined(__PRODUCT_MODEL_MINIRIG__)
+		{
+			// Tune down device to 60GH/s on normal single (+4%) or 30GH/s (+4% margin on little singles)
+		
+			// First get chip count. If it's 8, then it means we're a little single
+			char b16ChipUnit = FALSE;
+			if (ASIC_get_processor_count() > 8) { b16ChipUnit = TRUE; }
+				
+			// Ok, we know what we're dealing with...
+			
+			// Get total processing speed... We must perform a live test
+			unsigned int iTheoreticalMaxSpeed = 0;			
+			unsigned int iDetectedAverageSpeedPerEngine = 0;
+			unsigned int iTotalGoodEngines = 0;
+			
+			for (char umx = 0; umx < TOTAL_CHIPS_INSTALLED; umx++)
+			{
+				// Reset watchdog
+				WATCHDOG_RESET;
+				
+				// Good engines number
+				char iGoodEnginesIndex = 0xFF;
+				
+				// Check chip existence
+				if (!CHIP_EXISTS(umx)) continue;
+							
+				// Now detect a good engine
+				for (char umz = 0; umz < 16; umz++)
+				{
+					// Should we ignore engine zero?
+					#if defined(DO_NOT_USE_ENGINE_ZERO)
+						if (umz == 0) continue;
+					#endif
+					
+					// Is this engine ok?
+					if (!IS_PROCESSOR_OK(umx, umz)) continue;
+					
+					// Is it a good engine?
+					iGoodEnginesIndex = umz;
+					break;
+				}
+				
+				// Did we find any good engines?
+				if (iGoodEnginesIndex == 0xFF)
+				{
+					// Nothing found
+				}
+				else
+				{
+					// We have a good engine, test it
+					int iDetectedFreq = 0;
+					iDetectedFreq = ASIC_tune_chip_to_frequency(umx, iGoodEnginesIndex, TRUE);
+					iTotalGoodEngines += ASIC_get_chip_processor_count(umx);
+					iTheoreticalMaxSpeed += (ASIC_get_chip_processor_count(umx) * (iDetectedFreq / 1000000));
+				}
+			}	
+			
+			// Get the average speed per engine in MH/s
+			iDetectedAverageSpeedPerEngine = iTheoreticalMaxSpeed / iTotalGoodEngines;
+			
+			// We have theoretical max speed in MH/s			
+			unsigned int iSpeedDiff = 0;
+			unsigned int iTotalEnginesToDisable = 0;
+							
+			if (b16ChipUnit == TRUE)
+			{
+				// Ok, maximum allowed speed here for 16chips is 60GH/s + 4% = 62.4GH/s
+				if (iTheoreticalMaxSpeed > 62400)
+				{
+					// Calculate how many engines we need to disable
+					iSpeedDiff = iTheoreticalMaxSpeed - 62400;
+					iTotalEnginesToDisable = iSpeedDiff / iDetectedAverageSpeedPerEngine;
+				}
+				else
+				{
+					// Nothing, just ignore...				
+				}					
+			}
+			else
+			{
+				// Maximum allowed speed for 8 chips is 30GH/s + 4% = 31.2GH/s
+				if (iTheoreticalMaxSpeed > 31200)
+				{
+					// Calculate how many engines we need to disable
+					iSpeedDiff = iTheoreticalMaxSpeed - 31200;
+					iTotalEnginesToDisable = iSpeedDiff / iDetectedAverageSpeedPerEngine;					
+				}
+				else
+				{
+					// Nothing, just ignore...
+				}
+			}
+			
+			// We know how many engines to disable
+			unsigned int iTotalEnginesDisabled = 0;
+			
+			while (iTotalEnginesDisabled < iTotalEnginesToDisable)
+			{
+				// Reset watchdog in each loop
+				WATCHDOG_RESET;
+				
+				for (unsigned int iChipScan = 0; iChipScan < TOTAL_CHIPS_INSTALLED; iChipScan++)
+				{
+					if (!CHIP_EXISTS(iChipScan)) continue;
+					
+					// Ok, we need to find a good engine here and disable it
+					for (unsigned int iEngineScan = 0; iEngineScan < 16; iEngineScan++)	
+					{
+						// Skip engine 0 if necessary
+						#if defined(DO_NOT_USE_ENGINE_ZERO)
+							if (iEngineScan == 0) continue;
+						#endif
+						
+						// Continue...
+						if (!IS_PROCESSOR_OK(iChipScan, iEngineScan)) continue;
+						
+						// Ok disable the engine and continue the master loop
+						__chip_existence_map[iChipScan] &= ~(1<<iEngineScan); // Disable engine zero and one on all chips
+						ASIC_set_clock_mask(iChipScan, __chip_existence_map[iChipScan]);
+						iTotalEnginesDisabled++;
+						break;
+					}
+					
+					// We move on to the next chip (unless total request engines have been disabled
+					if (iTotalEnginesDisabled >= iTotalEnginesToDisable) break;
+				}
+			}
+			
+			// Ok we're done...
+			
+		}		
+		#endif	
+	#endif 
+	
 	// Ok, now we calculate nonce-range for the engines
 	#if defined(__ACTIVATE_JOB_LOAD_BALANCING)
 		ASIC_calculate_engines_nonce_range();

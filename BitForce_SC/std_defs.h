@@ -96,6 +96,12 @@
 // #define DISABLE_ENGINE_ZERO_AND_ONE_ON_ALL_CHIPS
 
 /////////////////////////////////////////////////////////////////////////
+// -- Tune down to 60GH/s
+// If set, the firmware will disable as many engines as needed, to reduce device
+// speed to 60GH (+4% = 62.4GH/s)
+#define TUNE_DOWN_TO_60GH   
+
+/////////////////////////////////////////////////////////////////////////
 // This MACRO disables the kernel from trying to increase frequency on ASICS
 // on startup if their actual frequency is less than what it should be...
 // #define __DO_NOT_TUNE_CHIPS_FREQUENCY 1
@@ -339,7 +345,10 @@ extern const unsigned int __ASIC_FREQUENCY_VALUES[10]; // We have to measure fre
 #define __XLINK_CHAIN_REFRESH_INTERVAL		 9000000 // 9 seconds
 
 /*************** Firmware Version ******************/
-#define __FIRMWARE_VERSION		"1.2.8"	
+#define __FIRMWARE_VERSION		"1.2.9"	
+
+// **** Change log Vs 1.2.8
+// - Added 'TUNE_DOWN_TO_60GH' option. Will tune down the fast units to 60GH/s (or 30GH for little singles)
 
 // **** Change log Vs 1.2.7
 // - An option introduced that disables Engines 0 and 1 on all chips. This is to throttle the speed so the unit won't overheat
