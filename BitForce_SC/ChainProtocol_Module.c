@@ -11,7 +11,7 @@
 #include "Generic_Module.h"
 #include "ChainProtocol_Module.h"
 #include <string.h>
-#include "AVR32X\AVR32_Module.h"
+#include "AVR32X/AVR32_Module.h"
 #include <avr32/io.h>
 #include "AVR32_OptimizedTemplates.h"
 #include "HostInteractionProtocols.h" // We use some constant here...

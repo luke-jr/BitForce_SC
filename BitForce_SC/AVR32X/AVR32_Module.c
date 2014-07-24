@@ -8,7 +8,7 @@
 
 #include <avr32/io.h>
 #include "intc.h"
-#include "..\std_defs.h"
+#include "../std_defs.h"
 #include "AVR32_Module.h"
 
 //////////////////////////////////////////////
